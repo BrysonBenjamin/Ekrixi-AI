@@ -1,0 +1,5 @@
+{
+  "name": "Ekrixi Nexus Prototype",
+  "description": "A playground for the Nexus Graph System, featuring Zettelkasten principles, DAG cycle detection, and force-directed graph visualization.",
+  "requestFramePermissions": []
+}
