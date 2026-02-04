@@ -1,5 +1,5 @@
 {
-  "name": "Ekrixi Nexus Prototype",
-  "description": "A playground for the Nexus Graph System, featuring Zettelkasten principles, DAG cycle detection, and force-directed graph visualization.",
+  "name": "Ekrixi AI: Knowledge Nexus",
+  "description": "An advanced Zettelkasten-inspired Knowledge Graph system with automated logic auditing, multi-view exploration, and neural prose generation.",
   "requestFramePermissions": []
 }

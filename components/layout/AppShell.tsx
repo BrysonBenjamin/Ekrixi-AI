@@ -11,12 +11,12 @@ import {
     Map as MapIcon,
     Zap,
     BookOpenCheck,
-    Box
+    FlaskConical
 } from 'lucide-react';
 import { ThemeMode } from '../../App';
 import { Logo } from '../shared/Logo';
 
-export type AppView = 'GENERATOR' | 'LIBRARY' | 'SETTINGS' | 'SCANNER' | 'REFINERY' | 'STRUCTURE' | 'WIKI' | 'DRILLDOWN' | 'ANALYZER';
+export type AppView = 'GENERATOR' | 'LIBRARY' | 'SETTINGS' | 'SCANNER' | 'REFINERY' | 'STRUCTURE' | 'WIKI' | 'DRILLDOWN' | 'ANALYZER' | 'PLAYGROUND';
 
 interface AppShellProps {
     currentView: AppView;
@@ -71,6 +71,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onViewChange, c
                     </div>
 
                     <nav className="flex flex-col w-full gap-2">
+                        <NavItem view="PLAYGROUND" icon={FlaskConical} label="Playground" />
                         <NavItem view="DRILLDOWN" icon={MapIcon} label="Explorer" />
                         <NavItem view="ANALYZER" icon={BookOpenCheck} label="Blueprint" />
                         <NavItem view="STRUCTURE" icon={ScrollText} label="Registry" />
@@ -109,6 +110,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onViewChange, c
                 md:hidden h-20 bg-nexus-900 border-t border-nexus-800 
                 flex items-center justify-around px-2 z-50 shrink-0 pb-safe
             ">
+                <NavItem view="PLAYGROUND" icon={FlaskConical} label="Dev" />
                 <NavItem view="DRILLDOWN" icon={MapIcon} label="Explore" />
                 <NavItem view="WIKI" icon={BookType} label="Library" />
                 <NavItem view="GENERATOR" icon={Flame} label="Nexus" />

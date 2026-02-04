@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
 
@@ -31,20 +32,12 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [currentStepIdx, setCurrentStepIdx] = useState(0);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
     
-    // session tracking to prevent re-triggering during navigation
     const attemptedRef = useRef<Set<string>>(new Set());
 
     const startTutorial = useCallback((id: string, tutorialSteps: TutorialStep[]) => {
-        const saved = localStorage.getItem('nexus_tutorials_completed');
-        const completed = saved ? JSON.parse(saved) : [];
-        
-        if (completed.includes(id) || attemptedRef.current.has(id) || activeTutorial) return;
-        
-        attemptedRef.current.add(id);
-        setActiveTutorial(id);
-        setSteps(tutorialSteps);
-        setCurrentStepIdx(0);
-    }, [activeTutorial]);
+        // Short-circuited for maintenance
+        return;
+    }, []);
 
     const completeTutorial = useCallback((id: string) => {
         const saved = localStorage.getItem('nexus_tutorials_completed');

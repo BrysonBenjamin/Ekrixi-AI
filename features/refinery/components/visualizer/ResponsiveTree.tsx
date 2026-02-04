@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { isLink, isReified, isContainer, NexusObject } from '../../../../types';
@@ -50,12 +51,16 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         
         const roots = allObjects.filter((o: NexusObject) => {
             if (isLink(o) && !isReified(o)) return false;
+            // Root if no container has it OR if it has the manual root tag
             const inContainer = allObjects.some((p: NexusObject) => isContainer(p) && p.children_ids.includes(o.id));
-            return !inContainer;
+            const isManualRoot = (o as any).tags?.includes('__is_root__');
+            return !inContainer || isManualRoot;
         });
 
-        const buildTree = (node: NexusObject): any => {
-            if (!node) return null;
+        const buildTree = (node: NexusObject, visited: Set<string> = new Set()): any => {
+            if (!node || visited.has(node.id)) return null;
+            visited.add(node.id);
+
             return {
                 id: node.id,
                 name: (node as any).title || 'Untitled',
@@ -63,12 +68,12 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
                 reified: isReified(node),
                 gist: (node as any).gist || 'No summary available.',
                 children: isContainer(node) 
-                    ? node.children_ids.map(cid => registry[cid]).filter((n): n is NexusObject => !!n).map(buildTree).filter(Boolean)
+                    ? node.children_ids.map(cid => registry[cid]).filter((n): n is NexusObject => !!n).map(c => buildTree(c, new Set(visited))).filter(Boolean)
                     : []
             };
         };
 
-        return { id: "VIRTUAL_ROOT", name: "NEXUS_ROOT", children: roots.map(buildTree).filter(Boolean) };
+        return { id: "VIRTUAL_ROOT", name: "NEXUS_ROOT", children: roots.map(r => buildTree(r)).filter(Boolean) };
     }, [registry]);
 
     useEffect(() => {
@@ -149,6 +154,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
 
             fo.on("contextmenu", (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 const clientX = e.clientX;
                 const clientY = e.clientY;
                 if (linkId && onLongPress) {
@@ -202,6 +208,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
 
             fo.on("contextmenu", (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 const clientX = e.clientX;
                 const clientY = e.clientY;
                 if (onLongPress) {

@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { 
     Search, Plus, Trash2, Share2, X, 
-    ArrowRight, Box, Zap, GitBranch, ArrowRightLeft, 
+    ArrowRight, Box, Zap, ArrowRightLeft, 
     ArrowUpRight, ArrowDownLeft, Repeat
 } from 'lucide-react';
 import { NexusObject, isLink, isContainer, isReified } from '../../../../types';
@@ -39,10 +40,10 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
     }
 
     const getHeaderIcon = () => {
-        if (reified) return <Share2 size={32} className="text-orange-500" />;
-        if (isL) return <Zap size={32} className="text-nexus-accent" />;
-        if (isC) return <Box size={32} className="text-nexus-500" />;
-        return <Box size={32} className="text-slate-400" />;
+        if (reified) return <Share2 size={24} className="text-orange-500" />;
+        if (isL) return <Zap size={24} className="text-nexus-accent" />;
+        if (isC) return <Box size={24} className="text-nexus-500" />;
+        return <Box size={24} className="text-slate-400" />;
     };
 
     return (
@@ -52,48 +53,48 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                 onClick={onClose} 
             />
             
-            <div className="relative w-full max-w-sm bg-nexus-900 border border-nexus-800 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="relative w-full max-w-[320px] bg-nexus-900 border border-nexus-800 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="px-6 pt-8 pb-6 text-center border-b border-nexus-800/50">
-                    <div className="flex justify-center mb-5">
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg border ${reified ? 'bg-orange-500/10 border-orange-500/20 shadow-orange-500/10' : 'bg-nexus-500/10 border-nexus-500/20 shadow-nexus-500/10'}`}>
+                <div className="px-5 pt-6 pb-4 text-center border-b border-nexus-800/50">
+                    <div className="flex justify-center mb-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border ${reified ? 'bg-orange-500/10 border-orange-500/20 shadow-orange-500/10' : 'bg-nexus-500/10 border-nexus-500/20 shadow-nexus-500/10'}`}>
                             {getHeaderIcon()}
                         </div>
                     </div>
                     
                     {isL && !reified ? (
                         <div className="flex flex-col items-center">
-                            <div className="flex items-center gap-3 text-slate-400 mb-1">
-                                <span className="text-[10px] font-bold uppercase tracking-widest truncate max-w-[100px]">{sourceTitle}</span>
-                                <ArrowRightLeft size={10} className="text-nexus-500 opacity-50" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest truncate max-w-[100px]">{targetTitle}</span>
+                            <div className="flex items-center gap-2 text-slate-400 mb-1">
+                                <span className="text-[8px] font-bold uppercase tracking-widest truncate max-w-[80px]">{sourceTitle}</span>
+                                <ArrowRightLeft size={8} className="text-nexus-500 opacity-50" />
+                                <span className="text-[8px] font-bold uppercase tracking-widest truncate max-w-[80px]">{targetTitle}</span>
                             </div>
-                            <h3 className="text-xl font-bold text-white tracking-tight px-4 capitalize italic">
+                            <h3 className="text-lg font-bold text-white tracking-tight px-4 capitalize italic">
                                 "{(object as any).verb}"
                             </h3>
                         </div>
                     ) : (
                         <>
-                            <h3 className="text-xl font-bold text-white tracking-tight mb-1 truncate px-4">{title}</h3>
-                            <div className={`text-[10px] font-mono uppercase tracking-[0.2em] ${reified ? 'text-orange-500' : 'text-slate-500'}`}>{reified ? 'Reified Logic Unit' : type}</div>
+                            <h3 className="text-lg font-bold text-white tracking-tight mb-0.5 truncate px-4">{title}</h3>
+                            <div className={`text-[9px] font-mono uppercase tracking-[0.2em] ${reified ? 'text-orange-500' : 'text-slate-500'}`}>{reified ? 'Reified Unit' : type}</div>
                         </>
                     )}
                 </div>
 
                 {/* Actions */}
-                <div className="p-4 grid grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto no-scrollbar">
+                <div className="p-3 grid grid-cols-1 gap-1.5 max-h-[50vh] overflow-y-auto no-scrollbar">
                     <ActionButton 
                         icon={Search} 
                         label="Inspect Unit" 
-                        desc="Detailed manifest & prose"
+                        desc="View manifest"
                         onClick={() => { onInspect(object.id); onClose(); }} 
                     />
                     
                     {isL && (
                         <ActionButton 
                             icon={Repeat} 
-                            label="Invert Direction" 
-                            desc="Swap source and target logic"
+                            label="Invert" 
+                            desc="Swap direction"
                             onClick={() => { if(onInvert) onInvert(object.id); onClose(); }} 
                         />
                     )}
@@ -101,8 +102,8 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                     {isC && onAddChild && (
                         <ActionButton 
                             icon={Plus} 
-                            label="Append Sub-Unit" 
-                            desc="Establish nested node"
+                            label="Append" 
+                            desc="New nested node"
                             onClick={() => { onAddChild(object.id); onClose(); }} 
                         />
                     )}
@@ -110,8 +111,8 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                     {isL && !reified && onReify && (
                         <ActionButton 
                             icon={Share2} 
-                            label="Reify Logic" 
-                            desc="Promote to First-Class Unit"
+                            label="Reify" 
+                            desc="Promote logic"
                             color="text-orange-500"
                             onClick={() => { onReify(object.id); onClose(); }} 
                         />
@@ -119,28 +120,28 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
 
                     {isL && onSelectNode && (
                         <>
-                            <div className="h-px bg-nexus-800/50 my-2 mx-4" />
+                            <div className="h-px bg-nexus-800/50 my-1 mx-4" />
                             <ActionButton 
                                 icon={ArrowUpRight} 
                                 label={`Go to ${sourceTitle}`} 
-                                desc="Jump to origin node"
+                                desc="Jump to origin"
                                 onClick={() => { onSelectNode(object.source_id); onClose(); }} 
                             />
                             <ActionButton 
                                 icon={ArrowDownLeft} 
                                 label={`Go to ${targetTitle}`} 
-                                desc="Jump to terminal node"
+                                desc="Jump to terminal"
                                 onClick={() => { onSelectNode(object.target_id); onClose(); }} 
                             />
                         </>
                     )}
 
-                    <div className="h-px bg-nexus-800/50 my-2 mx-4" />
+                    <div className="h-px bg-nexus-800/50 my-1 mx-4" />
 
                     <ActionButton 
                         icon={Trash2} 
-                        label="Terminate Unit" 
-                        desc="Permanent deletion from Nexus"
+                        label="Terminate" 
+                        desc="Permanent purge"
                         color="text-red-400"
                         onClick={() => { if(onDelete) onDelete(object.id); onClose(); }} 
                     />
@@ -149,9 +150,9 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                 {/* Footer Close */}
                 <button 
                     onClick={onClose}
-                    className="w-full py-5 bg-nexus-800/30 hover:bg-nexus-800 text-slate-500 font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 border-t border-nexus-800/50 transition-colors"
+                    className="w-full py-4 bg-nexus-800/30 hover:bg-nexus-800 text-slate-500 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border-t border-nexus-800/50 transition-colors"
                 >
-                    <X size={14} /> Cancel Selection
+                    <X size={12} /> Close
                 </button>
             </div>
         </div>
@@ -161,15 +162,15 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
 const ActionButton = ({ icon: Icon, label, desc, onClick, color = "text-nexus-500" }: any) => (
     <button 
         onClick={onClick}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-black/20 hover:bg-white/[0.03] border border-transparent hover:border-nexus-800 transition-all group active:scale-[0.98]"
+        className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-black/20 hover:bg-white/[0.03] border border-transparent hover:border-nexus-800 transition-all group active:scale-[0.98]"
     >
-        <div className={`p-3 rounded-xl bg-nexus-900 border border-nexus-800 group-hover:border-slate-700 transition-colors ${color}`}>
-            <Icon size={20} />
+        <div className={`p-2 rounded-lg bg-nexus-900 border border-nexus-800 group-hover:border-slate-700 transition-colors ${color}`}>
+            <Icon size={16} />
         </div>
         <div className="text-left flex-1 min-w-0">
-            <div className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors truncate">{label}</div>
-            <div className="text-[10px] text-slate-600 font-medium uppercase tracking-wider truncate">{desc}</div>
+            <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate">{label}</div>
+            <div className="text-[8px] text-slate-600 font-medium uppercase tracking-wider truncate">{desc}</div>
         </div>
-        <ArrowRight size={16} className="text-slate-800 group-hover:text-slate-400 transition-all shrink-0" />
+        <ArrowRight size={12} className="text-slate-800 group-hover:text-slate-400 transition-all shrink-0" />
     </button>
 );

@@ -16,6 +16,7 @@ interface StructureVisualizerProps {
     onDeleteLink?: (id: string) => void;
     onReifyLink?: (id: string) => void;
     onReifyNode?: (id: string) => void;
+    onReifyNodeToLink?: (nodeId: string, sourceId: string, targetId: string) => void;
     onInvertLink?: (id: string) => void;
     onInspect?: (id: string) => void;
     onViewModeChange?: (mode: 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR') => void;
@@ -24,7 +25,7 @@ interface StructureVisualizerProps {
 }
 
 export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({ 
-    registry, selectedId, onSelect, onAddChild, onDelete, onDeleteLink, onReifyLink, onReifyNode, onInvertLink, onInspect, onViewModeChange, onReparent, onMenuOpened
+    registry, selectedId, onSelect, onAddChild, onDelete, onDeleteLink, onReifyLink, onReifyNode, onReifyNodeToLink, onInvertLink, onInspect, onViewModeChange, onReparent, onMenuOpened
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -151,6 +152,7 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
                     }}
                     onReify={onReifyLink}
                     onReifyNode={onReifyNode}
+                    onReifyNodeToLink={onReifyNodeToLink}
                     onInvert={onInvertLink}
                     onSelectNode={onSelect}
                 />

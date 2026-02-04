@@ -1,5 +1,5 @@
 
-import { NexusCategory, NexusType } from '../../../../types';
+import { NexusCategory, NexusType, ConflictStatus } from '../../../../types';
 
 export const getCategoryColor = (cat: any, reified?: boolean) => {
     if (reified) return 'var(--accent-color)'; 
@@ -37,60 +37,54 @@ export const createNodeHTML = (d: any, isSelected: boolean, isHovered: boolean, 
     const isReifiedNode = d.data.reified;
     const color = getCategoryColor(d.data.category, isReifiedNode);
     const icon = getCategoryIconSvg(d.data.category, color, isReifiedNode);
-    
     const borderColor = (isSelected || isHovered) ? color : (isReifiedNode ? 'var(--accent-color)' : 'var(--bg-700)');
-    const background = isSelected 
-        ? 'var(--bg-900)' 
-        : (isHovered ? 'var(--bg-800)' : 'var(--bg-900)');
-
-    const textColor = 'var(--text-main)';
+    const background = isSelected ? 'var(--bg-900)' : (isHovered ? 'var(--bg-800)' : 'var(--bg-900)');
     const textMuted = 'var(--text-muted)';
 
     return `
-        <div xmlns="http://www.w3.org/1999/xhtml" class="node-pill flex flex-col rounded-2xl border transition-all duration-300 pointer-events-auto cursor-pointer w-full h-full shadow-lg" style="border-color: ${borderColor}; background: ${background}; -webkit-tap-highlight-color: transparent;">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node-pill flex flex-col rounded-2xl border transition-all duration-300 pointer-events-auto cursor-pointer w-full h-full shadow-lg" style="border-color: ${borderColor}; background: ${background};">
             <div class="flex items-center gap-3 p-3 w-full">
                 <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border" style="background: ${color}15; border-color: ${color}30;">${icon}</div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-[13px] font-display font-bold uppercase tracking-tight truncate" style="color: ${textColor};">${d.data.name}</div>
+                    <div class="text-[13px] font-display font-bold uppercase tracking-tight truncate" style="color: var(--text-main);">${d.data.name}</div>
                     <div class="text-[8px] font-mono uppercase tracking-widest mt-0.5 opacity-60" style="color: ${textMuted};">${d.data.category}</div>
                 </div>
-                <button class="expand-trigger p-1.5 hover:bg-black/5 rounded-lg transition-colors shrink-0" data-id="${d.data.id}">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="3" style="transform: rotate(${isExpanded ? '180deg' : '0deg'}); transition: transform 0.3s;"><path d="m6 9 6 6 6-6"/></svg>
-                </button>
             </div>
             ${isExpanded ? `
                 <div class="px-4 pb-4 border-t border-nexus-800/30 pt-3 bg-black/[0.02]">
-                    <p class="text-[10px] leading-relaxed font-serif italic mb-3 line-clamp-3" style="color: ${textMuted}; font-weight: 500;">"${d.data.gist}"</p>
-                    <button class="inspect-trigger w-full py-2 rounded-xl border flex items-center justify-center gap-2 transition-all hover:bg-nexus-accent hover:text-white hover:border-nexus-accent" style="background: var(--bg-800); border-color: var(--bg-700); color: var(--text-main); font-size: 9px; font-weight: 800; letter-spacing: 0.1em;" data-id="${d.data.id}">INSPECT UNIT</button>
+                    <p class="text-[10px] leading-relaxed font-serif italic mb-3 line-clamp-3" style="color: ${textMuted};">"${d.data.gist}"</p>
                 </div>
             ` : ''}
         </div>
     `;
 };
 
-export const createLinkPillHTML = (verb: string, isReified: boolean, isSelected: boolean) => {
-    const color = isReified ? 'var(--accent-color)' : 'var(--arcane-color)';
+export const createLinkPillHTML = (verb: string, isReified: boolean, isSelected: boolean, conflict?: ConflictStatus) => {
+    let color = isReified ? 'var(--accent-color)' : 'var(--arcane-color)';
+    let borderStyle = 'solid';
+    let opacity = 1;
+    let labelSuffix = '';
+
+    if (conflict === 'IMPLIED') {
+        color = '#f59e0b'; // Amber
+        borderStyle = 'dashed';
+        labelSuffix = ' <span style="opacity: 0.5;">[IMPLIED]</span>';
+    } else if (conflict === 'REDUNDANT') {
+        color = '#ef4444'; // Red
+        opacity = 0.5;
+        labelSuffix = ' <span style="opacity: 0.8; text-decoration: line-through;">[REDUNDANT]</span>';
+    }
+
     const bg = isSelected ? color : 'var(--bg-950)';
-    const border = isSelected ? color : 'var(--bg-700)';
     const textColor = isSelected ? 'var(--bg-950)' : 'var(--text-main)';
     
-    const icon = isReified 
-        ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="animation: pulse 2s infinite;"><path d="m17 11-5-5-5 5"/><path d="m17 18-5 5-5-5"/><path d="M12 6v17"/></svg>'
-        : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 5 5-5 5"/><path d="m13 7 5 5-5 5"/></svg>';
-    
     return `
-        <div xmlns="http://www.w3.org/1999/xhtml" class="w-full h-full flex items-center justify-center pointer-events-none">
-            <style>
-                @keyframes pulse {
-                    0% { transform: scale(1); opacity: 0.8; }
-                    50% { transform: scale(1.1); opacity: 1; }
-                    100% { transform: scale(1); opacity: 0.8; }
-                }
-            </style>
-            <div class="link-pill px-3 py-1.5 rounded-full border flex items-center gap-2 transition-all duration-300 pointer-events-auto cursor-pointer active:scale-95 shadow-md" 
-                 style="background: ${bg}; border-color: ${border}; -webkit-tap-highlight-color: transparent;">
-                <div class="flex items-center justify-center" style="color: ${textColor}">${icon}</div>
-                <span class="text-[9px] font-display font-black uppercase tracking-[0.15em] whitespace-nowrap" style="color: ${textColor};">${isReified ? 'LOGIC:' : ''} ${verb}</span>
+        <div xmlns="http://www.w3.org/1999/xhtml" class="w-full h-full flex items-center justify-center pointer-events-none" style="opacity: ${opacity}">
+            <div class="link-pill px-3 py-1.5 rounded-full border flex items-center gap-2 transition-all duration-300 pointer-events-auto cursor-pointer shadow-md" 
+                 style="background: ${bg}; border-color: ${color}; border-style: ${borderStyle};">
+                <span class="text-[9px] font-display font-black uppercase tracking-[0.15em] whitespace-nowrap" style="color: ${textColor};">
+                    ${isReified ? 'LOGIC:' : ''} ${verb}${labelSuffix}
+                </span>
             </div>
         </div>
     `;

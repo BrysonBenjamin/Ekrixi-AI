@@ -1,3 +1,4 @@
+
 import { 
     Book, 
     ArrowLeft, 
@@ -22,7 +23,15 @@ import {
     Users,
     Sparkles,
     FileCheck,
-    History
+    History,
+    Link2,
+    Repeat,
+    Layers,
+    GitBranch,
+    Settings2,
+    ArrowRight,
+    /* Fix: Added Share2 to imports from lucide-react */
+    Share2
 } from 'lucide-react';
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -34,7 +43,11 @@ import {
     SimpleNote, 
     ContainerNote,
     WikiArtifact,
-    NexusCategory
+    NexusCategory,
+    NexusType,
+    HierarchyType,
+    isStrictHierarchy,
+    isReified
 } from '../../types';
 import { Logo } from '../../components/shared/Logo';
 
@@ -65,25 +78,35 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
     const [showCustomizer, setShowCustomizer] = useState(false);
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
     
-    const [editData, setEditData] = useState<Partial<SimpleNote>>({});
+    const [editData, setEditData] = useState<any>({});
     const articleRef = useRef<HTMLDivElement>(null);
 
-    const currentNote = useMemo(() => {
+    const currentObject = useMemo(() => {
         if (!selectedId) return null;
-        const obj = registry[selectedId];
-        return (obj && !isLink(obj)) ? (obj as SimpleNote | ContainerNote) : null;
+        return registry[selectedId] || null;
     }, [selectedId, registry]);
 
-    const handleStartEdit = (node: SimpleNote | ContainerNote) => {
-        setEditData({
-            title: node.title,
-            gist: node.gist,
-            prose_content: node.prose_content,
-            aliases: [...(node.aliases || [])],
-            tags: [...(node.tags || [])],
-            category_id: node.category_id
-        });
-        setEditingNodeId(node.id);
+    const handleStartEdit = (obj: NexusObject) => {
+        if (isLink(obj) && !isReified(obj)) {
+            setEditData({
+                _type: obj._type,
+                verb: obj.verb,
+                verb_inverse: obj.verb_inverse,
+                hierarchy_type: (obj as any).hierarchy_type || HierarchyType.PARENT_OF,
+                gist: (obj as any).gist || '',
+                prose_content: (obj as any).prose_content || ''
+            });
+        } else {
+            setEditData({
+                title: (obj as any).title || (obj as any).verb,
+                gist: (obj as any).gist || '',
+                prose_content: (obj as any).prose_content || '',
+                aliases: [...((obj as any).aliases || [])],
+                tags: [...((obj as any).tags || [])],
+                category_id: (obj as any).category_id || NexusCategory.CONCEPT
+            });
+        }
+        setEditingNodeId(obj.id);
     };
 
     const handleSaveEdit = (id: string) => {
@@ -110,18 +133,18 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
             if (id) {
                 return `[${title}](#navigate-${id})`;
             }
-            return `<span class="nexus-ghost-link" title="Latent Unit: ${title}">${title}</span>`;
+            return `[${title}](#ghost-${title})`;
         });
     }, [allNodesByTitle]);
 
     const handleGenerateBg = async () => {
-        if (!currentNote) return;
+        if (!currentObject) return;
         setIsGeneratingBg(true);
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-image',
-                contents: [{ parts: [{ text: `A cinematic high-quality background illustration for a ${currentNote.category_id} titled "${currentNote.title}". Description: ${currentNote.gist}. Atmospheric, evocative, slightly abstract conceptual art.` }] }],
+                contents: [{ parts: [{ text: `A cinematic high-quality background illustration for a first-class logical unit titled "${(currentObject as any).title || (currentObject as any).verb}". Description: ${(currentObject as any).gist}. Atmospheric, evocative, slightly abstract conceptual art.` }] }],
                 config: { imageConfig: { aspectRatio: "16:9" } }
             });
             
@@ -134,7 +157,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                 }
             }
             if (imgUrl) {
-                onUpdateObject(currentNote.id, { background_url: imgUrl });
+                onUpdateObject(currentObject.id, { background_url: imgUrl });
             }
         } catch (err) {
             console.error("Background Generation Error:", err);
@@ -151,46 +174,21 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
     };
 
     const handleGenerateEncyclopedia = async () => {
-        if (!selectedId || !currentNote) return;
+        if (!selectedId || !currentObject) return;
         setIsGenerating(true);
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
             const projectSummary = (Object.values(registry) as NexusObject[])
-                .filter(n => !isLink(n))
-                .map((n: any) => `- ${n.title}: ${n.gist}`)
+                .filter(n => !isLink(n) || isReified(n))
+                .map((n: any) => `- ${n.title || n.verb}: ${n.gist}`)
                 .join('\n');
 
             const prompt = `
                 ACT AS: The Grand Chronicler of the Ekrixi AI Nexus.
-                TASK: Write a definitive, high-fidelity encyclopedia entry for the "${currentNote.category_id}" known as "${currentNote.title}".
-                
-                STRICT KNOWLEDGE CONSTRAINTS: 
-                - You MUST ONLY use information provided in the CONTEXT below.
-                - Do NOT hallucinate external lore, places, or history not present in the CONTEXT.
-                - If context is missing for a section, keep it brief or omit it.
-                - Your goal is to SYNTHESIZE existing records into a formal scholarly entry.
-
-                CONTEXT FOR CURRENT NODE:
-                - Title: ${currentNote.title}
-                - Designation: ${currentNote.category_id}
-                - Summary: ${currentNote.gist}
-                - Records: ${currentNote.prose_content || "No detailed record available."}
-                
-                GLOBAL CONTEXT (The state of the known world):
-                ${projectSummary}
-                
-                STRUCTURE:
-                1. # Executive Overview (A concise summary of purpose and origin based on gist)
-                2. ## Chronological Data (Timeline of existence if known)
-                3. ## Architectural/Systemic Profile (Physical or conceptual properties)
-                4. ## Neural Significance (Relationship to the rest of the known registry)
-                5. ## Known Associations (Explicitly reference other units using [[Title]] formatting)
-                
-                FORMATTING: 
-                - Use rich Markdown.
-                - Wrap mentions of other units in [[Double Brackets]].
-                - Maintain an atmospheric yet precise scholarly tone.
+                TASK: Write a definitive, high-fidelity encyclopedia entry for the logical unit known as "${(currentObject as any).title || (currentObject as any).verb}".
+                Knowledge Context: Summary: ${(currentObject as any).gist}. Records: ${(currentObject as any).prose_content || "N/A"}.
+                Project Scope: ${projectSummary}
             `;
             const response = await ai.models.generateContent({
                 model: 'gemini-3-pro-preview',
@@ -199,10 +197,10 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
             });
             const artifact: WikiArtifact = {
                 node_id: selectedId,
-                content: response.text || "Connection to the weave lost.",
+                content: response.text || "Connection lost.",
                 generated_at: new Date().toISOString(),
                 context_depth: 2,
-                graph_version: `v${Object.keys(registry).length}`
+                graph_version: `v1`
             };
             setArtifacts(prev => ({ ...prev, [selectedId]: artifact }));
         } catch (error) {
@@ -213,8 +211,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
     };
 
     const handleCommitToRegistry = () => {
-        if (currentArtifact && currentNote) {
-            onUpdateObject(currentNote.id, { 
+        if (currentArtifact && currentObject) {
+            onUpdateObject(currentObject.id, { 
                 prose_content: currentArtifact.content,
                 last_modified: new Date().toISOString()
             });
@@ -243,15 +241,16 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                     </button>
                                 );
                             }
+                            if (href.startsWith('#ghost-')) {
+                                const ghostTitle = href.replace('#ghost-', '');
+                                return (
+                                    <span className="nexus-ghost-link" title={`Latent Unit: ${ghostTitle}`}>
+                                        {props.children}
+                                    </span>
+                                );
+                            }
                             return <a {...props} className="hover:text-nexus-accent underline" style={{ color: color || 'var(--accent-color)' }} target="_blank" rel="noopener noreferrer" />;
-                        },
-                        h1: ({ children }) => <h1 id="renderer-h1">{children}</h1>,
-                        h2: ({ children }) => <h2 id="renderer-h2">{children}</h2>,
-                        h3: ({ children }) => <h3 id="renderer-h3">{children}</h3>,
-                        blockquote: ({ children }) => <blockquote>{children}</blockquote>,
-                        ul: ({ children }) => <ul>{children}</ul>,
-                        ol: ({ children }) => <ol>{children}</ol>,
-                        li: ({ children }) => <li>{children}</li>,
+                        }
                     }}
                 >
                     {transformWikiLinks(content)}
@@ -260,18 +259,172 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
         );
     };
 
-    const renderSection = (node: SimpleNote | ContainerNote, depth: number, visited: Set<string>): React.ReactNode => {
+    const renderLinkManifest = (link: any) => {
+        const source = registry[link.source_id];
+        const target = registry[link.target_id];
+        const isEditing = editingNodeId === link.id;
+        const isHierarchical = isStrictHierarchy(link);
+
+        return (
+            <section id={`section-${link.id}`} className="mb-20 animate-in fade-in duration-700">
+                <div className="flex items-center justify-between mb-12 border-b border-nexus-800/30 pb-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-nexus-arcane/10 rounded-2xl border border-nexus-arcane/30 text-nexus-arcane">
+                            <Link2 size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-display font-black text-nexus-muted uppercase tracking-[0.4em]">Neural Logic Manifest</h2>
+                            <p className="text-[10px] font-mono text-nexus-muted/40 uppercase tracking-widest mt-1">PROTOCOL: {link._type}</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => isEditing ? handleSaveEdit(link.id) : handleStartEdit(link)}
+                        className={`px-6 py-2.5 rounded-2xl transition-all border font-display font-black text-[10px] uppercase tracking-widest flex items-center gap-3 ${isEditing ? 'bg-nexus-essence text-white border-nexus-essence shadow-lg' : 'bg-nexus-800/30 border-nexus-700/50 text-nexus-text hover:bg-nexus-accent hover:text-white'}`}
+                    >
+                        {isEditing ? <><Save size={14} /> Commit Changes</> : <><Pencil size={14} /> Refine Records</>}
+                    </button>
+                </div>
+
+                {isEditing ? (
+                    <div className="space-y-10 mb-16 animate-in zoom-in-95 duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                                    <Settings2 size={12} /> Logic Protocol
+                                </label>
+                                <select 
+                                    value={editData._type} 
+                                    onChange={(e) => setEditData({...editData, _type: e.target.value})}
+                                    className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner"
+                                >
+                                    <option value={NexusType.SEMANTIC_LINK}>Semantic Association</option>
+                                    <option value={NexusType.HIERARCHICAL_LINK}>Structural Hierarchy</option>
+                                    <option value={NexusType.AGGREGATED_SEMANTIC_LINK}>Reified Association</option>
+                                    <option value={NexusType.AGGREGATED_HIERARCHICAL_LINK}>Reified Hierarchy</option>
+                                </select>
+                            </div>
+                            {(editData._type === NexusType.HIERARCHICAL_LINK || editData._type === NexusType.AGGREGATED_HIERARCHICAL_LINK) && (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                                        <GitBranch size={12} /> Hierarchy Type
+                                    </label>
+                                    <select 
+                                        value={editData.hierarchy_type} 
+                                        onChange={(e) => setEditData({...editData, hierarchy_type: e.target.value})}
+                                        className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-essence outline-none focus:border-nexus-essence transition-all shadow-inner"
+                                    >
+                                        <option value={HierarchyType.PARENT_OF}>Parent Of (A contains B)</option>
+                                        <option value={HierarchyType.PART_OF}>Part Of (A is inside B)</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                                    <Link2 size={12} /> Active Verb
+                                </label>
+                                <input 
+                                    value={editData.verb || ''}
+                                    onChange={(e) => setEditData({...editData, verb: e.target.value})}
+                                    className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-accent outline-none focus:border-nexus-accent shadow-inner"
+                                    placeholder="Direct relationship..."
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                                    <Repeat size={12} /> Reciprocal Verb
+                                </label>
+                                <input 
+                                    value={editData.verb_inverse || ''}
+                                    onChange={(e) => setEditData({...editData, verb_inverse: e.target.value})}
+                                    className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-500 outline-none focus:border-nexus-accent shadow-inner"
+                                    placeholder="Inverse relationship..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center mb-16">
+                        <div className="bg-nexus-900 border border-nexus-800 p-8 rounded-[40px] text-center shadow-xl group hover:border-nexus-accent transition-all">
+                            <span className="text-[9px] font-black uppercase text-nexus-muted tracking-widest block mb-4 opacity-50">Origin Node</span>
+                            <div className="text-xl font-display font-bold text-nexus-text truncate px-4">{(source as any)?.title || 'Uncharted'}</div>
+                            <button onClick={() => onSelect(link.source_id)} className="mt-6 text-[9px] font-black text-nexus-accent hover:underline uppercase tracking-widest">Focus origin scry</button>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="w-full h-px bg-gradient-to-r from-transparent via-nexus-accent/30 to-transparent relative">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-6 py-2 bg-nexus-950 border border-nexus-800 rounded-full shadow-2xl flex items-center gap-2">
+                                    {isHierarchical ? <Layers size={14} className="text-nexus-essence" /> : <Link2 size={14} className="text-nexus-accent" />}
+                                    <span className="text-nexus-accent font-display font-black text-xs uppercase tracking-[0.2em]">{link.verb}</span>
+                                </div>
+                            </div>
+                            <div className="w-full h-px bg-gradient-to-r from-transparent via-nexus-muted/20 to-transparent relative mt-2">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-6 py-2 bg-nexus-950 border border-nexus-800 rounded-full shadow-lg">
+                                    <span className="text-nexus-muted font-display font-black text-[10px] uppercase tracking-[0.1em] opacity-40">{link.verb_inverse}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-nexus-900 border border-nexus-800 p-8 rounded-[40px] text-center shadow-xl group hover:border-nexus-accent transition-all">
+                            <span className="text-[9px] font-black uppercase text-nexus-muted tracking-widest block mb-4 opacity-50">Terminal Node</span>
+                            <div className="text-xl font-display font-bold text-nexus-text truncate px-4">{(target as any)?.title || 'Uncharted'}</div>
+                            <button onClick={() => onSelect(link.target_id)} className="mt-6 text-[9px] font-black text-nexus-accent hover:underline uppercase tracking-widest">Focus terminal scry</button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-16">
+                    <div className="space-y-4">
+                         <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest ml-4 opacity-40">Causal Logic Abstract</label>
+                         {isEditing ? (
+                             <textarea 
+                                value={editData.gist || ''}
+                                onChange={(e) => setEditData({...editData, gist: e.target.value})}
+                                className="w-full bg-nexus-900 border border-nexus-800 rounded-[32px] p-8 text-nexus-text text-base font-serif italic outline-none focus:border-nexus-accent shadow-inner h-32 resize-none"
+                                placeholder="Manifest the core logic of this stream..."
+                             />
+                         ) : (
+                             <div className="bg-nexus-900/40 border border-nexus-800/50 rounded-[32px] p-10 backdrop-blur-sm">
+                                <p className="text-xl md:text-2xl font-serif italic text-nexus-text/90 leading-relaxed">"{link.gist || 'This connection has not yet been structurally abstracted.'}"</p>
+                             </div>
+                         )}
+                    </div>
+
+                    <div className="space-y-4">
+                         <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest ml-4 opacity-40">Deep Records (Prose)</label>
+                         {isEditing ? (
+                             <textarea 
+                                value={editData.prose_content || ''}
+                                onChange={(e) => setEditData({...editData, prose_content: e.target.value})}
+                                className="w-full bg-nexus-900 border border-nexus-800 rounded-[32px] p-8 text-nexus-text text-sm font-sans outline-none focus:border-nexus-accent shadow-inner h-[400px] no-scrollbar leading-relaxed"
+                                placeholder="# Document the nuances of this causality..."
+                             />
+                         ) : (
+                             <div className="wiki-content p-4">
+                                <MarkdownRenderer content={link.prose_content || ""} />
+                             </div>
+                         )}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
+    const renderSection = (node: any, depth: number, visited: Set<string>): React.ReactNode => {
         if (depth > 2 || visited.has(node.id)) return null;
         visited.add(node.id);
 
         const children = isContainer(node) 
             ? node.children_ids
-                .map(id => registry[id])
-                .filter((child): child is (SimpleNote | ContainerNote) => !!child && !isLink(child))
+                .map((id: string) => registry[id])
+                .filter((child: any) => !!child && (!isLink(child) || isReified(child)))
             : [];
 
         const isEditingThis = editingNodeId === node.id;
-        const themeColor = node.theme_color || currentNote?.theme_color;
+        const themeColor = node.theme_color || (currentObject as any)?.theme_color;
+        const reified = isReified(node);
 
         return (
             <section key={node.id} id={`section-${node.id}`} className="mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 scroll-mt-32 group/section">
@@ -279,8 +432,13 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                     <div className="flex items-center justify-between border-b border-nexus-800/30 pb-4">
                         <div className="flex items-center gap-4">
                             <span className="px-3 py-1 border rounded-full text-[9px] font-display font-black uppercase tracking-widest" style={{ borderColor: `${themeColor || 'var(--nexus-500)'}50`, backgroundColor: `${themeColor || 'var(--nexus-500)'}15`, color: themeColor || 'var(--accent-color)' }}>
-                                {node.category_id}
+                                {reified ? 'REIFIED LOGIC' : (node.category_id || 'CONCEPT')}
                             </span>
+                            {reified && (
+                                <div className="flex items-center gap-2 text-[8px] font-mono text-nexus-muted uppercase tracking-widest opacity-60">
+                                    {(registry[node.source_id] as any)?.title} <ArrowRight size={8} /> {(registry[node.target_id] as any)?.title}
+                                </div>
+                            )}
                         </div>
                         
                         <div className="flex items-center gap-2 opacity-40 group-hover/section:opacity-100 transition-all">
@@ -317,16 +475,18 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                             className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-4 text-xl font-display font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest">Category</label>
-                                        <select 
-                                            value={editData.category_id}
-                                            onChange={(e) => setEditData({...editData, category_id: e.target.value as NexusCategory})}
-                                            className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-4 text-sm font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner h-[60px]"
-                                        >
-                                            {Object.values(NexusCategory).map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
+                                    {!reified && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest">Category</label>
+                                            <select 
+                                                value={editData.category_id}
+                                                onChange={(e) => setEditData({...editData, category_id: e.target.value as NexusCategory})}
+                                                className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-4 text-sm font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner h-[60px]"
+                                            >
+                                                {Object.values(NexusCategory).map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">
@@ -348,27 +508,6 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest flex items-center gap-2"><AtSign size={10} /> Designations</label>
-                                        <input 
-                                            value={editData.aliases?.join(', ') || ''}
-                                            onChange={(e) => setEditData({...editData, aliases: e.target.value.split(',').map(s => s.trim())})}
-                                            className="w-full bg-nexus-950 border border-nexus-800 rounded-xl p-3 text-[11px] text-nexus-text outline-none focus:border-nexus-accent shadow-inner"
-                                            placeholder="alias1, alias2..."
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest flex items-center gap-2"><Tag size={10} /> Tags</label>
-                                        <input 
-                                            value={editData.tags?.join(', ') || ''}
-                                            onChange={(e) => setEditData({...editData, tags: e.target.value.split(',').map(s => s.trim())})}
-                                            className="w-full bg-nexus-950 border border-nexus-800 rounded-xl p-3 text-[11px] text-nexus-text outline-none focus:border-nexus-accent shadow-inner"
-                                            placeholder="tag1, tag2..."
-                                        />
-                                    </div>
-                                </div>
-
                                 <div className="flex items-center justify-end gap-4 pt-6 border-t border-nexus-800">
                                     <button onClick={() => setEditingNodeId(null)} className="px-6 py-3 rounded-2xl text-[10px] font-display font-black text-nexus-muted hover:text-nexus-text transition-all uppercase tracking-widest">Discard</button>
                                     <button onClick={() => handleSaveEdit(node.id)} className="px-10 py-3 bg-nexus-accent text-white rounded-2xl text-[10px] font-display font-black uppercase tracking-[0.2em] hover:brightness-110 transition-all shadow-xl shadow-nexus-accent/20 flex items-center gap-3"><Save size={16} /> Commit Change</button>
@@ -380,11 +519,11 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                             <div>
                                 {depth === 0 ? (
                                     <h1 className="text-5xl md:text-7xl font-display font-black text-nexus-text tracking-tighter mb-4 leading-tight">
-                                        {node.title}
+                                        {node.title || node.verb}
                                     </h1>
                                 ) : (
                                     <h2 className="text-3xl md:text-4xl font-display font-bold text-nexus-text tracking-tight mb-4">
-                                        {node.title}
+                                        {node.title || node.verb}
                                     </h2>
                                 )}
 
@@ -395,12 +534,12 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mb-10">
-                                    {node.aliases && node.aliases.length > 0 && node.aliases.map(a => (
+                                    {node.aliases && node.aliases.length > 0 && node.aliases.map((a: string) => (
                                         <span key={a} className="flex items-center gap-1.5 px-3 py-1.5 bg-nexus-800/20 border border-nexus-700/50 rounded-lg text-[10px] font-display font-bold text-nexus-muted uppercase tracking-widest shadow-sm">
                                             <AtSign size={10} className="text-nexus-accent" /> {a}
                                         </span>
                                     ))}
-                                    {node.tags && node.tags.length > 0 && node.tags.map(t => (
+                                    {node.tags && node.tags.length > 0 && node.tags.map((t: string) => (
                                         <span key={t} className="flex items-center gap-1.5 px-3 py-1.5 bg-nexus-800/20 border border-nexus-700/50 rounded-lg text-[10px] font-display font-bold text-nexus-muted uppercase tracking-widest shadow-sm">
                                             <Tag size={10} className="text-nexus-essence" /> {t}
                                         </span>
@@ -414,7 +553,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
 
                             {children.length > 0 && (
                                 <div className="pt-16 border-t border-nexus-800/30 ml-4 lg:ml-12">
-                                    {children.map(child => renderSection(child, depth + 1, visited))}
+                                    {children.map((child: any) => renderSection(child, depth + 1, visited))}
                                 </div>
                             )}
                         </div>
@@ -425,22 +564,22 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
     };
 
     const tableOfContents = useMemo(() => {
-        if (!currentNote) return [];
-        const walk = (node: SimpleNote | ContainerNote, depth: number, visited: Set<string>, toc: { id: string, title: string, depth: number }[]) => {
+        if (!currentObject) return [];
+        const walk = (node: any, depth: number, visited: Set<string>, toc: { id: string, title: string, depth: number }[]) => {
             if (depth > 2 || visited.has(node.id)) return;
             visited.add(node.id);
-            toc.push({ id: node.id, title: node.title, depth });
+            toc.push({ id: node.id, title: node.title || node.verb, depth });
             if (isContainer(node)) {
-                node.children_ids.forEach(cid => {
+                node.children_ids.forEach((cid: string) => {
                     const child = registry[cid];
-                    if (child && !isLink(child)) walk(child as SimpleNote | ContainerNote, depth + 1, visited, toc);
+                    if (child && (!isLink(child) || isReified(child))) walk(child, depth + 1, visited, toc);
                 });
             }
         };
         const result: { id: string, title: string, depth: number }[] = [];
-        walk(currentNote, 0, new Set(), result);
+        walk(currentObject, 0, new Set(), result);
         return result;
-    }, [currentNote, registry]);
+    }, [currentObject, registry]);
 
     const connections = useMemo(() => {
         if (!selectedId) return [];
@@ -461,7 +600,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
         }).filter(conn => conn && conn.neighbor);
     }, [selectedId, registry]);
 
-    if (!selectedId || !currentNote) {
+    if (!selectedId || !currentObject) {
         return (
             <div className="flex flex-col h-full bg-nexus-950 p-8 pb-32 overflow-y-auto no-scrollbar">
                 <header className="mb-20 text-center max-w-4xl mx-auto mt-20">
@@ -475,7 +614,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                    {(Object.values(registry) as NexusObject[]).filter(o => !isLink(o)).map((node: any) => (
+                    {(Object.values(registry) as NexusObject[]).filter(o => !isLink(o) || isReified(o)).map((node: any) => (
                         <button 
                             key={node.id}
                             onClick={() => onSelect(node.id)}
@@ -484,11 +623,11 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                             <div className="absolute top-0 right-0 w-32 h-32 bg-nexus-accent/5 rounded-full blur-3xl group-hover:bg-nexus-accent/10 transition-colors" />
                             <div className="flex items-center gap-3 mb-8 relative z-10">
                                 <div className="p-3 bg-nexus-800 rounded-2xl border border-nexus-700 text-nexus-accent group-hover:bg-nexus-accent group-hover:text-white transition-all shadow-sm">
-                                    {node.category_id === NexusCategory.LOCATION ? <MapPin size={20} /> : <Users size={20} />}
+                                    {isReified(node) ? <Share2 size={20} /> : node.category_id === NexusCategory.LOCATION ? <MapPin size={20} /> : <Users size={20} />}
                                 </div>
-                                <span className="text-[10px] font-display font-black text-nexus-muted group-hover:text-nexus-accent uppercase tracking-widest transition-colors">{node.category_id}</span>
+                                <span className="text-[10px] font-display font-black text-nexus-muted group-hover:text-nexus-accent uppercase tracking-widest transition-colors">{isReified(node) ? 'REIFIED LOGIC' : node.category_id}</span>
                             </div>
-                            <h3 className="text-2xl font-display font-bold text-nexus-text mb-4 leading-tight relative z-10">{node.title}</h3>
+                            <h3 className="text-2xl font-display font-bold text-nexus-text mb-4 leading-tight relative z-10">{node.title || node.verb}</h3>
                             <p className="text-sm text-nexus-muted italic line-clamp-3 mb-8 font-serif relative z-10">"{node.gist || 'Neural record awaited.'}"</p>
                             <div className="mt-auto flex items-center justify-between text-[10px] font-display font-black uppercase tracking-widest text-nexus-muted opacity-40 group-hover:opacity-100 transition-opacity relative z-10">
                                 <span>Navigate Unit</span>
@@ -496,7 +635,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                             </div>
                         </button>
                     ))}
-                    {Object.keys(registry).filter(k => !isLink(registry[k])).length === 0 && (
+                    {Object.keys(registry).filter(k => !isLink(registry[k]) || isReified(registry[k])).length === 0 && (
                         <div className="col-span-full py-40 flex flex-col items-center justify-center border-2 border-dashed border-nexus-800 rounded-[64px] opacity-20 text-center">
                             <History size={64} className="mb-6" />
                             <h3 className="text-xl font-display font-black uppercase tracking-[0.4em]">Registry Empty</h3>
@@ -507,13 +646,16 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
         );
     }
 
+    const isL = isLink(currentObject) && !isReified(currentObject);
+    const themeColor = (currentObject as any).theme_color;
+
     return (
         <div className="flex flex-col h-full bg-nexus-950 overflow-hidden md:flex-row relative font-sans">
             {/* Ambient Background */}
-            {currentNote.background_url && (
+            {(currentObject as any).background_url && (
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
                     <img 
-                        src={currentNote.background_url} 
+                        src={(currentObject as any).background_url} 
                         alt="Ambient" 
                         className="w-full h-full object-cover blur-[80px] scale-125"
                         onError={(e) => {
@@ -555,28 +697,29 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                         </nav>
                     )}
 
-                    <div>
-                        <h4 className="text-[11px] font-display font-black text-nexus-muted uppercase tracking-[0.4em] mb-10 flex items-center gap-3 opacity-50">
-                            <Hash size={16} /> Logic Streams
-                        </h4>
-                        <div className="space-y-4">
-                            {connections.map((conn: any) => (
-                                <button 
-                                    key={conn.linkId}
-                                    onClick={() => onSelect(conn.neighbor.id)}
-                                    className="w-full flex flex-col p-5 rounded-3xl bg-nexus-900 border border-nexus-800 hover:border-nexus-accent hover:translate-x-1 transition-all group text-left shadow-lg"
-                                >
-                                    <span className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1.5 opacity-60 group-hover:text-nexus-accent">
-                                        {conn.verb}
-                                    </span>
-                                    <span className="text-[13px] font-display font-bold text-nexus-text/90 group-hover:text-nexus-text truncate">
-                                        {conn.neighbor.title}
-                                    </span>
-                                </button>
-                            ))}
-                            {connections.length === 0 && <span className="text-[10px] text-nexus-muted italic opacity-40">No external causal ties recorded.</span>}
+                    {!isL && connections.length > 0 && (
+                        <div>
+                            <h4 className="text-[11px] font-display font-black text-nexus-muted uppercase tracking-[0.4em] mb-10 flex items-center gap-3 opacity-50">
+                                <Hash size={16} /> Logic Streams
+                            </h4>
+                            <div className="space-y-4">
+                                {connections.map((conn: any) => (
+                                    <button 
+                                        key={conn.linkId}
+                                        onClick={() => onSelect(conn.neighbor.id)}
+                                        className="w-full flex flex-col p-5 rounded-3xl bg-nexus-900 border border-nexus-800 hover:border-nexus-accent hover:translate-x-1 transition-all group text-left shadow-lg"
+                                    >
+                                        <span className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1.5 opacity-60 group-hover:text-nexus-accent">
+                                            {conn.verb}
+                                        </span>
+                                        <span className="text-[13px] font-display font-bold text-nexus-text/90 group-hover:text-nexus-text truncate">
+                                            {conn.neighbor.title || conn.neighbor.verb}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </aside>
 
@@ -585,31 +728,42 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                     
                     <div className="flex items-center justify-end mb-16 sticky top-4 z-50 pointer-events-none gap-4">
                         <div className="flex bg-nexus-900/90 backdrop-blur-xl border border-nexus-700/50 rounded-full p-1.5 shadow-2xl pointer-events-auto items-center">
-                             <button 
-                                onClick={() => setViewMode('NOTE')}
-                                className={`px-6 py-2.5 rounded-full text-[10px] font-display font-black uppercase tracking-[0.2em] transition-all ${viewMode === 'NOTE' ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
-                             >
-                                Chronicle
-                             </button>
-                             <button 
-                                onClick={() => setViewMode('ENCYCLOPEDIA')}
-                                className={`px-6 py-2.5 rounded-full text-[10px] font-display font-black uppercase tracking-[0.2em] transition-all ${viewMode === 'ENCYCLOPEDIA' ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
-                             >
-                                Encyclopedia
-                             </button>
-                             
-                             <div className="w-px h-6 bg-nexus-800 mx-2" />
-                             
-                             <button 
-                                onClick={() => setShowCustomizer(!showCustomizer)}
-                                className={`p-2.5 rounded-full transition-all ${showCustomizer ? 'bg-nexus-accent text-white' : 'text-nexus-muted hover:text-nexus-text'}`}
-                                title="Visual Neural ID"
-                             >
-                                <Palette size={14} />
-                             </button>
+                             {!isL && (
+                                <>
+                                    <button 
+                                        onClick={() => setViewMode('NOTE')}
+                                        className={`px-6 py-2.5 rounded-full text-[10px] font-display font-black uppercase tracking-[0.2em] transition-all ${viewMode === 'NOTE' ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+                                    >
+                                        Chronicle
+                                    </button>
+                                    <button 
+                                        onClick={() => setViewMode('ENCYCLOPEDIA')}
+                                        className={`px-6 py-2.5 rounded-full text-[10px] font-display font-black uppercase tracking-[0.2em] transition-all ${viewMode === 'ENCYCLOPEDIA' ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+                                    >
+                                        Encyclopedia
+                                    </button>
+                                    
+                                    <div className="w-px h-6 bg-nexus-800 mx-2" />
+                                    
+                                    <button 
+                                        onClick={() => setShowCustomizer(!showCustomizer)}
+                                        className={`p-2.5 rounded-full transition-all ${showCustomizer ? 'bg-nexus-accent text-white' : 'text-nexus-muted hover:text-nexus-text'}`}
+                                        title="Visual Neural ID"
+                                    >
+                                        <Palette size={14} />
+                                    </button>
+                                </>
+                             )}
+                             {isL && (
+                                <button 
+                                    className="px-6 py-2.5 rounded-full bg-nexus-arcane text-white shadow-lg text-[10px] font-display font-black uppercase tracking-[0.2em] flex items-center gap-2"
+                                >
+                                    <Link2 size={12} /> Neural Logic Editor
+                                </button>
+                             )}
                         </div>
 
-                        {showCustomizer && (
+                        {showCustomizer && !isL && (
                             <div className="absolute top-16 right-0 w-72 bg-nexus-900 border border-nexus-700 rounded-[32px] p-6 shadow-2xl pointer-events-auto animate-in fade-in zoom-in-95 backdrop-blur-3xl">
                                 <div className="space-y-8">
                                     <div>
@@ -620,13 +774,13 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                             {THEME_COLORS.map(c => (
                                                 <button 
                                                     key={c.hex} 
-                                                    onClick={() => onUpdateObject(currentNote.id, { theme_color: c.hex })}
-                                                    className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${currentNote.theme_color === c.hex ? 'border-white' : 'border-transparent'}`}
+                                                    onClick={() => onUpdateObject(currentObject.id, { theme_color: c.hex })}
+                                                    className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${(currentObject as any).theme_color === c.hex ? 'border-white' : 'border-transparent'}`}
                                                     style={{ backgroundColor: c.hex }}
                                                 />
                                             ))}
                                             <button 
-                                                onClick={() => onUpdateObject(currentNote.id, { theme_color: undefined })}
+                                                onClick={() => onUpdateObject(currentObject.id, { theme_color: undefined })}
                                                 className="w-7 h-7 rounded-full border border-nexus-800 flex items-center justify-center text-nexus-muted hover:bg-nexus-800 transition-colors"
                                             >
                                                 <X size={10} />
@@ -647,9 +801,9 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                                 {isGeneratingBg ? <RotateCw size={12} className="animate-spin" /> : <Wand2 size={12} />}
                                                 Manifest Atmosphere
                                             </button>
-                                            {currentNote.background_url && (
+                                            {(currentObject as any).background_url && (
                                                 <button 
-                                                    onClick={() => onUpdateObject(currentNote.id, { background_url: undefined })}
+                                                    onClick={() => onUpdateObject(currentObject.id, { background_url: undefined })}
                                                     className="w-full py-3 border border-red-500/20 text-red-500 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-red-500/10 transition-all"
                                                 >
                                                     <Trash2 size={12} />
@@ -663,73 +817,77 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                         )}
                     </div>
 
-                    {viewMode === 'NOTE' ? (
-                        <div className="relative">
-                            {showSaveSuccess && (
-                                <div className="absolute -top-12 right-0 bg-nexus-essence text-white px-6 py-2 rounded-full text-[10px] font-display font-black uppercase tracking-widest shadow-lg shadow-nexus-essence/20 animate-in slide-in-from-bottom-2 duration-300 flex items-center gap-2">
-                                    <FileCheck size={14} /> Records Synchronized
-                                </div>
-                            )}
-                            {renderSection(currentNote, 0, new Set())}
-                        </div>
+                    {isL ? (
+                        renderLinkManifest(currentObject)
                     ) : (
-                        <div className="animate-in fade-in zoom-in-95 duration-1000">
-                             {currentArtifact ? (
-                                <div className="space-y-12">
-                                    <div className="flex items-center justify-between bg-nexus-accent/10 border border-nexus-accent/20 rounded-[32px] p-6 shadow-xl animate-in slide-in-from-top-4 duration-500">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-nexus-accent/20 rounded-2xl">
-                                                <Sparkles className="text-nexus-accent" size={24} />
+                        viewMode === 'NOTE' ? (
+                            <div className="relative">
+                                {showSaveSuccess && (
+                                    <div className="absolute -top-12 right-0 bg-nexus-essence text-white px-6 py-2 rounded-full text-[10px] font-display font-black uppercase tracking-widest shadow-lg shadow-nexus-essence/20 animate-in slide-in-from-bottom-2 duration-300 flex items-center gap-2">
+                                        <FileCheck size={14} /> Records Synchronized
+                                    </div>
+                                )}
+                                {renderSection(currentObject, 0, new Set())}
+                            </div>
+                        ) : (
+                            <div className="animate-in fade-in zoom-in-95 duration-1000">
+                                 {currentArtifact ? (
+                                    <div className="space-y-12">
+                                        <div className="flex items-center justify-between bg-nexus-accent/10 border border-nexus-accent/20 rounded-[32px] p-6 shadow-xl animate-in slide-in-from-top-4 duration-500">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-nexus-accent/20 rounded-2xl">
+                                                    <Sparkles className="text-nexus-accent" size={24} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-display font-black text-nexus-text uppercase tracking-widest">Neural Draft Manifested</h4>
+                                                    <p className="text-[10px] text-nexus-muted font-mono uppercase tracking-widest">Global Graph Context Integrated</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className="text-sm font-display font-black text-nexus-text uppercase tracking-widest">Neural Draft Manifested</h4>
-                                                <p className="text-[10px] text-nexus-muted font-mono uppercase tracking-widest">Global Graph Context Integrated</p>
-                                            </div>
+                                            <button 
+                                                onClick={handleCommitToRegistry}
+                                                className="px-8 py-3 bg-nexus-accent text-white rounded-2xl text-[10px] font-display font-black uppercase tracking-[0.2em] hover:brightness-110 transition-all shadow-xl shadow-nexus-accent/20 flex items-center gap-3"
+                                            >
+                                                <Save size={16} /> Commit to Chronicle
+                                            </button>
                                         </div>
-                                        <button 
-                                            onClick={handleCommitToRegistry}
-                                            className="px-8 py-3 bg-nexus-accent text-white rounded-2xl text-[10px] font-display font-black uppercase tracking-[0.2em] hover:brightness-110 transition-all shadow-xl shadow-nexus-accent/20 flex items-center gap-3"
-                                        >
-                                            <Save size={16} /> Commit to Chronicle
-                                        </button>
+                                        
+                                        <div className="bg-nexus-900/20 border border-nexus-800 rounded-[64px] p-12 md:p-20 shadow-inner overflow-hidden">
+                                            <MarkdownRenderer content={currentArtifact.content} color={themeColor} />
+                                        </div>
+                                        
+                                        <div className="flex justify-center pt-10">
+                                            <button 
+                                                onClick={handleGenerateEncyclopedia}
+                                                disabled={isGenerating}
+                                                className="text-nexus-muted hover:text-nexus-accent transition-all flex items-center gap-3 text-[10px] font-display font-black uppercase tracking-widest"
+                                            >
+                                                <RotateCw size={14} className={isGenerating ? "animate-spin" : ""} />
+                                                Re-Weave Synthesis
+                                            </button>
+                                        </div>
                                     </div>
-                                    
-                                    <div className="bg-nexus-900/20 border border-nexus-800 rounded-[64px] p-12 md:p-20 shadow-inner overflow-hidden">
-                                        <MarkdownRenderer content={currentArtifact.content} color={currentNote.theme_color} />
-                                    </div>
-                                    
-                                    <div className="flex justify-center pt-10">
+                                 ) : (
+                                    <div className="py-40 flex flex-col items-center justify-center text-center space-y-12 bg-nexus-900 border border-nexus-800 rounded-[64px] p-16 shadow-2xl backdrop-blur-xl">
+                                        <div className="p-10 rounded-full bg-nexus-accent/10 border border-nexus-accent/20 flex items-center justify-center relative">
+                                             <Logo size={96} />
+                                             <div className="absolute inset-0 bg-nexus-accent/20 rounded-full animate-pulse blur-2xl -z-10" />
+                                        </div>
+                                        <div className="space-y-4">
+                                            <h2 className="text-4xl font-display font-black text-nexus-text tracking-tighter uppercase">Neural Record Void</h2>
+                                            <p className="text-nexus-muted max-w-sm mx-auto font-serif italic text-lg opacity-70 leading-relaxed">"Initiate the Weaver protocol to manifest a definitive entry from the collective graph memory."</p>
+                                        </div>
                                         <button 
                                             onClick={handleGenerateEncyclopedia}
                                             disabled={isGenerating}
-                                            className="text-nexus-muted hover:text-nexus-accent transition-all flex items-center gap-3 text-[10px] font-display font-black uppercase tracking-widest"
+                                            className="bg-nexus-accent text-white px-12 py-5 rounded-3xl font-display font-black text-xs uppercase tracking-[0.4em] transition-all hover:brightness-110 shadow-2xl shadow-nexus-accent/30 flex items-center gap-4 active:scale-95"
                                         >
-                                            <RotateCw size={14} className={isGenerating ? "animate-spin" : ""} />
-                                            Re-Weave Synthesis
+                                            {isGenerating ? <RotateCw size={18} className="animate-spin" /> : <Wand2 size={18} />}
+                                            {isGenerating ? "Synchronizing Graph..." : "Initiate Weaving Protocol"}
                                         </button>
                                     </div>
-                                </div>
-                             ) : (
-                                <div className="py-40 flex flex-col items-center justify-center text-center space-y-12 bg-nexus-900 border border-nexus-800 rounded-[64px] p-16 shadow-2xl backdrop-blur-xl">
-                                    <div className="p-10 rounded-full bg-nexus-accent/10 border border-nexus-accent/20 flex items-center justify-center relative">
-                                         <Logo size={96} />
-                                         <div className="absolute inset-0 bg-nexus-accent/20 rounded-full animate-pulse blur-2xl -z-10" />
-                                    </div>
-                                    <div className="space-y-4">
-                                        <h2 className="text-4xl font-display font-black text-nexus-text tracking-tighter uppercase">Neural Record Void</h2>
-                                        <p className="text-nexus-muted max-w-sm mx-auto font-serif italic text-lg opacity-70 leading-relaxed">"Initiate the Weaver protocol to manifest a definitive entry from the collective graph memory."</p>
-                                    </div>
-                                    <button 
-                                        onClick={handleGenerateEncyclopedia}
-                                        disabled={isGenerating}
-                                        className="bg-nexus-accent text-white px-12 py-5 rounded-3xl font-display font-black text-xs uppercase tracking-[0.4em] transition-all hover:brightness-110 shadow-2xl shadow-nexus-accent/30 flex items-center gap-4 active:scale-95"
-                                    >
-                                        {isGenerating ? <RotateCw size={18} className="animate-spin" /> : <Wand2 size={18} />}
-                                        {isGenerating ? "Synchronizing Graph..." : "Initiate Weaving Protocol"}
-                                    </button>
-                                </div>
-                             )}
-                        </div>
+                                 )}
+                            </div>
+                        )
                     )}
                 </div>
             </article>

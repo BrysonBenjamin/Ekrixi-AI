@@ -1,7 +1,7 @@
 
 /**
  * NEXUS.TS
- * Version: 3.7 (Author's Notes Integration)
+ * Version: 4.1 (Types & Core Utils Only)
  */
 
 export interface NexusElement {
@@ -14,11 +14,11 @@ export interface NexusElement {
 }
 
 export interface WikiArtifact {
-  node_id: string;        // Foreign key to NexusElement
-  content: string;        // The LLM-generated Markdown
-  generated_at: string;   // For cache invalidation
-  context_depth: number;  // How many levels were crawled
-  graph_version: string;  // To check if the structure has changed
+  node_id: string;
+  content: string;
+  generated_at: string;
+  context_depth: number;
+  graph_version: string;
 }
 
 export interface TraitContainer {
@@ -88,10 +88,9 @@ export interface SimpleNote extends NexusElement {
   prose_content: string;
   category_id: NexusCategory;
   is_ghost: boolean;
-  is_author_note?: boolean; // New trait for thematic isolation
-  // Visual Customization
+  is_author_note?: boolean; 
   background_url?: string;
-  theme_color?: string; // Hex or CSS variable
+  theme_color?: string; 
 }
 
 export interface ContainerNote extends Omit<SimpleNote, '_type'>, TraitContainer {
@@ -147,60 +146,12 @@ export const isStrictHierarchy = (obj: NexusObject): boolean => {
          obj._type === NexusType.CONTAINER_NOTE;
 };
 
+export type ConflictStatus = 'APPROVED' | 'IMPLIED' | 'REDUNDANT';
+
 export const NexusGraphUtils = {
-  buildParentMap: (allNodes: Record<string, NexusObject>): Record<string, string[]> => {
-    const map: Record<string, string[]> = {};
-    Object.values(allNodes).forEach(node => {
-      if (isContainer(node)) {
-        node.children_ids.forEach(childId => {
-          if (!map[childId]) map[childId] = [];
-          map[childId].push(node.id);
-        });
-      }
-      if (isLink(node) && isStrictHierarchy(node)) {
-         if (!map[node.target_id]) map[node.target_id] = [];
-         map[node.target_id].push(node.source_id);
-      }
-    });
-    return map;
-  },
-
-  detectCycle: (
-    sourceId: string, 
-    targetId: string, 
-    parentMap: Record<string, string[]>
-  ): boolean => {
-    if (sourceId === targetId) return true;
-    const visited = new Set<string>();
-    const stack = [sourceId];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      if (current === targetId) return true;
-      if (!visited.has(current)) {
-        visited.add(current);
-        const parents = parentMap[current] || [];
-        for (const p of parents) {
-          stack.push(p);
-        }
-      }
-    }
-    return false;
-  },
-
-  validateConnection: (
-    sourceId: string, 
-    targetId: string, 
-    type: NexusType, 
-    allNodes: Record<string, NexusObject>
-  ): { valid: boolean; reason?: string } => {
-    if (type === NexusType.SEMANTIC_LINK || type === NexusType.AGGREGATED_SEMANTIC_LINK) {
-       return { valid: true };
-    }
-    const parentMap = NexusGraphUtils.buildParentMap(allNodes);
-    if (NexusGraphUtils.detectCycle(sourceId, targetId, parentMap)) {
-      return { valid: false, reason: "Cycle Detected: A node cannot contain its own ancestor." };
-    }
-    return { valid: true };
+  reconcileHierarchy: (parent: NexusObject, child: NexusObject, type: NexusType) => {
+    const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(parent, child, type, 'contains');
+    return { updatedParent: updatedSource, updatedChild: updatedTarget, newLink: link };
   },
 
   createNode: (title: string, type: NexusType = NexusType.SIMPLE_NOTE): SimpleNote | ContainerNote => {
@@ -232,10 +183,7 @@ export const NexusGraphUtils = {
       } as ContainerNote;
     }
 
-    return {
-      ...base,
-      _type: NexusType.SIMPLE_NOTE
-    } as SimpleNote;
+    return { ...base, _type: NexusType.SIMPLE_NOTE } as SimpleNote;
   },
 
   createLink: (source: NexusObject, target: NexusObject, type: NexusType, verb: string) => {
@@ -260,30 +208,15 @@ export const NexusGraphUtils = {
         (link as any).hierarchy_type = HierarchyType.PARENT_OF;
     }
 
-    const updatedSource = {
-      ...source,
-      link_ids: [...source.link_ids, linkId]
-    };
+    const updatedSource = { ...source, link_ids: [...source.link_ids, linkId] };
     
     if (type === NexusType.HIERARCHICAL_LINK && isContainer(updatedSource)) {
         updatedSource.children_ids = Array.from(new Set([...updatedSource.children_ids, target.id]));
     }
 
-    const updatedTarget = {
-      ...target,
-      link_ids: [...target.link_ids, linkId]
-    };
+    const updatedTarget = { ...target, link_ids: [...target.link_ids, linkId] };
 
     return { link, updatedSource, updatedTarget };
-  },
-
-  reconcileHierarchy: (parent: NexusObject & TraitContainer, child: NexusObject, type: NexusType) => {
-    const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(parent, child, type, 'contains');
-    return { 
-      updatedParent: updatedSource as NexusObject & TraitContainer, 
-      updatedChild: updatedTarget as NexusObject, 
-      newLink: link 
-    };
   },
 
   createShadowLink: (sourceId: string, targetId: string): NexusObject => {

@@ -72,7 +72,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     const allNodesByTitle = useMemo(() => {
         const map: Record<string, string> = {};
-        // Fix: Explicitly cast to NexusObject[] to ensure 'node' is recognized as NexusObject instead of unknown during iteration
         (Object.values(registry) as NexusObject[]).forEach(node => {
             const anyNode = node as any;
             if (anyNode.title) {
@@ -86,10 +85,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         return content.replace(/\[\[(.*?)\]\]/g, (match, title) => {
             const id = allNodesByTitle[title.toLowerCase()];
             if (id) {
-                // We use a custom protocol for inter-feature navigation or just styling
                 return `[${title}](#navigate-${id})`;
             }
-            return `<span class="nexus-ghost-link" title="Latent Unit: ${title}">${title}</span>`;
+            // Use specific ghost protocol instead of raw HTML
+            return `[${title}](#ghost-${title})`;
         });
     }, [allNodesByTitle]);
     
@@ -153,6 +152,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                                                 >
                                                     {props.children}
                                                 </button>
+                                            );
+                                        }
+                                        if (href.startsWith('#ghost-')) {
+                                            const ghostTitle = href.replace('#ghost-', '');
+                                            return (
+                                                <span className="nexus-ghost-link" title={`Latent Unit: ${ghostTitle}`}>
+                                                    {props.children}
+                                                </span>
                                             );
                                         }
                                         return <a {...props} target="_blank" rel="noopener noreferrer" className="text-nexus-accent underline" />;
