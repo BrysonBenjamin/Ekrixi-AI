@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { 
     Sparkles, 
@@ -65,13 +64,15 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
             const noteContext = notes.map(n => `- ${n.title}: ${n.gist}`).join('\n');
             
             const prompt = `
-                ACT AS: The Ekrixi Writing Architect. You are a high-fidelity literary assistant.
+                ACT AS: The Ekrixi Writing Chat agent. You are a high-fidelity literary assistant.
                 
                 YOUR MISSION:
                 1. Provide prose suggestions that respect the chapter's gist and governing Author Notes.
                 2. If the user provides a "SELECTION" (highlighted text), focus specifically on rewriting or expanding that section based on their prompt.
                 3. Maintain a consistent voice based on the narrative mass of the manuscript.
-
+                
+                REQUIREMENT: Return RAW PROSE only. Do not use Markdown symbols like **bold** or # headings in the proseSuggestion field.
+                
                 CONTEXT:
                 - TARGET_UNIT: ${chapterContext}
                 - ACTIVE_AUTHOR_NOTES:
@@ -83,7 +84,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                 OUTPUT: JSON ONLY.
                 {
                     "reply": "Conversational advice or commentary.",
-                    "proseSuggestion": "The actual suggested text rewrite/expansion.",
+                    "proseSuggestion": "The actual suggested RAW PROSE rewrite/expansion.",
                     "logicObservation": "Any structural warnings or insights regarding author notes."
                 }
             `;
@@ -97,7 +98,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
             const result = JSON.parse(response.text || '{}');
             setMessages(prev => [...prev, { role: 'assistant', ...result }]);
         } catch (err) {
-            setMessages(prev => [...prev, { role: 'assistant', reply: "Assistant synchronization interrupted." }]);
+            setMessages(prev => [...prev, { role: 'assistant', reply: "Assistant synchronization interrupted. Registry heartbeat lost." }]);
         } finally {
             setIsLoading(false);
         }
@@ -107,10 +108,10 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
         <div className="flex flex-col h-full bg-nexus-900/50 backdrop-blur-xl">
             <header className="h-14 border-b border-nexus-800 flex items-center px-6 gap-3 shrink-0 bg-nexus-950/20">
                 <Sparkles size={16} className="text-nexus-accent animate-pulse" />
-                <h3 className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Writing Assistant</h3>
+                <h3 className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Writing Chat</h3>
                 <div className="flex-1" />
                 <div className="flex items-center gap-2">
-                     <span className="text-[8px] font-mono text-nexus-muted uppercase">Context: {isChapterMode ? 'Composite' : 'Focused'}</span>
+                     <span className="text-[8px] font-mono text-nexus-muted uppercase">Kernel: Raw Text v1.0</span>
                 </div>
             </header>
 
@@ -120,7 +121,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                         <Bot size={48} className="mx-auto text-nexus-accent" />
                         <div className="space-y-2">
                             <p className="text-[10px] font-display font-bold uppercase tracking-[0.2em] px-10">Awaiting Writing Directives</p>
-                            <p className="text-[9px] font-serif italic max-w-xs mx-auto">"Highlight text in the editor to send it as context for refinement."</p>
+                            <p className="text-[9px] font-serif italic max-w-xs mx-auto">"Highlight text in the editor and click 'Search Selection' to send it as context."</p>
                         </div>
                     </div>
                 )}
@@ -128,9 +129,9 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                 {messages.map((m, i) => (
                     <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start animate-in fade-in slide-in-from-bottom-2'}`}>
                         {m.selection && (
-                            <div className="max-w-[80%] mb-2 p-3 bg-nexus-essence/10 border border-nexus-essence/30 rounded-2xl flex items-start gap-3">
-                                <Quote size={12} className="text-nexus-essence shrink-0 mt-1" />
-                                <p className="text-[10px] text-nexus-essence italic line-clamp-2 leading-relaxed">"{m.selection}"</p>
+                            <div className="max-w-[80%] mb-2 p-3 bg-nexus-accent/10 border border-nexus-accent/30 rounded-2xl flex items-start gap-3">
+                                <Quote size={12} className="text-nexus-accent shrink-0 mt-1" />
+                                <p className="text-[10px] text-nexus-text italic line-clamp-3 leading-relaxed">"{m.selection}"</p>
                             </div>
                         )}
                         
@@ -145,18 +146,19 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-[8px] font-black uppercase text-nexus-accent tracking-widest flex items-center gap-2">
-                                        <Sparkles size={10} /> Suggested Manifest
+                                        <Sparkles size={10} /> Suggested Raw Manifest
                                     </span>
                                     <button 
                                         onClick={() => navigator.clipboard.writeText(m.proseSuggestion)}
                                         className="p-1.5 bg-nexus-900 border border-nexus-800 rounded-lg text-nexus-muted hover:text-nexus-accent transition-all"
+                                        title="Copy Suggested Prose"
                                     >
                                         <Layers size={14} />
                                     </button>
                                 </div>
-                                <p className="text-[12px] text-nexus-text font-serif leading-relaxed italic border-l-2 border-nexus-accent/20 pl-4">
+                                <div className="text-[13px] text-nexus-text font-serif leading-relaxed whitespace-pre-wrap border-l-2 border-nexus-accent/20 pl-4 py-2">
                                     {m.proseSuggestion}
-                                </p>
+                                </div>
                                 {m.logicObservation && (
                                     <div className="pt-4 border-t border-nexus-800 flex items-start gap-3">
                                         <ShieldCheck size={14} className="text-amber-500 shrink-0 mt-0.5" />
@@ -178,10 +180,10 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
 
             <div className="p-5 border-t border-nexus-800 bg-nexus-950/60 relative">
                 {selection && (
-                    <div className="absolute bottom-full left-4 right-4 mb-4 p-4 bg-nexus-essence text-white rounded-[24px] shadow-2xl flex items-center justify-between animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="absolute bottom-full left-4 right-4 mb-4 p-4 bg-nexus-accent text-white rounded-[24px] shadow-2xl flex items-center justify-between animate-in slide-in-from-bottom-2 duration-300">
                          <div className="flex items-center gap-3 overflow-hidden">
                              <Quote size={16} />
-                             <p className="text-[10px] font-bold truncate italic">"{selection}"</p>
+                             <p className="text-[10px] font-bold truncate italic">Context selection captured</p>
                          </div>
                          <button onClick={onClearSelection} className="p-1 hover:bg-white/20 rounded-full shrink-0 ml-2"><X size={14}/></button>
                     </div>
@@ -192,7 +194,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder={selection ? "Suggest a rewrite for selection..." : "Ask for a scene expansion or edit..."}
+                        placeholder={selection ? "Suggest a rewrite for selection..." : "Request a scene expansion or edit..."}
                         className="w-full bg-nexus-900 border border-nexus-800 rounded-3xl pl-6 pr-14 py-4 text-sm text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner placeholder:text-nexus-muted/30"
                     />
                     <button 
@@ -202,10 +204,6 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                     >
                         <ArrowRight size={20} />
                     </button>
-                </div>
-                <div className="mt-3 flex items-center justify-center gap-4 opacity-40">
-                     <span className="text-[8px] font-mono uppercase tracking-[0.2em]">Context-Aware Assist v9.0</span>
-                     <div className="w-1 h-1 rounded-full bg-nexus-accent animate-ping" />
                 </div>
             </div>
         </div>

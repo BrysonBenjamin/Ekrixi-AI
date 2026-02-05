@@ -1,6 +1,7 @@
 import { NexusObject, NexusType, NexusCategory, StoryType, NarrativeStatus, ContainmentType, DefaultLayout, HierarchyType } from '../../../types';
 import { generateId } from '../../../utils/ids';
-import { StudioBlock } from '../../story-studio/StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../../story-studio/types';
 
 export const getCompletedManuscriptBatch = (): NexusObject[] => {
     const timestamp = new Date().toISOString();
@@ -12,7 +13,7 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
     const sc1Id = generateId();
     const sc2Id = generateId();
 
-    const manifesto: StudioBlock[] = [
+    const blueprint: StudioBlock[] = [
         { id: generateId(), type: 'THESIS', data: { text: "Survival depends on understanding the language of a dying planet." } },
         { id: generateId(), type: 'LITERARY_APPROACH', data: { archetype: 'SAVE_CAT', rationale: "High engagement required for scientific mystery." } }
     ];
@@ -29,7 +30,7 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
         is_collapsed: false,
         default_layout: DefaultLayout.TREE,
         children_ids: [ch1Id, ch2Id],
-        manifesto_data: manifesto,
+        manifesto_data: blueprint,
         created_at: timestamp,
         last_modified: timestamp,
         link_ids: [],

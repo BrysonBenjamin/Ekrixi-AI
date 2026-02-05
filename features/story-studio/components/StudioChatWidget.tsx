@@ -52,7 +52,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({ isOpen, onCl
             const worldContext = contextNodes.map(n => `- ${n.title}`).join('\n');
 
             const prompt = `
-                ACT AS: The Ekrixi Neural Weaver. You are a high-fidelity literary consultant and story architect.
+                ACT AS: The Ekrixi Neural Chat agent. You are a high-fidelity literary consultant and story architect.
                 
                 YOUR PRIMARY OPERATING MODES:
                 1. CHAPTER_SPEC: Draft or refine chapters based on user specifications. Ask clarifying questions if the prompt is vague.
@@ -62,7 +62,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({ isOpen, onCl
                 PRIORITY: Prioritize executing user-requested edits and structural commands over generating your own storyline ideas unless explicitly asked for "Brainstorming" or "Suggestions".
 
                 KNOWLEDGE CONTEXT:
-                - MANIFESTO: ${JSON.stringify(blocks)}
+                - BLUEPRINT: ${JSON.stringify(blocks)}
                 - SPINE SUMMARY:
                 ${chaptersSummary}
                 - DRAGGED LORE UNITS:
@@ -86,7 +86,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({ isOpen, onCl
             setMessages(prev => [...prev, { role: 'assistant', text: result.reply, action: result }]);
             setContextNodes([]);
         } catch (err) {
-            setMessages(prev => [...prev, { role: 'assistant', text: "Neural Weaver connection interrupted. Please re-synchronize." }]);
+            setMessages(prev => [...prev, { role: 'assistant', text: "Neural Chat connection interrupted. Please re-synchronize." }]);
         } finally {
             setIsLoading(false);
         }
@@ -148,7 +148,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({ isOpen, onCl
             <header className="h-14 flex items-center justify-between px-6 border-b border-nexus-800 bg-nexus-ruby/5">
                 <div className="flex items-center gap-3">
                     <Sparkles size={16} className="text-nexus-ruby" />
-                    <span className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Neural Weaver</span>
+                    <span className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Neural Chat</span>
                 </div>
                 {!inline && <button onClick={onClose} className="p-1.5 text-nexus-muted hover:text-nexus-text transition-colors"><X size={16} /></button>}
             </header>

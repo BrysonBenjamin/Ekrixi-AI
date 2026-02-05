@@ -16,7 +16,8 @@ import {
     Box,
     Check
 } from 'lucide-react';
-import { StudioBlock } from '../StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import { generateId } from '../../../utils/ids';
 import { NexusObject } from '../../../types';
@@ -55,10 +56,10 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({ blocks, onUp
             const archetypeOptions = LITERARY_ARCHETYPES.map(a => `- ${a.id}: ${a.label} (${a.desc})`).join('\n');
 
             const prompt = `
-                ACT AS: The Ekrixi Manifesto Weaver. 
-                TASK: Help the user build a high-fidelity story manifesto.
+                ACT AS: The Ekrixi Blueprint Chat agent. 
+                TASK: Help the user build a high-fidelity story blueprint.
                 
-                CURRENT MANIFESTO BLOCKS:
+                CURRENT BLUEPRINT BLOCKS:
                 ${manifestContext || "None yet."}
 
                 LITERARY ARCHETYPES (MANDATORY FOR 'LITERARY_APPROACH' BLOCKS):
@@ -91,7 +92,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({ blocks, onUp
             const result = JSON.parse(response.text || '{}');
             setMessages(prev => [...prev, { role: 'assistant', text: result.reply, action: result }]);
         } catch (err) {
-            console.error("Manifesto Synthesis Error:", err);
+            console.error("Blueprint Synthesis Error:", err);
             setMessages(prev => [...prev, { role: 'assistant', text: "Synthesis kernel interrupted. Please retry." }]);
         } finally {
             setIsLoading(false);
@@ -108,7 +109,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({ blocks, onUp
             });
         });
         onUpdateBlocks(nextBlocks);
-        setMessages(prev => [...prev, { role: 'assistant', text: "Blocks reified into Manifesto." }]);
+        setMessages(prev => [...prev, { role: 'assistant', text: "Blocks reified into Blueprint." }]);
     };
 
     return (
@@ -116,7 +117,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({ blocks, onUp
             <header className="h-16 flex items-center justify-between px-6 border-b border-nexus-800 bg-nexus-ruby/5 shrink-0">
                 <div className="flex items-center gap-3">
                     <Sparkles size={16} className="text-nexus-ruby" />
-                    <span className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Manifesto Weaver</span>
+                    <span className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Blueprint Chat</span>
                 </div>
                 <button onClick={onClose} className="p-1.5 text-nexus-muted hover:text-white transition-colors">
                     <X size={16} />

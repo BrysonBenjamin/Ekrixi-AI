@@ -1,6 +1,6 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { StudioBlock } from '../StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../types';
 import { 
     NexusObject, 
     NexusType, 
@@ -11,17 +11,20 @@ import {
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
 
+// NOTE: Currently operating in RAW TEXT MODE for maximum structural stability. 
+// Markdown symbols are treated as literal characters to prevent parsing drift during recursive search.
+
 export const StudioSpineAgent = {
     /**
-     * Agent: Manifesto Synthesizer
+     * Agent: Blueprint Synthesizer
      * Generates a full protocol block array from a simple seed.
      */
     async synthesizeManifestoBlocks(seed: string): Promise<StudioBlock[]> {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const prompt = `
-            ACT AS: The Ekrixi Manifesto Weaver.
-            TASK: Generate a high-fidelity narrative manifesto from the user's seed IDEA.
+            ACT AS: The Ekrixi Blueprint Chat.
+            TASK: Generate a high-fidelity narrative blueprint from the user's seed IDEA.
             
             SEED: "${seed}"
             
@@ -52,7 +55,7 @@ export const StudioSpineAgent = {
 
     /**
      * Agent: Latent Unit Synthesizer
-     * Consumes the entire manifesto and world registry context to suggest unit metadata.
+     * Consumes the entire blueprint and world registry context to suggest unit metadata.
      */
     async autofillLatentUnit(title: string, intent: string, manifesto: StudioBlock[], registry: Record<string, NexusObject>): Promise<any> {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -75,7 +78,7 @@ export const StudioSpineAgent = {
             TASK: Suggest metadata for a new unit titled "${title}".
             
             USER INTENT: ${intent || "Establish logical narrative footprint."}
-            MANIFESTO THESIS: ${thesis}
+            BLUEPRINT THESIS: ${thesis}
             LITERARY APPROACH: ${approach.archetype} (${approach.rationale})
             ADDITIONAL CONTEXT: ${contextStr}
 
@@ -88,7 +91,7 @@ export const StudioSpineAgent = {
                 "gist": "One sentence summary capturing its primary role",
                 "aliases": ["Name 1", "Name 2"],
                 "tags": ["tag1", "tag2"],
-                "thematicWeight": "Short note on how this unit inherits or subverts the manifesto thesis"
+                "thematicWeight": "Short note on how this unit inherits or subverts the blueprint thesis"
             }
         `;
 
@@ -110,7 +113,7 @@ export const StudioSpineAgent = {
         
         const prompt = `
             ACT AS: The Ekrixi AI Chapter Architect.
-            TASK: Generate a sequence of 5-10 logical Story Chapters from Manifesto.
+            TASK: Generate a sequence of 5-10 logical Story Chapters from Blueprint.
             ${summary}
             OUTPUT: JSON ONLY: { "chapters": [ { "title": "string", "gist": "string", "tension_level": number } ] }
         `;
@@ -151,9 +154,9 @@ export const StudioSpineAgent = {
         const prompt = `
             ACT AS: The Ekrixi AI Scene Architect.
             TASK: Generate a sequence of 3-5 logical Story Scenes for the focused Chapter.
-            GLOBAL MANIFESTO CONTEXT:
+            GLOBAL BLUEPRINT CONTEXT:
             ${globalSummary}
-            CHAPTER MANIFESTO:
+            CHAPTER BLUEPRINT:
             ${chapterSummary}
             OUTPUT: JSON ONLY: { "scenes": [ { "title": "string", "gist": "string", "tension_level": number } ] }
         `;
@@ -217,16 +220,16 @@ export const StudioSpineAgent = {
         
         const prompt = `
             ACT AS: The Ekrixi Neural Draftsman.
+            TASK: Expand raw text prose for a narrative beat.
             UNIT_FOCUS: ${target.title} (${target.story_type})
             SUMMARY: ${target.gist}
             CONTEXTUAL NEIGHBORS:
             - PREV: ${prev ? `${prev.title}: ${prev.gist}` : "None (Start)"}
             - NEXT: ${next ? `${next.title}: ${next.gist}` : "None (End)"}
             MANUSCRIPT THESIS: ${thesis}
-            TASK:
-            1. Expand the GIST into a punchy beat (2 sentences).
-            2. Write DRAFT CONTENT (approx 300 words).
-            3. Ensure seamless transition.
+            
+            REQUIREMENT: Return RAW TEXT only for the content field. Do not use Markdown formatting.
+            
             OUTPUT: JSON ONLY: { "gist": "string", "content": "string" }
         `;
 
@@ -247,7 +250,7 @@ export const StudioSpineAgent = {
         const prompt = `
             ACT AS: The Ekrixi Structural Auditor.
             GOAL: Evaluate spine suitability.
-            MANIFESTO: ${summary}
+            BLUEPRINT: ${summary}
             SEQUENCE: ${chapterList}
             OUTPUT: JSON ONLY: { "status": "SUITABLE" | "NEEDS_REFACTOR", "critique": "string", "alternatives": [ { "name": "string", "rationale": "string" } ] }
         `;

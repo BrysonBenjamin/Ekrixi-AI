@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
     PenTool, 
@@ -22,10 +21,11 @@ import {
     ShieldCheck,
     Quote,
     LayoutTemplate,
-    Focus
+    Focus,
+    MousePointer2,
+    Wand2
 } from 'lucide-react';
 import { NexusObject, isLink, isContainer, NexusType, NexusCategory, StoryType } from '../../../types';
-import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
 import { LocalizedWorldWiki } from './LocalizedWorldWiki';
 import { WeaverChatAssistant } from './WeaverChatAssistant';
 
@@ -45,14 +45,16 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
     const [scannedMentions, setScannedMentions] = useState<Set<string>>(new Set());
     const [showContext, setShowContext] = useState(true);
     const [selectedText, setSelectedText] = useState<string>('');
+    const [selectionMenu, setSelectionMenu] = useState<{ x: number, y: number, text: string } | null>(null);
     const editorRef = useRef<HTMLTextAreaElement>(null);
 
     // Resolve context for switching
     const focusedNode = studioItems.find(i => i.id === activeId) as any;
     const parentChapterId = useMemo(() => {
         if (isChapterMode) return activeId;
-        const link = studioItems.find(l => isLink(l) && l.target_id === activeId && (studioItems.find(p => p.id === l.source_id) as any)?.story_type === StoryType.CHAPTER);
-        return link?.source_id || null;
+        // Fix: Use any cast to handle source_id/target_id access on NexusObject union in find callback
+        const link = studioItems.find(l => isLink(l) && (l as any).target_id === activeId && (studioItems.find(p => p.id === (l as any).source_id) as any)?.story_type === StoryType.CHAPTER);
+        return link ? (link as any).source_id : null;
     }, [studioItems, activeId, isChapterMode]);
 
     const scenesInChapter = useMemo(() => {
@@ -78,7 +80,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
         );
         onUpdate(nextItems as NexusObject[]);
 
-        // Scry Mentions
+        // Search Mentions - Still useful for sidebars
         const mentions = new Set<string>();
         const wikiRegex = /\[\[(.*?)\]\]/g;
         let match;
@@ -92,10 +94,26 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
         setScannedMentions(prev => new Set([...Array.from(prev), ...Array.from(mentions)]));
     }, [studioItems, activeId, worldRegistry, onUpdate]);
 
-    const handleMouseUp = () => {
-        const sel = window.getSelection()?.toString().trim();
-        if (sel && sel.length > 5) setSelectedText(sel);
-        else setSelectedText('');
+    const handleMouseUp = (e: React.MouseEvent) => {
+        const selection = window.getSelection();
+        const selText = selection?.toString().trim();
+        if (selText && selText.length > 3) {
+            setSelectionMenu({
+                x: e.clientX,
+                y: e.clientY - 60,
+                text: selText
+            });
+        } else {
+            setSelectionMenu(null);
+        }
+    };
+
+    const handlePushSelectionToAssistant = () => {
+        if (selectionMenu) {
+            setSelectedText(selectionMenu.text);
+            setShowContext(true);
+            setSelectionMenu(null);
+        }
     };
 
     const handleToggleContext = (mode: 'SCENE' | 'CHAPTER') => {
@@ -111,6 +129,29 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
 
     return (
         <div className="h-full flex flex-col md:flex-row bg-nexus-950 overflow-hidden animate-in zoom-in-95 duration-500">
+            {/* Selection Search Tooltip */}
+            {selectionMenu && (
+                <div 
+                    className="fixed z-[1000] bg-nexus-accent border border-nexus-accent/50 rounded-2xl p-1 shadow-2xl flex items-center gap-1 animate-in zoom-in-95 duration-200"
+                    style={{ left: selectionMenu.x, top: selectionMenu.y }}
+                >
+                    <button 
+                        onClick={handlePushSelectionToAssistant}
+                        className="px-4 py-2 bg-nexus-950 text-white hover:bg-nexus-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                    >
+                        <Sparkles size={14} className="text-nexus-accent animate-pulse" />
+                        Search Selection
+                    </button>
+                    <div className="w-px h-6 bg-nexus-800/40" />
+                    <button 
+                        onClick={() => setSelectionMenu(null)}
+                        className="p-2 hover:bg-nexus-900 text-white/50 hover:text-white rounded-xl"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
+
             {/* Left: Writing Area */}
             <div className={`flex-1 flex flex-col border-r border-nexus-800 transition-all duration-700 ${showContext ? 'md:w-3/5' : 'md:w-full'}`}>
                 <header className="h-16 border-b border-nexus-800 bg-nexus-900/30 flex items-center justify-between px-6 shrink-0">
@@ -144,13 +185,13 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
                     <div className="flex items-center gap-3">
                          {selectedText && (
                             <div className="animate-in slide-in-from-right-4 flex items-center gap-2 px-3 py-1 bg-nexus-essence/10 border border-nexus-essence/30 rounded-full text-nexus-essence text-[9px] font-black uppercase tracking-widest">
-                                <Quote size={10} /> Scry Selection
+                                <Quote size={10} /> Search Selection Active
                             </div>
                          )}
                         <button 
                             onClick={() => setShowContext(!showContext)}
-                            className={`p-2 rounded-xl transition-all ${showContext ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
-                            title="Context Oracle"
+                            className={`p-2 rounded-xl transition-all ${showContext ? 'bg-nexus-accent text-white shadow-lg shadow-nexus-accent/20' : 'text-nexus-muted hover:text-nexus-text'}`}
+                            title="Context Chat"
                         >
                             <Compass size={18} />
                         </button>
@@ -186,17 +227,13 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
                                             </button>
                                         </div>
 
-                                        <MarkdownToolbar 
-                                            textareaRef={null as any} 
-                                            content={scene.prose_content || ''} 
-                                            onUpdate={(val) => handleTextChange(val, scene.id)} 
-                                        />
                                         <textarea 
                                             value={scene.prose_content || ''}
                                             onMouseUp={handleMouseUp}
                                             onChange={(e) => handleTextChange(e.target.value, scene.id)}
                                             placeholder="Weave this sequence..."
-                                            className="w-full h-auto min-h-[300px] bg-transparent border-none outline-none resize-none font-serif text-xl leading-[1.8] text-nexus-text selection:bg-nexus-ruby/20 placeholder:text-nexus-muted/10 overflow-hidden"
+                                            spellCheck={false}
+                                            className="w-full h-auto min-h-[300px] bg-transparent border-none outline-none resize-none font-serif text-xl leading-[1.8] text-nexus-text selection:bg-nexus-accent/20 placeholder:text-nexus-muted/10 overflow-hidden"
                                             style={{ height: 'auto' }}
                                             onInput={(e) => {
                                                 const el = e.target as HTMLTextAreaElement;
@@ -206,27 +243,17 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
                                         />
                                     </div>
                                 ))}
-                                {scenesInChapter.length === 0 && (
-                                    <div className="py-40 text-center opacity-30">
-                                        <History size={48} className="mx-auto mb-6" />
-                                        <p className="text-sm font-display font-black uppercase tracking-widest">Chapter sequence void.</p>
-                                    </div>
-                                )}
                             </div>
                         ) : (
                             <div className="flex flex-col gap-8 h-full animate-in fade-in duration-500">
-                                <MarkdownToolbar 
-                                    textareaRef={editorRef} 
-                                    content={focusedNode?.prose_content || ''} 
-                                    onUpdate={(val) => handleTextChange(val)} 
-                                />
                                 <textarea 
                                     ref={editorRef}
                                     value={focusedNode?.prose_content || ''}
                                     onMouseUp={handleMouseUp}
                                     onChange={(e) => handleTextChange(e.target.value)}
-                                    placeholder="# Manifest the scry..."
-                                    className="flex-1 w-full bg-transparent border-none outline-none resize-none font-serif text-2xl leading-[1.8] text-nexus-text selection:bg-nexus-ruby/20 placeholder:text-nexus-muted/20"
+                                    placeholder="Manifest the search..."
+                                    spellCheck={false}
+                                    className="flex-1 w-full bg-transparent border-none outline-none resize-none font-serif text-2xl leading-[1.8] text-nexus-text selection:bg-nexus-accent/20 placeholder:text-nexus-muted/20 no-scrollbar"
                                 />
                             </div>
                         )}
@@ -235,14 +262,14 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
 
                 <footer className="h-12 border-t border-nexus-800 bg-nexus-900 flex items-center px-6 justify-between shrink-0 z-10">
                     <div className="flex items-center gap-6 text-[9px] font-mono text-nexus-muted uppercase tracking-widest font-bold">
-                        <span className="flex items-center gap-2"><LayoutTemplate size={12} className="text-nexus-arcane" /> {isChapterMode ? 'Composite Manifest' : 'Focused Manifest'}</span>
-                        <span>{focusedNode?.prose_content?.length || 0} symbols</span>
-                        <span>{scannedMentions.size} world syncs</span>
+                        <span className="flex items-center gap-2"><LayoutTemplate size={12} className="text-nexus-arcane" /> {isChapterMode ? 'COMPOSITE_RAW' : 'FOCUSED_RAW'}</span>
+                        <span>{focusedNode?.prose_content?.length || 0} symbols manifest</span>
+                        <span>{scannedMentions.size} world syncs active</span>
                     </div>
                     <div className="flex items-center gap-4">
                          <div className="flex items-center gap-2">
                             <Activity size={12} className="text-nexus-essence animate-pulse" />
-                            <span className="text-[9px] font-black text-nexus-essence uppercase tracking-widest">Logic stabilized</span>
+                            <span className="text-[9px] font-black text-nexus-essence uppercase tracking-widest">Neural Stability: Optimal</span>
                          </div>
                     </div>
                 </footer>

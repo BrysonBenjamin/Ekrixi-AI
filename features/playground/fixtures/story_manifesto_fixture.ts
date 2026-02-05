@@ -1,7 +1,10 @@
-import { StudioBlock } from '../../story-studio/StoryStudioFeature';
+
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../../story-studio/types';
 import { generateId } from '../../../utils/ids';
 import { NexusCategory } from '../../../types';
 
+// Renamed from getSeedStoryBlueprint to getSeedStoryManifesto to fix import errors in PlaygroundFeature.tsx and ManifestoForge.tsx
 export const getSeedStoryManifesto = (): StudioBlock[] => {
     return [
         {

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
     Activity, Plus, Trash2, Check, ShieldAlert, FileCode, ArrowUp, ArrowDown, 
@@ -8,7 +7,8 @@ import {
     ChevronRight, ChevronLeft, LayoutTemplate, Layers
 } from 'lucide-react';
 import { NexusObject, StoryType, NexusType, NexusCategory, HierarchyType, isLink, NarrativeStatus, isContainer } from '../../../types';
-import { StudioBlock } from '../StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../types';
 import { StudioSpineAgent } from './StudioSpineAgent';
 import { generateId } from '../../../utils/ids';
 import { ManifestoForge } from './ManifestoForge';
@@ -28,15 +28,15 @@ interface StudioSpineProps {
     onSetZoomedSceneId: (id: string | null) => void;
     isCompositeMode: boolean;
     onSetCompositeMode: (val: boolean) => void;
-    isChapterManifestoMode: boolean;
-    onSetChapterManifestoMode: (val: boolean) => void;
+    isChapterBlueprintMode: boolean;
+    onSetChapterBlueprintMode: (val: boolean) => void;
 }
 
 export const StudioSpine: React.FC<StudioSpineProps> = ({ 
     items, onUpdate, registry, blocks, onUpdateBlocks, onCommitBatch, onBackToManifesto,
     zoomedChapterId, onSetZoomedChapterId, zoomedSceneId, onSetZoomedSceneId,
     isCompositeMode, onSetCompositeMode,
-    isChapterManifestoMode, onSetChapterManifestoMode
+    isChapterBlueprintMode, onSetChapterBlueprintMode
 }) => {
     const [isSynthesizing, setIsSynthesizing] = useState(false);
     const [synthStatus, setSynthStatus] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         }).sort((a, b) => ((a as any).sequence_index || 0) - ((b as any).sequence_index || 0));
     }, [items, zoomedChapterId]);
 
-    const handleUpdateChapterManifesto = (chapterId: string, newBlocks: StudioBlock[]) => {
+    const handleUpdateChapterBlueprint = (chapterId: string, newBlocks: StudioBlock[]) => {
         setChapterManifestos(prev => ({ ...prev, [chapterId]: newBlocks }));
         onUpdate(items.map(item => 
             item.id === chapterId ? { ...item, manifesto_data: newBlocks, last_modified: new Date().toISOString() } : item
@@ -120,7 +120,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
             }));
             const nextItems = [...items, ...generatedScenes, ...hierarchyLinks];
             onUpdate(nextItems as any);
-            onSetChapterManifestoMode(false);
+            onSetChapterBlueprintMode(false);
         } catch (err) {
             console.error("Scene Synthesis Failed", err);
         } finally {
@@ -129,24 +129,24 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         }
     };
 
-    const handleExportChapterManifesto = (id: string) => {
+    const handleExportChapterBlueprint = (id: string) => {
         const data = JSON.stringify(chapterManifestos[id] || [], null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `chapter_${id}_manifesto.json`;
+        a.download = `chapter_${id}_blueprint.json`;
         a.click();
     };
 
-    const handleImportChapterManifesto = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
+    const handleImportChapterBlueprint = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
                 const imported = JSON.parse(ev.target?.result as string);
-                handleUpdateChapterManifesto(id, imported);
+                handleUpdateChapterBlueprint(id, imported);
             } catch (err) { alert("Invalid Format"); }
         };
         reader.readAsText(file);
@@ -219,7 +219,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                 </div>
                 <div className="text-center max-w-xl space-y-6">
                     <h2 className="text-4xl font-display font-black text-nexus-text uppercase tracking-tighter">Manifest <span className="text-nexus-ruby">Manuscript.</span></h2>
-                    <p className="text-nexus-muted text-lg font-serif italic opacity-70">Synthesize Manifesto logic into a coherent sequence of narrative beads.</p>
+                    <p className="text-nexus-muted text-lg font-serif italic opacity-70">Synthesize Blueprint logic into a coherent sequence of narrative beads.</p>
                     <div className="flex gap-4 justify-center">
                         <button onClick={async () => {
                             setIsSynthesizing(true);
@@ -241,7 +241,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
 
     if (isSynthesizing) return <div className="h-full flex flex-col items-center justify-center bg-nexus-950"><RotateCw className="text-nexus-ruby animate-spin mb-8" size={64} /><h2 className="text-2xl font-display font-black text-nexus-text uppercase tracking-widest animate-pulse">{synthStatus}</h2></div>;
 
-    // SCENE WEAVER MODE
+    // SCENE CHAT MODE
     if (zoomedSceneId || isCompositeMode) {
         return (
             <div className="h-full flex flex-col bg-nexus-950">
@@ -277,19 +277,19 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
             <header className="h-20 flex items-center justify-between px-10 border-b border-nexus-800 bg-nexus-900/20 shrink-0">
                 <div className="flex items-center gap-4 min-w-0 overflow-hidden">
                     {zoomedChapterId ? (
-                        <button onClick={() => { onSetZoomedChapterId(null); onSetChapterManifestoMode(false); }} className="p-2 bg-nexus-900 border border-nexus-800 rounded-xl text-nexus-muted hover:text-nexus-ruby mr-2 shrink-0"><ArrowLeft size={18} /></button>
+                        <button onClick={() => { onSetZoomedChapterId(null); onSetChapterBlueprintMode(false); }} className="p-2 bg-nexus-900 border border-nexus-800 rounded-xl text-nexus-muted hover:text-nexus-ruby mr-2 shrink-0"><ArrowLeft size={18} /></button>
                     ) : (
                         <div className="p-2 bg-nexus-ruby/10 rounded-xl text-nexus-ruby border border-nexus-ruby/20 shrink-0"><Activity size={18} /></div>
                     )}
                     <div className="min-w-0">
                         <h2 className="text-xl font-display font-black text-nexus-text tracking-tighter uppercase truncate">
-                            {zoomedChapterId ? (isChapterManifestoMode ? <span>Chapter <span className="text-nexus-arcane">Manifesto</span></span> : <span>Scene <span className="text-nexus-arcane">Directory</span></span>) : <span>Nodic <span className="text-nexus-ruby">History</span></span>}
+                            {zoomedChapterId ? (isChapterBlueprintMode ? <span>Chapter <span className="text-nexus-arcane">Blueprint</span></span> : <span>Scene <span className="text-nexus-arcane">Directory</span></span>) : <span>Nodic <span className="text-nexus-ruby">History</span></span>}
                         </h2>
                         <p className="text-[10px] font-mono text-nexus-muted uppercase tracking-widest truncate">{zoomedChapterId ? `BEAT_FOCUS: ${zoomedNode?.title}` : 'Structural Chapters'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    {zoomedChapterId && !isChapterManifestoMode && (
+                    {zoomedChapterId && !isChapterBlueprintMode && (
                         <button 
                             onClick={() => onSetCompositeMode(true)}
                             className="flex items-center gap-2 px-4 py-1.5 bg-nexus-arcane text-white rounded-full text-[9px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-nexus-arcane/20 transition-all mr-2"
@@ -302,13 +302,17 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                         onClick={onBackToManifesto}
                         className="flex items-center gap-2 px-4 py-1.5 bg-nexus-900 border border-nexus-800 text-nexus-muted rounded-full text-[9px] font-black uppercase tracking-widest hover:text-nexus-ruby transition-all mr-2 group"
                     >
-                        <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> {zoomedChapterId && (chapterManifestos[zoomedChapterId]?.length > 0) ? 'Chapter Manifesto' : 'Global Manifesto'}
+                        <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> {zoomedChapterId && (chapterManifestos[zoomedChapterId]?.length > 0) ? 'Chapter Blueprint' : 'Global Blueprint'}
                     </button>
 
-                    {zoomedChapterId && isChapterManifestoMode && (
+                    {zoomedChapterId && isChapterBlueprintMode && (
                             <div className="flex gap-1.5 mr-2">
-                            <button onClick={() => handleExportChapterManifesto(zoomedChapterId)} className="p-2 rounded-xl bg-nexus-950 border border-nexus-800 text-nexus-muted hover:text-white" title="Export Chapter Manifesto"><Download size={14}/></button>
-                            <label className="p-2 rounded-xl bg-nexus-950 border border-nexus-800 text-nexus-muted hover:text-white cursor-pointer" title="Import Chapter Manifesto"><Upload size={14}/><input type="file" className="hidden" onChange={handleImportChapterManifesto} accept=".json" /></label>
+                            <button onClick={() => handleExportChapterBlueprint(zoomedChapterId)} className="p-2 rounded-xl bg-nexus-950 border border-nexus-800 text-nexus-muted hover:text-white" title="Export Chapter Blueprint"><Download size={14}/></button>
+                            <label className="p-2 rounded-xl bg-nexus-950 border border-nexus-800 text-nexus-muted hover:text-white cursor-pointer" title="Import Chapter Blueprint">
+                                <Upload size={14}/>
+                                {/* Fix: Wrap handleImportChapterBlueprint to provide the zoomedChapterId */}
+                                <input type="file" className="hidden" onChange={(e) => handleImportChapterBlueprint(e, zoomedChapterId!)} accept=".json" />
+                            </label>
                             </div>
                     )}
                     {!zoomedChapterId && <button onClick={() => { setShowAudit(true); setIsAuditing(true); StudioSpineAgent.analyzeStructure(blocks, chapters as any).then(setAuditResult).finally(() => setIsAuditing(false)); }} className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all"><ShieldAlert size={14} /> Audit</button>}
@@ -317,32 +321,32 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
             </header>
 
             <div className="flex-1 overflow-y-auto no-scrollbar p-10 space-y-12">
-                {zoomedChapterId && currentList.length === 0 && !isChapterManifestoMode ? (
+                {zoomedChapterId && currentList.length === 0 && !isChapterBlueprintMode ? (
                     <div className="h-full flex flex-col items-center justify-center space-y-10 animate-in fade-in duration-500">
                             <div className="text-center space-y-4">
                             <h3 className="text-3xl font-display font-black text-nexus-text uppercase">Empty <span className="text-nexus-arcane">Chronicle</span></h3>
-                            <p className="text-nexus-muted text-sm font-serif italic max-w-sm">"The chapter remains a void. Choose your manifest protocol to establish narrative mass."</p>
+                            <p className="text-nexus-muted text-sm font-serif italic max-w-sm">"The chapter remains a void. Choose your blueprint protocol to establish narrative mass."</p>
                             </div>
                             <div className="flex gap-6">
-                            <button onClick={() => { onSetChapterManifestoMode(true); handleUpdateChapterManifesto(zoomedChapterId, []); }} className="group w-64 p-8 bg-nexus-900 border border-nexus-arcane/30 hover:border-nexus-arcane rounded-[40px] text-center transition-all shadow-xl hover:-translate-y-2">
+                            <button onClick={() => { onSetChapterBlueprintMode(true); handleUpdateChapterBlueprint(zoomedChapterId, []); }} className="group w-64 p-8 bg-nexus-900 border border-nexus-arcane/30 hover:border-nexus-arcane rounded-[40px] text-center transition-all shadow-xl hover:-translate-y-2">
                                 <Sparkles size={32} className="mx-auto mb-6 text-nexus-arcane group-hover:scale-110 transition-transform" />
-                                <div className="text-xs font-black uppercase tracking-widest mb-2 text-nexus-text">Chapter Manifesto</div>
+                                <div className="text-xs font-black uppercase tracking-widest mb-2 text-nexus-text">Chapter Blueprint</div>
                                 <p className="text-[10px] text-nexus-muted italic">Generate scene hierarchy via AI synthesis blocks.</p>
                             </button>
                             <button onClick={() => handleAddScene(zoomedChapterId)} className="group w-64 p-8 bg-nexus-950 border border-nexus-800 hover:border-nexus-text rounded-[40px] text-center transition-all shadow-xl hover:-translate-y-2">
                                 <PenTool size={32} className="mx-auto mb-6 text-nexus-muted group-hover:text-nexus-text group-hover:scale-110 transition-transform" />
                                 <div className="text-xs font-black uppercase tracking-widest mb-2 text-nexus-text">Direct Outline</div>
-                                <p className="text-[10px] text-nexus-muted italic">Manually plot the scions and narrative scry.</p>
+                                <p className="text-[10px] text-nexus-muted italic">Manually plot the scions and narrative search.</p>
                             </button>
                             </div>
                     </div>
-                ) : zoomedChapterId && isChapterManifestoMode ? (
+                ) : zoomedChapterId && isChapterBlueprintMode ? (
                     <div className="max-w-4xl mx-auto">
                         <ManifestoForge 
-                            title="Chapter Manifesto"
+                            title="Chapter Blueprint"
                             subtitle={`Refining ${zoomedNode?.title}`}
                             blocks={chapterManifestos[zoomedChapterId] || []}
-                            onUpdateBlocks={(b) => handleUpdateChapterManifesto(zoomedChapterId, b)}
+                            onUpdateBlocks={(b) => handleUpdateChapterBlueprint(zoomedChapterId, b)}
                             registry={registry}
                             accentColor="nexus-arcane"
                             synthesisLabel="Synthesize Chapter Scenes"
@@ -354,7 +358,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                             context="CHAPTER"
                         />
                         <div className="flex justify-center mt-8">
-                            <button onClick={() => onSetChapterManifestoMode(false)} className="text-[10px] font-black text-nexus-muted uppercase tracking-widest hover:text-red-500">Back to Scene List</button>
+                            <button onClick={() => onSetChapterBlueprintMode(false)} className="text-[10px] font-black text-nexus-muted uppercase tracking-widest hover:text-red-500">Back to Scene List</button>
                         </div>
                     </div>
                 ) : (
@@ -405,7 +409,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                                                     Run Fill
                                                 </button>
                                             </div>
-                                            <p className="text-[8px] text-nexus-muted italic px-1">Analyzes surrounding beats and global manifesto to establish title/gist.</p>
+                                            <p className="text-[8px] text-nexus-muted italic px-1">Analyzes surrounding beats and global blueprint to establish title/gist.</p>
                                         </div>
 
                                         <div className="flex justify-end gap-3 pt-2">
@@ -421,13 +425,13 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                                                 <TensionIndicator value={ch.tension_level} />
                                                 <button onClick={() => handleNeuralFill(ch.id)} disabled={isFillingId === ch.id} className="p-2 text-nexus-essence hover:brightness-125 transition-all disabled:opacity-30" title="Prose Generation"><Wand2 size={18} className={isFillingId === ch.id ? 'animate-spin' : ''} /></button>
                                                 <button onClick={() => setEditingId(ch.id)} className="p-2 text-nexus-muted hover:text-nexus-ruby transition-colors"><Edit3 size={18}/></button>
-                                                <button onClick={() => zoomedChapterId ? onSetZoomedSceneId(ch.id) : onSetZoomedChapterId(ch.id)} className={`p-2 px-4 ${zoomedChapterId ? 'bg-nexus-arcane/10 text-nexus-arcane border-nexus-arcane/20 hover:bg-nexus-arcane' : 'bg-nexus-ruby/10 text-nexus-ruby border-nexus-ruby/20 hover:bg-nexus-ruby'} hover:text-white rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-2 border`}><Maximize2 size={12}/> Focus Scry</button>
+                                                <button onClick={() => zoomedChapterId ? onSetZoomedSceneId(ch.id) : onSetZoomedChapterId(ch.id)} className={`p-2 px-4 ${zoomedChapterId ? 'bg-nexus-arcane/10 text-nexus-arcane border-nexus-arcane/20 hover:bg-nexus-arcane' : 'bg-nexus-ruby/10 text-nexus-ruby border-nexus-ruby/20 hover:bg-nexus-ruby'} hover:text-white rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-2 border`}><Maximize2 size={12}/> Focus Search</button>
                                             </div>
                                         </div>
                                         <p className="text-[15px] text-nexus-muted font-serif italic leading-relaxed mb-6">"{ch.gist}"</p>
                                         {!zoomedChapterId && (
                                             <div className="space-y-4 border-t border-nexus-800/50 pt-8">
-                                                <div className="flex items-center gap-3 mb-2 opacity-50"><ScrollText size={12} className="text-nexus-arcane" /><span className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-[0.3em]">Scene Manifest</span></div>
+                                                <div className="flex items-center gap-3 mb-2 opacity-50"><ScrollText size={12} className="text-nexus-arcane" /><span className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-[0.3em]">Scene Blueprint</span></div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {items.filter(i => (i as any).story_type === StoryType.SCENE && items.some(l => isLink(l) && l.source_id === ch.id && l.target_id === i.id)).map(sc => (
                                                         <button key={sc.id} onClick={() => { onSetZoomedChapterId(ch.id); onSetZoomedSceneId(sc.id); }} className="px-4 py-2 bg-nexus-950 border border-nexus-800 rounded-xl text-[10px] font-bold text-nexus-muted hover:border-nexus-arcane transition-all truncate max-w-[150px]">{(sc as any).title}</button>

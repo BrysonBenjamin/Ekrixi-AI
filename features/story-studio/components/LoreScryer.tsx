@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Search, X, MapPin, Users, Box, Ghost, ArrowRight, Share2 } from 'lucide-react';
 import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../types';
@@ -37,7 +36,7 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
                 <header className="h-16 flex items-center justify-between px-6 border-b border-nexus-800 bg-nexus-900/50 backdrop-blur-xl">
                     <div className="flex items-center gap-3">
                         <Search size={16} className="text-nexus-accent" />
-                        <span className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Lore Scryer</span>
+                        <span className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">Lore Searcher</span>
                     </div>
                     <button onClick={onClose} className="p-1.5 text-nexus-muted hover:text-white transition-colors">
                         <X size={16} />
@@ -51,7 +50,7 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
                     <input 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Scry world memory..."
+                        placeholder="Search world memory..."
                         className="w-full bg-nexus-950 border border-nexus-800 rounded-xl pl-9 pr-4 py-2.5 text-[10px] text-nexus-text outline-none focus:border-nexus-accent transition-all"
                     />
                 </div>
@@ -87,7 +86,7 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
 
             <footer className="p-4 bg-nexus-950/50 border-t border-nexus-800 shrink-0">
                  <p className="text-[8px] text-nexus-muted font-mono uppercase tracking-widest leading-relaxed">
-                    Drag units into writing fields or the Weaver Chat for contextual scrying.
+                    Drag units into writing fields or the Chat for contextual searching.
                  </p>
             </footer>
         </aside>

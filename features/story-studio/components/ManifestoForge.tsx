@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -11,7 +10,8 @@ import {
     List, GitMerge, FastForward, History, Archive, Repeat,
     Eye, Flame, Sword, Crown, MapPin, Users
 } from 'lucide-react';
-import { StudioBlock, BlockType } from '../StoryStudioFeature';
+// Fix: Import StudioBlock, BlockType from types
+import { StudioBlock, BlockType } from '../types';
 import { NexusObject, NexusCategory, isLink, isContainer, NexusType, HierarchyType } from '../../../types';
 import { generateId } from '../../../utils/ids';
 import { StudioSpineAgent } from './StudioSpineAgent';
@@ -220,7 +220,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
         setShowBlockPicker(false);
     };
 
-    const handleAiManifestRequest = async () => {
+    const handleAiBlueprintRequest = async () => {
         if (!aiSeedInput.trim()) return;
         setIsSeedingAi(true);
         try {
@@ -257,8 +257,8 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
         const before = text.slice(0, atMenu.pos);
         const after = text.slice(atMenu.pos);
         const lastAt = before.lastIndexOf('@');
-        const next = before.slice(0, lastAt) + `[[${title}]]` + after;
-        updateBlockData(atMenu.blockId, { [atMenu.field]: next });
+        const newText = before.slice(0, lastAt) + `[[${title}]]` + after;
+        updateBlockData(atMenu.blockId, { [atMenu.field]: newText });
         setAtMenu(null);
     };
 
@@ -280,7 +280,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
             <div className={`flex items-start ${blocks.length === 0 ? 'justify-end' : 'justify-between'} shrink-0`}>
                 {blocks.length > 0 && (
                     <div className="animate-in slide-in-from-left duration-500">
-                        <h2 className="text-3xl font-display font-black text-nexus-text uppercase tracking-tight">{title}</h2>
+                        <h2 className="text-3xl font-display font-black text-nexus-text uppercase tracking-tight">{title.replace('Manifesto', 'Blueprint')}</h2>
                         <p className="text-[10px] font-mono text-nexus-muted uppercase tracking-widest">{subtitle}</p>
                     </div>
                 )}
@@ -313,12 +313,12 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
                                 <LayoutTemplate size={48} />
                             </div>
                             <h3 className="text-3xl font-display font-black text-nexus-text uppercase tracking-tight">
-                                {isGlobal ? 'Empty Manifesto' : 'Chapter Mini-Manifesto'}
+                                {isGlobal ? 'Empty Blueprint' : 'Chapter Mini-Blueprint'}
                             </h3>
                             <p className="text-sm text-nexus-muted font-serif italic max-w-sm mx-auto leading-relaxed">
                                 {isGlobal 
                                     ? '"The narrative void awaits its core protocols. Initialize the forge via manual units, AI synthesis, or structural templates."'
-                                    : '"Refine the specific causal logic for this chapter segment. Bridge global thesis into granular narrative mass."'}
+                                    : '"Refine the specific causal logic for this chapter segment. Bridge global blueprint into granular narrative mass."'}
                             </p>
                         </div>
 
@@ -328,12 +328,12 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
                                     <input 
                                         value={aiSeedInput}
                                         onChange={(e) => setAiSeedInput(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAiManifestRequest()}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAiBlueprintRequest()}
                                         placeholder={isGlobal ? "Describe your story idea to manifest blocks..." : "Describe this chapter's sequence to manifest logic..."}
                                         className={`w-full bg-nexus-950 border border-nexus-800 rounded-[32px] px-8 py-5 text-nexus-text outline-none focus:border-${activeColorClass} transition-all shadow-2xl font-serif italic pr-20`}
                                     />
                                     <button 
-                                        onClick={handleAiManifestRequest}
+                                        onClick={handleAiBlueprintRequest}
                                         disabled={!aiSeedInput.trim() || isSeedingAi}
                                         className={`absolute right-3 top-1/2 -translate-y-1/2 p-4 bg-${activeColorClass} text-white rounded-[24px] shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50`}
                                     >
@@ -417,7 +417,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
                                         onClick={() => setActiveSearchBlockId(activeSearchBlockId === block.id ? null : block.id)}
                                         className={`px-3 py-1.5 rounded-lg bg-nexus-950 border border-nexus-800 text-[8px] font-black uppercase tracking-widest text-nexus-muted hover:text-${activeColorClass} transition-all`}
                                     >
-                                        Scry Registry
+                                        Search Registry
                                     </button>
                                 )}
                             </div>
@@ -440,7 +440,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
             {atMenu && suggestions.length > 0 && (
                 <div className="fixed z-[300] w-64 bg-nexus-900 border border-nexus-700 rounded-[24px] shadow-2xl overflow-hidden backdrop-blur-xl animate-in zoom-in-95"
                      style={{ left: '50%', transform: 'translateX(-50%)', bottom: '100px' }}>
-                    <div className={`px-5 py-3 border-b border-nexus-800 bg-nexus-950/40 text-[9px] font-black text-${activeColorClass} uppercase tracking-widest`}>Neural Scry</div>
+                    <div className={`px-5 py-3 border-b border-nexus-800 bg-nexus-950/40 text-[9px] font-black text-${activeColorClass} uppercase tracking-widest`}>Neural Search</div>
                     <div className="max-h-48 overflow-y-auto no-scrollbar p-1 space-y-0.5">
                         {suggestions.map((node: any) => (
                             <button key={node.id} onClick={() => insertMention(node.title)} className={`w-full flex items-center gap-3 p-3 hover:bg-${activeColorClass} hover:text-white transition-all text-left group rounded-xl`}>
@@ -571,7 +571,7 @@ const StudioBlockEditor: React.FC<{
     onShowTheory?: (id: string) => void;
     activeColorClass: string;
 }> = ({ block, onUpdate, onInput, registry, allBlocks, onCommit, onShowTheory, activeColorClass }) => {
-    const [isScrying, setIsScrying] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
 
     const handleDropText = (e: React.DragEvent, field: string) => {
@@ -689,7 +689,7 @@ const StudioBlockEditor: React.FC<{
                             value={block.data.rationale} 
                             onChange={(e) => onInput(block.id, 'rationale', e.target.value, e.target.selectionStart || 0)} 
                             onSelect={(e) => onInput(block.id, 'rationale', (e.target as any).value, (e.target as any).selectionStart || 0)}
-                            placeholder="Why does this structure serve your thesis? (Drag lore here to link)" 
+                            placeholder="Why does this structure serve your blueprint? (Drag lore here to link)" 
                             className={`${commonTextProps('rationale').className} h-28 shadow-inner`}
                         />
                     </div>
@@ -738,8 +738,8 @@ const StudioBlockEditor: React.FC<{
             );
 
         case 'LATENT_UNIT':
-            const runScry = async () => {
-                setIsScrying(true);
+            const runSearch = async () => {
+                setIsSearching(true);
                 try {
                     const result = await StudioSpineAgent.autofillLatentUnit(block.data.title, block.data.draftPrompt, allBlocks, registry);
                     onUpdate({ 
@@ -749,7 +749,7 @@ const StudioBlockEditor: React.FC<{
                         tags: result.tags, 
                         thematicWeight: result.thematicWeight 
                     });
-                } catch (e) { console.error(e); } finally { setIsScrying(false); }
+                } catch (e) { console.error(e); } finally { setIsSearching(false); }
             };
 
             const commitToRegistry = () => {
@@ -802,18 +802,18 @@ const StudioBlockEditor: React.FC<{
                                 value={block.data.draftPrompt} 
                                 onChange={(e) => onInput(block.id, 'draftPrompt', e.target.value, e.target.selectionStart || 0)} 
                                 onSelect={(e) => onInput(block.id, 'draftPrompt', (e.target as any).value, (e.target as any).selectionStart || 0)}
-                                onKeyDown={(e) => e.key === 'Enter' && runScry()}
+                                onKeyDown={(e) => e.key === 'Enter' && runSearch()}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => handleDropText(e, 'draftPrompt')}
                                 placeholder="Describe the role... (Drag lore to reference)" 
                                 className="flex-1 bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-3 text-xs outline-none focus:border-nexus-essence"
                             />
                             <button 
-                                onClick={runScry}
-                                disabled={isScrying || !block.data.title}
+                                onClick={runSearch}
+                                disabled={isSearching || !block.data.title}
                                 className="px-6 py-3 bg-nexus-essence text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 flex items-center gap-3 disabled:opacity-50"
                             >
-                                {isScrying ? <RotateCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                {isSearching ? <RotateCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                 Draft Unit
                             </button>
                         </div>
@@ -838,7 +838,7 @@ const StudioBlockEditor: React.FC<{
                                     {block.data.aliases?.map((a: string) => (
                                         <span key={a} className="px-2 py-1 bg-nexus-essence/10 border border-nexus-essence/30 rounded text-[9px] font-bold text-nexus-essence">{a}</span>
                                     ))}
-                                    {!block.data.aliases?.length && <span className="text-[8px] text-nexus-muted/40 italic">Waiting for scry...</span>}
+                                    {!block.data.aliases?.length && <span className="text-[8px] text-nexus-muted/40 italic">Waiting for search...</span>}
                                 </div>
                             </div>
                             <div className="space-y-2">
@@ -847,13 +847,13 @@ const StudioBlockEditor: React.FC<{
                                     {block.data.tags?.map((t: string) => (
                                         <span key={t} className="px-2 py-1 bg-nexus-950 border border-nexus-800 rounded text-[9px] font-bold text-nexus-muted">#{t}</span>
                                     ))}
-                                    {!block.data.tags?.length && <span className="text-[8px] text-nexus-muted/40 italic">Waiting for scry...</span>}
+                                    {!block.data.tags?.length && <span className="text-[8px] text-nexus-muted/40 italic">Waiting for search...</span>}
                                 </div>
                             </div>
                          </div>
                          <div className="space-y-2">
                              <label className="text-[8px] font-black uppercase text-nexus-muted tracking-[0.3em] ml-1 flex items-center gap-2"><Fingerprint size={10} /> Thematic Inheritance</label>
-                             <div className="p-4 bg-nexus-900 border border-nexus-800 rounded-xl text-[10px] text-nexus-muted font-serif leading-relaxed italic">
+                             <div className="p-4 bg-nexus-900 border border-nexus-800 rounded-xl text-[10px] text-nexus-muted font-serif italic leading-relaxed italic">
                                  {block.data.thematicWeight || "Neural weights not yet established."}
                              </div>
                          </div>
@@ -912,8 +912,8 @@ const StudioBlockEditor: React.FC<{
                                      <FileSearch size={32} className={isDragOver ? 'animate-bounce' : 'opacity-20'} />
                                  </div>
                                  <div className="max-w-xs">
-                                     <h4 className="text-sm font-black uppercase text-nexus-muted tracking-widest mb-1">{isDragOver ? 'Release to Synchronize' : 'Awaiting Memory Scry'}</h4>
-                                     <p className="text-[10px] text-nexus-muted font-serif italic">Drag lore here or use the Scry Registry button above to link an existing concept.</p>
+                                     <h4 className="text-sm font-black uppercase text-nexus-muted tracking-widest mb-1">{isDragOver ? 'Release to Synchronize' : 'Awaiting Memory Search'}</h4>
+                                     <p className="text-[10px] text-nexus-muted font-serif italic">Drag lore here or use the Search Registry button above to link an existing concept.</p>
                                  </div>
                              </div>
                          )}

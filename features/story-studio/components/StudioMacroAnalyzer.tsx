@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
     Activity, 
@@ -17,7 +16,8 @@ import {
     Search,
     BookOpen
 } from 'lucide-react';
-import { StudioBlock } from '../StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import { NexusObject } from '../../../types';
 
@@ -44,7 +44,7 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({ blocks
             
             const prompt = `
                 ACT AS: The Macro-Sequence Oracle for Ekrixi AI.
-                CONTEXT: I am providing a story Manifesto consisting of blocks (Thesis, Delta, Context, etc.).
+                CONTEXT: I am providing a story Blueprint consisting of blocks (Thesis, Delta, Context, etc.).
                 BLOCKS:
                 ${contextSummary}
                 
@@ -112,7 +112,7 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({ blocks
                 <div className="space-y-6">
                     <div className="flex items-center gap-3 px-2">
                         <Compass size={16} className="text-nexus-ruby" />
-                        <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.3em]">Current Manifest Context</span>
+                        <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.3em]">Current Blueprint Context</span>
                     </div>
                     
                     <div className="bg-nexus-950 border border-nexus-800 rounded-[32px] p-8 shadow-xl relative overflow-hidden group">
@@ -144,7 +144,7 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({ blocks
                         </div>
                         <div className="max-w-xs space-y-3">
                              <h3 className="text-lg font-display font-bold uppercase tracking-tight">Idle State</h3>
-                             <p className="text-xs text-nexus-muted font-serif italic leading-relaxed">"Synchronize the Manifesto logic with narrative archetypes to evaluate sequence fidelity."</p>
+                             <p className="text-xs text-nexus-muted font-serif italic leading-relaxed">"Synchronize the Blueprint logic with narrative archetypes to evaluate sequence fidelity."</p>
                         </div>
                         <button 
                             onClick={handleRunAnalysis}

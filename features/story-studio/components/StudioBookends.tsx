@@ -1,5 +1,6 @@
 import React from 'react';
-import { StudioBlock } from '../StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../types';
 import { ManifestoForge } from './ManifestoForge';
 import { NexusObject } from '../../../types';
 
@@ -23,7 +24,7 @@ export const StudioBookends: React.FC<StudioBookendsProps> = ({
             <div className="flex-1 flex flex-col min-w-0 p-10 lg:p-20 overflow-y-auto no-scrollbar relative">
                 <div className="max-w-5xl mx-auto w-full">
                     <ManifestoForge 
-                        title="Manifesto Forge"
+                        title="Blueprint Forge"
                         subtitle="Assembling Manuscript Prerequisites"
                         blocks={blocks}
                         onUpdateBlocks={onUpdateBlocks}

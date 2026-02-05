@@ -3,7 +3,8 @@
  * Version: 4.3 (Dramaturgical Storage Extension)
  */
 
-import { StudioBlock } from './features/story-studio/StoryStudioFeature';
+// Fix: Import StudioBlock from the correct types file
+import { StudioBlock } from './features/story-studio/types';
 
 export interface NexusElement {
   id: string;

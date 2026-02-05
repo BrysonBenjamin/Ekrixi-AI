@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { BookOpen, History, Library, Plus, PlusCircle, Activity } from 'lucide-react';
 import { NexusObject, NexusType, StoryType } from '../../../types';
-import { StudioBlock } from '../StoryStudioFeature';
+// Fix: Import StudioBlock from types
+import { StudioBlock } from '../types';
 
 interface ManuscriptGalleryProps {
     registry: Record<string, NexusObject>;
