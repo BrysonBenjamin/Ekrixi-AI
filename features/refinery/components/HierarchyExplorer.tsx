@@ -95,6 +95,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const item = registry[id];
+        // Allow dropping onto any node that isn't a simple link
         if (id === 'root' || (item && !isLink(item))) {
             if (dragOverId !== id) setDragOverId(id);
         }
@@ -116,13 +117,14 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
     const handleExecuteDrop = (isReference: boolean) => {
         if (pendingDrop && onReparent) {
             onReparent(pendingDrop.sourceId, pendingDrop.targetId, pendingDrop.oldParentId, isReference);
+            // Auto-expand target if it was a file that became a folder
+            setExpandedFolders(prev => new Set([...prev, pendingDrop.targetId]));
         }
         setPendingDrop(null);
     };
 
     const isCycle = useMemo(() => {
         if (!pendingDrop || pendingDrop.targetId === 'root') return false;
-        // Updated to use central GraphIntegrityService
         return GraphIntegrityService.detectCycle(pendingDrop.targetId, pendingDrop.sourceId, registry);
     }, [pendingDrop, registry]);
 
@@ -249,7 +251,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
                     <div className="flex items-center gap-3">
                         <Boxes size={16} className="text-nexus-accent" />
                         <span className={`text-[11px] font-display font-black uppercase tracking-[0.2em] ${dragOverId === 'root' ? 'text-nexus-text' : 'text-nexus-text opacity-70'}`}>
-                            {dragOverId === 'root' ? 'Relocate to Origin' : 'File System'}
+                            {dragOverId === 'root' ? 'Relocate to Origin' : 'Registry Map'}
                         </span>
                     </div>
                     <button onClick={() => setIsCollapsed(true)} className="p-1.5 hover:bg-nexus-800 rounded-lg text-nexus-muted hover:text-nexus-text transition-all"><ChevronLeft size={18} /></button>

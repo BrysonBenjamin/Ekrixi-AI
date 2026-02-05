@@ -3,9 +3,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import * as d3 from 'd3';
 import { NexusObject, isLink } from '../../../types';
 import { TreeHUD } from '../../structure/components/visualizer/TreeHUD';
-import { ResponsiveTree } from '../../structure/components/visualizer/ResponsiveTree';
+import { ResponsiveTree } from './visualizer/ResponsiveTree';
 import { TraditionalContextMenu } from '../../structure/components/visualizer/TraditionalContextMenu';
-import { FloatingContextualMenu } from '../../structure/components/visualizer/FloatingContextualMenu';
 
 interface StructureVisualizerProps {
     registry: Record<string, NexusObject>;
@@ -21,10 +20,11 @@ interface StructureVisualizerProps {
     onInspect?: (id: string) => void;
     onViewModeChange?: (mode: 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR' | 'EXPLORER') => void;
     onDrilldown?: (id: string) => void;
+    onReparent?: (sourceId: string, targetId: string, oldParentId?: string, isReference?: boolean) => void;
 }
 
 export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({ 
-    registry, selectedId, onSelect, onAddChild, onDelete, onDeleteLink, onReifyLink, onReifyNode, onReifyNodeToLink, onInvertLink, onViewModeChange, onDrilldown 
+    registry, selectedId, onSelect, onAddChild, onDelete, onDeleteLink, onReifyLink, onReifyNode, onReifyNodeToLink, onInvertLink, onViewModeChange, onDrilldown, onReparent 
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -34,8 +34,6 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
     
     // Traditional Context Menu state
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
-    // Mobile Floating Arc Menu state
-    const [floatingMenu, setFloatingMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
     const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
     const svgElRef = useRef<SVGSVGElement | null>(null);
@@ -89,13 +87,7 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
         setContextMenu({ id, x, y });
     };
 
-    const handleLongPress = (id: string, x: number, y: number) => {
-        setFloatingMenu({ id, x, y });
-        if (navigator.vibrate) navigator.vibrate(20);
-    };
-
     const contextObject = contextMenu ? registry[contextMenu.id] : null;
-    const floatingObject = floatingMenu ? registry[floatingMenu.id] : null;
 
     return (
         <div ref={containerRef} className="w-full h-full relative bg-nexus-950 overflow-hidden flex flex-col">
@@ -119,9 +111,9 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
                 onHover={setHoveredId}
                 onViewModeChange={onViewModeChange}
                 onContextMenu={handleContextMenu}
-                onLongPress={handleLongPress}
                 setZoomRef={(z) => zoomRef.current = z}
                 setSvgRef={(s) => svgElRef.current = s}
+                onReparent={onReparent}
             />
 
             {contextObject && contextMenu && (
@@ -150,30 +142,6 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
                     onReifyNodeToLink={onReifyNodeToLink}
                     onInvert={onInvertLink}
                     onSelectNode={onSelect}
-                />
-            )}
-
-            {floatingObject && floatingMenu && (
-                <FloatingContextualMenu 
-                    object={floatingObject}
-                    x={floatingMenu.x}
-                    y={floatingMenu.y}
-                    onClose={() => setFloatingMenu(null)}
-                    onInspect={(id) => {
-                        onSelect(id);
-                        onViewModeChange?.('INSPECTOR');
-                    }}
-                    onAddChild={onAddChild}
-                    onDelete={(id) => {
-                        const obj = registry[id];
-                        if (obj && isLink(obj)) {
-                            onDeleteLink?.(id);
-                        } else {
-                            onDelete?.(id);
-                        }
-                    }}
-                    onReify={onReifyLink}
-                    onInvert={onInvertLink}
                 />
             )}
         </div>

@@ -66,14 +66,30 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
         }
 
         const visited = new Map<string, number>();
+        // Hard-coded performance limit to avoid visual and computational bloat
+        const MAX_DRILLDOWN_NODES = 40;
+        let nodeCount = 0;
 
-        while (queue.length > 0) {
+        while (queue.length > 0 && nodeCount < MAX_DRILLDOWN_NODES) {
             const { id, depth, pathType } = queue.shift()!;
             if (depth > 2) continue; 
             if (visited.has(id) && visited.get(id)! <= depth) continue;
 
             const obj = registry[id];
             if (!obj) continue;
+            
+            // 1. Strictly exclude Story units (Book, Chapter, Scene, Beat)
+            if (obj._type === NexusType.STORY_NOTE) continue;
+            
+            // 2. Exclude Reified Links (Aggregated Links) that connect to Story units
+            if (isReified(obj)) {
+                const source = registry[(obj as any).source_id];
+                const target = registry[(obj as any).target_id];
+                const isConnectedToStory = source?._type === NexusType.STORY_NOTE || target?._type === NexusType.STORY_NOTE;
+                if (isConnectedToStory) continue;
+            }
+
+            // 3. Exclude Author units unless toggled
             if ((obj as any).is_author_note && !showAuthorNotes) continue;
 
             const isNode = !isLink(obj) || isReified(obj);
@@ -85,6 +101,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
                     pathType, 
                     isParentPath: pathType === 'ancestor' 
                 } as VisibleNode;
+                nodeCount++;
             }
 
             if (isContainer(obj)) {
@@ -282,6 +299,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
                     <h2 className="text-4xl font-display font-black text-nexus-text tracking-tighter leading-none mb-4 group-hover:text-nexus-accent transition-colors">
                         {currentContainer ? (currentContainer as any).title : 'World Registry'}
                     </h2>
+                    <h2 className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] mb-4 opacity-50">Conceptual Map</h2>
                     <p className="text-sm text-nexus-muted font-serif italic max-w-sm line-clamp-2 leading-relaxed opacity-70">
                         {currentContainer ? (currentContainer as any).gist : 'Tracing scion lines and causality from the origin point of the sector.'}
                     </p>

@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { ArrowUp, RotateCw, Maximize2, Minimize2, StickyNote, Plus, Database, X, Sparkles, ChevronRight, Search } from 'lucide-react';
-import { NexusObject, isLink } from '../../../types';
+import { NexusObject, isLink, isContainer } from '../../../types';
 
 interface ComposerProps {
     isLoading: boolean;
@@ -28,8 +28,6 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             if (atMenu) {
-                // If menu is open, handle selection logic could go here, 
-                // but for now we let it fall through or close it.
                 setAtMenu(null);
             }
             e.preventDefault();
@@ -53,6 +51,7 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
         const beforeCursor = text.slice(0, pos);
         const afterCursor = text.slice(pos);
         const lastAtIndex = beforeCursor.lastIndexOf('@');
+        // Support underscore spaces in search but replace with original title spaces in tag
         const newText = beforeCursor.slice(0, lastAtIndex) + `[[${nodeTitle}]]` + afterCursor;
         setText(newText);
         setAtMenu(null);
@@ -78,14 +77,39 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
 
     const suggestions = useMemo(() => {
         if (!atMenu) return [];
-        const q = atMenu.query.toLowerCase();
-        // Fix: Explicitly cast to NexusObject[] to ensure filter argument 'n' is recognized as NexusObject instead of unknown
-        return (Object.values(registry) as NexusObject[])
-            .filter(n => !isLink(n) && (n as any).title.toLowerCase().includes(q))
-            .slice(0, 5);
+        const q = atMenu.query.replace(/_/g, ' ').toLowerCase();
+        const allItems = Object.values(registry) as NexusObject[];
+        
+        // Compute basic seniority (depth)
+        const parentMap: Record<string, string[]> = {};
+        allItems.forEach(obj => {
+            if (isContainer(obj)) {
+                obj.children_ids.forEach(cid => {
+                    if (!parentMap[cid]) parentMap[cid] = [];
+                    parentMap[cid].push(obj.id);
+                });
+            }
+        });
+
+        const getDepth = (id: string, visited = new Set<string>()): number => {
+            if (visited.has(id)) return 999;
+            visited.add(id);
+            const parents = parentMap[id] || [];
+            if (parents.length === 0) return 0;
+            return 1 + Math.min(...parents.map(p => getDepth(p, new Set(visited))));
+        };
+
+        const filtered = allItems
+            .filter(n => !isLink(n) && (n as any).title?.toLowerCase().includes(q))
+            .map(n => ({ node: n, depth: getDepth(n.id) }));
+
+        // Prioritize lower depth (most senior parents)
+        return filtered
+            .sort((a, b) => a.depth - b.depth)
+            .map(f => f.node)
+            .slice(0, 15);
     }, [atMenu, registry]);
 
-    // Fix: Explicitly cast to NexusObject[] to ensure 'o' is recognized as NexusObject when calling isLink(o)
     const registrySize = useMemo(() => (Object.values(registry) as NexusObject[]).filter(o => !isLink(o)).length, [registry]);
 
     return (
@@ -101,7 +125,7 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
                          <span className="text-[10px] font-display font-black text-nexus-accent uppercase tracking-widest flex items-center gap-2"><Sparkles size={12} /> Neural Registry Scry</span>
                          <button onClick={() => setAtMenu(null)} className="text-nexus-muted hover:text-nexus-text transition-colors"><X size={14} /></button>
                     </div>
-                    <div className="p-2 space-y-1">
+                    <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto no-scrollbar">
                         {suggestions.map((node: any) => (
                             <button 
                                 key={node.id}
@@ -130,7 +154,6 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
                         : 'mx-auto w-full bg-nexus-900 rounded-[24px] border border-nexus-800 shadow-lg ring-1 ring-nexus-text/5 hover:ring-nexus-accent/20'}
             `}>
                 
-                {/* Text Input Area */}
                 <div className={`w-full flex-1 min-h-0 ${isExpanded ? 'p-8 pb-0' : 'px-6 pt-5 pb-2'}`}>
                     <textarea
                         ref={textareaRef}
@@ -150,7 +173,6 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
                     />
                 </div>
 
-                {/* Bottom Toolbar */}
                 <div className={`flex items-center justify-between ${isExpanded ? 'px-8 pb-8 pt-4' : 'px-5 pb-4 pt-1'}`}>
                     <div className="flex items-center gap-3">
                         <button className="p-2 rounded-xl text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all">
@@ -204,7 +226,6 @@ export const Composer: React.FC<ComposerProps> = ({ isLoading, onSend, variant =
                     </div>
                 </div>
 
-                 {/* Top Right Expand Trigger */}
                  {text.length > 0 && (
                     <button 
                         onClick={toggleExpand}

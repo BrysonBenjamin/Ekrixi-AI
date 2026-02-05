@@ -19,7 +19,6 @@ export const FloatingContextualMenu: React.FC<FloatingContextualMenuProps> = ({
     object, x, y, onClose, onInspect, onAddChild, onDelete, onReify, onInvert
 }) => {
     const isL = isLink(object);
-    const isC = isContainer(object);
     const reified = isReified(object);
 
     const menuWidth = 200;
@@ -29,7 +28,8 @@ export const FloatingContextualMenu: React.FC<FloatingContextualMenuProps> = ({
 
     const actions = [
         { id: 'inspect', icon: Search, label: 'Inspect', color: 'text-nexus-accent', onClick: () => onInspect(object.id) },
-        ...((isC || (isL && reified)) ? [{ id: 'add', icon: Plus, label: 'Add Unit', color: 'text-nexus-essence', onClick: () => onAddChild?.(object.id) }] : []),
+        // All non-link nodes (or reified) can have children now
+        ...((!isL || reified) ? [{ id: 'add', icon: Plus, label: 'Add Unit', color: 'text-nexus-essence', onClick: () => onAddChild?.(object.id) }] : []),
         ...(isL && !reified ? [{ id: 'reify', icon: Share2, label: 'Reify', color: 'text-nexus-accent', onClick: () => onReify?.(object.id) }] : []),
         ...(isL ? [{ id: 'invert', icon: Repeat, label: 'Invert', color: 'text-nexus-arcane', onClick: () => onInvert?.(object.id) }] : []),
         { id: 'delete', icon: Trash2, label: 'Purge', color: 'text-red-500', onClick: () => onDelete?.(object.id) },

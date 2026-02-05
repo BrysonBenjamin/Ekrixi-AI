@@ -1,5 +1,4 @@
-
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { isLink, isReified, isContainer, NexusObject, NexusType } from '../../../../types';
 import { GraphIntegrityService } from '../../../integrity/GraphIntegrityService';
@@ -9,26 +8,30 @@ interface ResponsiveTreeProps {
     registry: Record<string, NexusObject>;
     selectedId: string | null;
     expandedIds: Set<string>;
+    collapsedIds?: Set<string>;
     hoveredId: string | null;
     orientation: 'HORIZONTAL' | 'VERTICAL';
     onSelect: (id: string) => void;
     onToggleExpand: (id: string) => void;
+    onToggleCollapse?: (id: string) => void;
     onHover: (id: string | null) => void;
     onContextMenu?: (id: string, x: number, y: number) => void;
     onLongPress?: (id: string, x: number, y: number) => void;
     onViewModeChange?: (mode: 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR') => void;
+    onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
     setZoomRef: (zoom: d3.ZoomBehavior<SVGSVGElement, unknown>) => void;
     setSvgRef: (svg: SVGSVGElement | null) => void;
 }
 
 export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({ 
-    registry, selectedId, expandedIds, hoveredId, orientation, 
-    onSelect, onToggleExpand, onHover, onContextMenu, onLongPress, onViewModeChange,
-    setZoomRef, setSvgRef
+    registry, selectedId, expandedIds, collapsedIds = new Set(), hoveredId, orientation, 
+    onSelect, onToggleExpand, onToggleCollapse, onHover, onContextMenu, onLongPress, onViewModeChange,
+    onReparent, setZoomRef, setSvgRef
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const currentTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
     const isVertical = orientation === 'VERTICAL';
+    const [dragOverNodeId, setDragOverNodeId] = useState<string | null>(null);
 
     const integrityMap = useMemo(() => GraphIntegrityService.getRegistryIntegrityMap(registry), [registry]);
 
@@ -57,14 +60,23 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         const buildTree = (node: NexusObject, visited: Set<string> = new Set()): any => {
             if (!node || visited.has(node.id)) return null;
             visited.add(node.id);
+            
+            const isBranchCollapsed = collapsedIds.has(node.id);
+            
             return {
-                id: node.id, name: (node as any).title || 'Untitled', category: (node as any).category_id,
-                reified: isReified(node), gist: (node as any).gist || '',
-                children: isContainer(node) ? node.children_ids.map(cid => registry[cid]).filter(n => !!n).map(c => buildTree(c, new Set(visited))).filter(Boolean) : []
+                id: node.id, 
+                name: (node as any).title || 'Untitled', 
+                category: (node as any).category_id,
+                reified: isReified(node), 
+                gist: (node as any).gist || '',
+                isCollapsed: isBranchCollapsed,
+                children: (isContainer(node) && !isBranchCollapsed) 
+                    ? node.children_ids.map(cid => registry[cid]).filter(n => !!n).map(c => buildTree(c, new Set(visited))).filter(Boolean) 
+                    : []
             };
         };
         return { id: "VIRTUAL_ROOT", name: "NEXUS_ROOT", children: roots.map(r => buildTree(r)).filter(Boolean) };
-    }, [registry]);
+    }, [registry, collapsedIds]);
 
     useEffect(() => {
         if (!svgRef.current) return;
@@ -125,20 +137,61 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
             .attr("transform", d => `translate(${getX(d) - 130},${getY(d) - 27})`);
 
         nodeGroups.each(function(d: any) {
-            d3.select(this).selectAll("foreignObject").data([d]).join("foreignObject").attr("width", 260).attr("height", expandedIds.has(d.data.id) ? 200 : 54).style("overflow", "visible")
-              .html(() => createNodeHTML(d, selectedId === d.data.id, hoveredId === d.data.id, expandedIds.has(d.data.id)))
+            const isDraggingOver = dragOverNodeId === d.data.id;
+            const fo = d3.select(this).selectAll("foreignObject").data([d]).join("foreignObject").attr("width", 260).attr("height", expandedIds.has(d.data.id) ? 200 : 54).style("overflow", "visible")
+              .html(() => createNodeHTML(d, selectedId === d.data.id, hoveredId === d.data.id || isDraggingOver, expandedIds.has(d.data.id), collapsedIds.has(d.data.id)))
               .on("contextmenu", (e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(d.data.id, e.clientX, e.clientY); });
+
+            // Direct Graph Drag & Drop Listeners
+            fo.attr("draggable", "true")
+              .on("dragstart", (e) => {
+                e.dataTransfer.setData("text/plain", d.data.id);
+                // Try to find current parent
+                const parent = (Object.values(registry) as NexusObject[]).find(o => isContainer(o) && o.children_ids.includes(d.data.id));
+                e.dataTransfer.setData("application/nexus-parent-id", parent?.id || 'root');
+              })
+              .on("dragover", (e) => {
+                e.preventDefault();
+                setDragOverNodeId(d.data.id);
+              })
+              .on("dragleave", () => {
+                setDragOverNodeId(null);
+              })
+              .on("drop", (e) => {
+                e.preventDefault();
+                setDragOverNodeId(null);
+                const sourceId = e.dataTransfer.getData("text/plain");
+                const oldParentId = e.dataTransfer.getData("application/nexus-parent-id");
+                if (sourceId && sourceId !== d.data.id && onReparent) {
+                    onReparent(sourceId, d.data.id, oldParentId);
+                }
+              });
         });
 
         svg.on("click", (e) => {
             const t = e.target as HTMLElement;
-            const expand = t.closest('.expand-trigger');
+            const expandTrigger = t.closest('.expand-trigger');
+            const collapseTrigger = t.closest('.collapse-trigger');
             const pill = t.closest('.node-pill');
-            if (expand) onToggleExpand(expand.getAttribute('data-id')!);
-            else if (pill) onSelect((d3.select(pill.closest('.node-group') as any).datum() as any).data.id);
+            
+            if (collapseTrigger) {
+                e.stopPropagation();
+                onToggleCollapse?.(collapseTrigger.getAttribute('data-id')!);
+            } else if (expandTrigger) {
+                e.stopPropagation();
+                onToggleExpand(expandTrigger.getAttribute('data-id')!);
+            } else if (pill) {
+                const nodeId = (d3.select(pill.closest('.node-group') as any).datum() as any).data.id;
+                // If it's already selected, clicking it again toggles its children
+                if (selectedId === nodeId) {
+                    onToggleCollapse?.(nodeId);
+                } else {
+                    onSelect(nodeId);
+                }
+            }
         });
 
-    }, [hierarchyData, registry, selectedId, expandedIds, hoveredId, orientation, integrityMap]);
+    }, [hierarchyData, registry, selectedId, expandedIds, collapsedIds, hoveredId, orientation, integrityMap, dragOverNodeId, onReparent, onToggleExpand, onToggleCollapse, onSelect]);
 
     return <svg ref={svgRef} className="w-full h-full block cursor-grab active:cursor-grabbing outline-none" />;
 };

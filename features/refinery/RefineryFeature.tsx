@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Package, ArrowLeft, Edit3, Orbit, AlertCircle, FlaskConical, ChevronRight, X, Compass, ListTree } from 'lucide-react';
-import { NexusObject, isContainer, NexusType, isLink, ContainerNote, ContainmentType, DefaultLayout, isReified, NexusCategory } from '../../types';
+import { NexusObject, isContainer, NexusType, isLink, ContainerNote, ContainmentType, DefaultLayout, isReified, NexusCategory, HierarchyType, NexusGraphUtils } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { HierarchyExplorer } from './components/HierarchyExplorer';
 import { StructureVisualizer } from './components/StructureVisualizer';
@@ -33,10 +32,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
     const [localQueue, setLocalQueue] = useState<NexusObject[]>([]);
     const [toasts, setToasts] = useState<any[]>([]);
     
-    // Track the loaded batch ID to prevent re-loading same data when parent updates
     const lastLoadedBatchId = useRef<string | null>(null);
-
-    // Drilldown Logic
     const [drillStack, setDrillStack] = useState<string[]>([]);
     const currentDrillFocusId = drillStack.length > 0 ? drillStack[drillStack.length - 1] : null;
 
@@ -45,7 +41,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
             const batch = batches.find(b => b.id === activeBatchId);
             if (batch) {
                 setLocalQueue(batch.items);
-                setDrillStack([]); // Reset drill when switching batches
+                setDrillStack([]);
                 setShowInspector(false);
                 lastLoadedBatchId.current = activeBatchId;
             }
@@ -81,6 +77,98 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
         setLocalQueue(nextQueue);
         if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
     }, [localQueue, activeBatchId, onUpdateBatch]);
+
+    const handleAddChild = useCallback((parentId: string) => {
+        const newNode = NexusGraphUtils.createNode('New Unit', NexusType.SIMPLE_NOTE);
+        const parent = localQueue.find(i => i.id === parentId);
+        if (!parent || isLink(parent)) return;
+
+        // Upgrade parent to container if it isn't one
+        const updatedParent = isContainer(parent) 
+            ? { ...parent, children_ids: [...parent.children_ids, newNode.id] }
+            : { 
+                ...parent, 
+                _type: parent._type === NexusType.STORY_NOTE ? NexusType.STORY_NOTE : NexusType.CONTAINER_NOTE, 
+                children_ids: [newNode.id], 
+                containment_type: ContainmentType.FOLDER, 
+                is_collapsed: false, 
+                default_layout: DefaultLayout.GRID 
+              } as any;
+
+        const hierarchyLink = {
+            id: generateId(),
+            _type: NexusType.HIERARCHICAL_LINK,
+            source_id: parentId,
+            target_id: newNode.id,
+            verb: 'contains',
+            verb_inverse: 'part of',
+            hierarchy_type: HierarchyType.PARENT_OF,
+            created_at: new Date().toISOString(),
+            last_modified: new Date().toISOString(),
+            link_ids: [],
+            internal_weight: 1.0,
+            total_subtree_mass: 0
+        };
+
+        const nextQueue = [...localQueue.filter(i => i.id !== parentId), updatedParent, newNode, hierarchyLink];
+        setLocalQueue(nextQueue);
+        setSelectedId(newNode.id);
+        setShowInspector(true);
+        if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
+        addToast("Sub-unit established.", "success");
+    }, [localQueue, activeBatchId, onUpdateBatch]);
+
+    const handleReparent = useCallback((sourceId: string, targetId: string, oldParentId?: string, isReference: boolean = false) => {
+        if (sourceId === targetId) return;
+        if (targetId !== 'root' && GraphIntegrityService.detectCycle(targetId, sourceId, registry)) {
+            addToast("Cycle Detected: Operation Aborted.", "error");
+            return;
+        }
+
+        let nextQueue = [...localQueue];
+
+        // 1. Remove from old parent
+        if (!isReference && oldParentId) {
+            if (oldParentId === 'root') {
+                nextQueue = nextQueue.map(i => i.id === sourceId ? { ...i, tags: (i as any).tags?.filter((t: string) => t !== '__is_root__') || [] } as any : i);
+            } else {
+                nextQueue = nextQueue.map(i => {
+                    if (i.id === oldParentId && isContainer(i)) {
+                        return { ...i, children_ids: i.children_ids.filter(id => id !== sourceId) } as any;
+                    }
+                    return i;
+                });
+                // Remove the old hierarchical link
+                nextQueue = nextQueue.filter(i => !(isLink(i) && i._type === NexusType.HIERARCHICAL_LINK && i.source_id === oldParentId && i.target_id === sourceId));
+            }
+        }
+
+        // 2. Add to new target
+        if (targetId === 'root') {
+            nextQueue = nextQueue.map(i => i.id === sourceId ? { ...i, tags: Array.from(new Set([...((i as any).tags || []), '__is_root__'])) } as any : i);
+        } else {
+            nextQueue = nextQueue.map(i => {
+                if (i.id === targetId) {
+                    if (isContainer(i)) return { ...i, children_ids: Array.from(new Set([...i.children_ids, sourceId])) } as any;
+                    return { 
+                        ...i, 
+                        _type: i._type === NexusType.STORY_NOTE ? NexusType.STORY_NOTE : NexusType.CONTAINER_NOTE, 
+                        children_ids: [sourceId], 
+                        containment_type: ContainmentType.FOLDER, 
+                        is_collapsed: false, 
+                        default_layout: DefaultLayout.GRID 
+                    } as any;
+                }
+                return i;
+            });
+            const shadowLink = NexusGraphUtils.createShadowLink(targetId, sourceId);
+            nextQueue.push(shadowLink);
+        }
+
+        setLocalQueue(nextQueue);
+        if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
+        addToast("Unit Relocated.", "success");
+    }, [localQueue, registry, activeBatchId, onUpdateBatch]);
 
     const handleReifyLink = useCallback((linkId: string) => {
         const nextQueue = localQueue.map(item => {
@@ -163,18 +251,6 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
         addToast("Unit promoted to Causal Stream.", "success");
     }, [localQueue, activeBatchId, onUpdateBatch]);
 
-    const handleReparent = (sourceId: string, targetId: string, oldParentId?: string, isReference: boolean = false) => {
-        if (sourceId === targetId) return;
-        if (targetId !== 'root' && GraphIntegrityService.detectCycle(targetId, sourceId, registry)) {
-            addToast("Cycle Detected: Operation Aborted.", "error");
-            return;
-        }
-        // Reparent logic actually doesn't modify localQueue directly yet in the snippet, 
-        // assuming it would call onRegistryUpdate if implemented fully.
-        // For this fix, we focus on the existing modification handlers.
-        addToast("Unit Relocated.", "success");
-    };
-
     const handleDeleteItem = useCallback((id: string) => {
         const nextQueue = localQueue.filter(item => item.id !== id);
         setLocalQueue(nextQueue);
@@ -198,17 +274,12 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
         setActiveView('EXPLORER');
     };
 
-    const handleOpenInspector = (id: string) => {
-        setSelectedId(id);
-        setShowInspector(true);
-    };
-
     return (
         <div className="flex flex-col h-full bg-nexus-950 overflow-hidden relative">
             {!activeBatchId ? (
                 <div className="p-8 md:p-12 h-full flex flex-col">
                     <div className="flex items-center justify-between mb-12">
-                        <h1 className="text-4xl font-display font-black uppercase text-white tracking-tighter">Refinery <span className="text-nexus-accent">Inbox</span></h1>
+                        <h1 className="text-4xl font-display font-black uppercase text-nexus-text tracking-tighter">Refinery <span className="text-nexus-accent">Inbox</span></h1>
                         <div className="flex items-center gap-4 text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
                              Intel Ready: {batches.length} BATCHES
                         </div>
@@ -250,7 +321,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
                                         </div>
                                         <div className="text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">{b.source}</div>
                                     </div>
-                                    <div className="text-xl font-display font-bold text-white mb-2 truncate group-hover:text-nexus-accent transition-colors">{b.name}</div>
+                                    <div className="text-xl font-display font-bold text-nexus-text mb-2 truncate group-hover:text-nexus-accent transition-colors">{b.name}</div>
                                     <div className="text-[10px] text-nexus-muted uppercase font-black tracking-widest">{b.items.length} Structural Units</div>
                                     <div className="mt-8 flex items-center justify-between text-[9px] font-black text-nexus-muted uppercase tracking-widest opacity-30 group-hover:opacity-100 transition-opacity">
                                         <span>Initialize Scry</span>
@@ -265,7 +336,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
                 <div className="flex flex-col h-full">
                     <header className="h-16 border-b border-nexus-800 bg-nexus-900 flex items-center justify-between px-6 shrink-0 z-40">
                         <div className="flex items-center gap-6">
-                            <button onClick={() => setActiveBatchId(null)} className="text-nexus-muted hover:text-white flex items-center gap-3 font-display font-black text-[10px] uppercase tracking-widest transition-all">
+                            <button onClick={() => setActiveBatchId(null)} className="text-nexus-muted hover:text-nexus-text flex items-center gap-3 font-display font-black text-[10px] uppercase tracking-widest transition-all">
                                 <ArrowLeft size={16}/> Back to Inbox
                             </button>
                             
@@ -327,6 +398,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
                                     registry={registry} 
                                     selectedId={selectedId} 
                                     onSelect={setSelectedId}
+                                    onAddChild={handleAddChild}
                                     onViewModeChange={(mode: any) => {
                                         if (mode === 'INSPECTOR') setShowInspector(true);
                                     }}
@@ -336,10 +408,10 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({ batches, onUpd
                                     onReifyLink={handleReifyLink}
                                     onReifyNode={handleReifyNode}
                                     onReifyNodeToLink={handleReifyNodeToLink}
+                                    onReparent={handleReparent}
                                 />
                              )}
 
-                             {/* Overlayed Inspector Widget */}
                              <div className={`
                                 fixed inset-y-0 right-0 w-[420px] bg-nexus-900 border-l border-nexus-800 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] z-[500]
                                 transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)

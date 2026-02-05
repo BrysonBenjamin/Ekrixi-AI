@@ -175,7 +175,8 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                                         <ChevronRight size={14} className={`transition-transform group-hover:translate-x-1 ${selectedAnomalyId === link.id ? 'rotate-90 text-nexus-accent' : 'text-nexus-muted'}`} />
                                     </div>
                                     <div className="text-xs font-display font-bold text-nexus-text uppercase truncate">
-                                        {registry[link.source_id]?.title || '?' } → {registry[link.target_id]?.title || '?'}
+                                        {/* Fix: Cast to any to access 'title' which may not exist on all NexusObject union types (specifically links) */}
+                                        {(registry[link.source_id] as any)?.title || '?' } → {(registry[link.target_id] as any)?.title || '?'}
                                     </div>
                                     <div className="text-[10px] text-nexus-muted mt-1 italic">Logic: "{link.verb}"</div>
                                 </button>

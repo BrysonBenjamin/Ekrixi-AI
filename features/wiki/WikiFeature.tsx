@@ -30,8 +30,10 @@ import {
     GitBranch,
     Settings2,
     ArrowRight,
-    /* Fix: Added Share2 to imports from lucide-react */
-    Share2
+    Share2,
+    PenTool,
+    Plus,
+    ShieldCheck
 } from 'lucide-react';
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -50,6 +52,7 @@ import {
     isReified
 } from '../../types';
 import { Logo } from '../../components/shared/Logo';
+import { MarkdownToolbar } from '../shared/MarkdownToolbar';
 
 interface WikiFeatureProps {
     registry: Record<string, NexusObject>;
@@ -78,8 +81,15 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
     const [showCustomizer, setShowCustomizer] = useState(false);
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
     
+    // Scry/Mention menu state
+    const [atMenu, setAtMenu] = useState<{ query: string; pos: number } | null>(null);
+    
     const [editData, setEditData] = useState<any>({});
+    const [aliasInput, setAliasInput] = useState('');
+    const [tagInput, setTagInput] = useState('');
+    
     const articleRef = useRef<HTMLDivElement>(null);
+    const sectionProseRef = useRef<HTMLTextAreaElement>(null);
 
     const currentObject = useMemo(() => {
         if (!selectedId) return null;
@@ -103,7 +113,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                 prose_content: (obj as any).prose_content || '',
                 aliases: [...((obj as any).aliases || [])],
                 tags: [...((obj as any).tags || [])],
-                category_id: (obj as any).category_id || NexusCategory.CONCEPT
+                category_id: (obj as any).category_id || NexusCategory.CONCEPT,
+                is_author_note: (obj as any).is_author_note || false
             });
         }
         setEditingNodeId(obj.id);
@@ -222,6 +233,64 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
         }
     };
 
+    // Scry Detection
+    const handleProseChange = (val: string, pos: number) => {
+        setEditData({ ...editData, prose_content: val });
+        const beforeCursor = val.slice(0, pos);
+        const lastAt = beforeCursor.lastIndexOf('@');
+        if (lastAt !== -1 && !beforeCursor.slice(lastAt).includes(' ')) {
+            setAtMenu({ query: beforeCursor.slice(lastAt + 1), pos });
+        } else {
+            setAtMenu(null);
+        }
+    };
+
+    const insertMention = (title: string) => {
+        if (!atMenu) return;
+        const text = editData.prose_content || '';
+        const before = text.slice(0, atMenu.pos);
+        const after = text.slice(atMenu.pos);
+        const lastAt = before.lastIndexOf('@');
+        const newText = before.slice(0, lastAt) + `[[${title}]]` + after;
+        setEditData({ ...editData, prose_content: newText });
+        setAtMenu(null);
+        if (sectionProseRef.current) sectionProseRef.current.focus();
+    };
+
+    const scrySuggestions = useMemo(() => {
+        if (!atMenu) return [];
+        const q = atMenu.query.replace(/_/g, ' ').toLowerCase();
+        const allItems = Object.values(registry) as NexusObject[];
+        
+        // Seniority calculation
+        const parentMap: Record<string, string[]> = {};
+        allItems.forEach(obj => {
+            if (isContainer(obj)) {
+                obj.children_ids.forEach(cid => {
+                    if (!parentMap[cid]) parentMap[cid] = [];
+                    parentMap[cid].push(obj.id);
+                });
+            }
+        });
+
+        const getDepth = (id: string, visited = new Set<string>()): number => {
+            if (visited.has(id)) return 999;
+            visited.add(id);
+            const parents = parentMap[id] || [];
+            if (parents.length === 0) return 0;
+            return 1 + Math.min(...parents.map(p => getDepth(p, new Set(visited))));
+        };
+
+        const filtered = allItems
+            .filter(n => !isLink(n) && (n as any).title?.toLowerCase().includes(q))
+            .map(n => ({ node: n, depth: getDepth(n.id) }));
+
+        return filtered
+            .sort((a, b) => a.depth - b.depth)
+            .map(f => f.node)
+            .slice(0, 15);
+    }, [atMenu, registry]);
+
     const MarkdownRenderer = ({ content, color }: { content: string, color?: string }) => {
         return (
             <div className="prose max-w-none">
@@ -328,7 +397,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                 <input 
                                     value={editData.verb || ''}
                                     onChange={(e) => setEditData({...editData, verb: e.target.value})}
-                                    className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-accent outline-none focus:border-nexus-accent shadow-inner"
+                                    className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent shadow-inner"
                                     placeholder="Direct relationship..."
                                 />
                             </div>
@@ -392,15 +461,39 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                          )}
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 relative">
                          <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest ml-4 opacity-40">Deep Records (Prose)</label>
                          {isEditing ? (
-                             <textarea 
-                                value={editData.prose_content || ''}
-                                onChange={(e) => setEditData({...editData, prose_content: e.target.value})}
-                                className="w-full bg-nexus-900 border border-nexus-800 rounded-[32px] p-8 text-nexus-text text-sm font-sans outline-none focus:border-nexus-accent shadow-inner h-[400px] no-scrollbar leading-relaxed"
-                                placeholder="# Document the nuances of this causality..."
-                             />
+                             <div className="space-y-4 relative">
+                                <MarkdownToolbar 
+                                    textareaRef={sectionProseRef}
+                                    content={editData.prose_content || ''}
+                                    onUpdate={(val) => handleProseChange(val, sectionProseRef.current?.selectionStart || 0)}
+                                />
+                                <textarea 
+                                    ref={sectionProseRef}
+                                    value={editData.prose_content || ''}
+                                    onChange={(e) => handleProseChange(e.target.value, e.target.selectionStart)}
+                                    spellCheck={false}
+                                    className="w-full bg-nexus-900 border border-nexus-800 rounded-[32px] p-8 text-nexus-text text-sm font-mono outline-none focus:border-nexus-accent shadow-inner h-[400px] no-scrollbar leading-[1.8] tracking-tight selection:bg-nexus-accent/30"
+                                    placeholder="# Document the nuances of this causality..."
+                                />
+                                
+                                {/* Mention UI in Link Edit */}
+                                {atMenu && scrySuggestions.length > 0 && (
+                                    <div className="absolute bottom-full left-0 mb-4 w-64 bg-nexus-900 border border-nexus-700 rounded-[32px] shadow-2xl overflow-hidden z-[100] animate-in zoom-in-95 backdrop-blur-2xl">
+                                        <div className="px-5 py-3 border-b border-nexus-800 bg-nexus-950/40 text-[9px] font-black text-nexus-accent uppercase tracking-widest">Neural Scry</div>
+                                        <div className="max-h-48 overflow-y-auto no-scrollbar p-1 space-y-0.5">
+                                            {scrySuggestions.map((node: any) => (
+                                                <button key={node.id} onClick={() => insertMention(node.title)} className="w-full flex items-center gap-3 p-3 hover:bg-nexus-accent hover:text-white transition-all text-left group rounded-xl">
+                                                    <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">{node.category_id?.charAt(0)}</div>
+                                                    <div className="text-[10px] font-bold truncate">{node.title}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                             </div>
                          ) : (
                              <div className="wiki-content p-4">
                                 <MarkdownRenderer content={link.prose_content || ""} />
@@ -425,19 +518,32 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
         const isEditingThis = editingNodeId === node.id;
         const themeColor = node.theme_color || (currentObject as any)?.theme_color;
         const reified = isReified(node);
+        const isStoryNode = node._type === NexusType.STORY_NOTE;
 
         return (
             <section key={node.id} id={`section-${node.id}`} className="mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 scroll-mt-32 group/section">
                 <div className="flex flex-col gap-6">
                     <div className="flex items-center justify-between border-b border-nexus-800/30 pb-4">
                         <div className="flex items-center gap-4">
-                            <span className="px-3 py-1 border rounded-full text-[9px] font-display font-black uppercase tracking-widest" style={{ borderColor: `${themeColor || 'var(--nexus-500)'}50`, backgroundColor: `${themeColor || 'var(--nexus-500)'}15`, color: themeColor || 'var(--accent-color)' }}>
-                                {reified ? 'REIFIED LOGIC' : (node.category_id || 'CONCEPT')}
+                            <span 
+                                className="px-3 py-1 border rounded-full text-[9px] font-display font-black uppercase tracking-widest" 
+                                style={{ 
+                                    borderColor: isStoryNode ? 'rgba(225,29,72,0.5)' : `${themeColor || 'var(--nexus-500)'}50`, 
+                                    backgroundColor: isStoryNode ? 'rgba(225,29,72,0.15)' : `${themeColor || 'var(--nexus-500)'}15`, 
+                                    color: isStoryNode ? '#e11d48' : themeColor || 'var(--accent-color)' 
+                                }}
+                            >
+                                {isStoryNode ? 'STORY UNIT' : reified ? 'REIFIED LOGIC' : (node.category_id || 'CONCEPT')}
                             </span>
                             {reified && (
                                 <div className="flex items-center gap-2 text-[8px] font-mono text-nexus-muted uppercase tracking-widest opacity-60">
                                     {(registry[node.source_id] as any)?.title} <ArrowRight size={8} /> {(registry[node.target_id] as any)?.title}
                                 </div>
+                            )}
+                            {node.is_author_note && (
+                                <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-500 text-[9px] font-black uppercase tracking-widest">
+                                    <ShieldCheck size={12} /> Author Protocol
+                                </span>
                             )}
                         </div>
                         
@@ -477,16 +583,35 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                     </div>
                                     {!reified && (
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest">Category</label>
+                                            <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest">Category Signature</label>
                                             <select 
                                                 value={editData.category_id}
+                                                disabled={isStoryNode}
                                                 onChange={(e) => setEditData({...editData, category_id: e.target.value as NexusCategory})}
-                                                className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-4 text-sm font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner h-[60px]"
+                                                className={`w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-4 text-sm font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner h-[60px] ${isStoryNode ? 'opacity-50 grayscale' : ''}`}
                                             >
                                                 {Object.values(NexusCategory).map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
                                     )}
+                                </div>
+
+                                <div className="space-y-4 p-6 bg-nexus-950/50 border border-nexus-800 rounded-3xl">
+                                     <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                               <ShieldCheck size={16} className="text-amber-500" />
+                                               <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest">Author Metadata Layer</span>
+                                          </div>
+                                          <button 
+                                            onClick={() => setEditData({...editData, is_author_note: !editData.is_author_note})}
+                                            className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${editData.is_author_note ? 'bg-amber-500 text-black' : 'bg-nexus-800 text-nexus-muted'}`}
+                                          >
+                                            {editData.is_author_note ? 'PROTOCOL ACTIVE' : 'MARK AS PROTOCOL'}
+                                          </button>
+                                     </div>
+                                     <p className="text-[9px] text-nexus-muted italic font-serif leading-relaxed">
+                                          Author protocols are reified narrative governed units that appear in the Story Studio as strategic anchors.
+                                     </p>
                                 </div>
 
                                 <div className="space-y-2">
@@ -498,14 +623,117 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                     />
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest ml-2 flex items-center gap-2">
+                                            <AtSign size={12} className="text-nexus-arcane" /> Designations (AKA)
+                                        </label>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <input 
+                                                value={aliasInput}
+                                                onChange={(e) => setAliasInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        const val = aliasInput.trim();
+                                                        if (val && !editData.aliases.includes(val)) {
+                                                            setEditData({...editData, aliases: [...editData.aliases, val]});
+                                                        }
+                                                        setAliasInput('');
+                                                    }
+                                                }}
+                                                placeholder="Add nickname..."
+                                                className="flex-1 bg-nexus-950 border border-nexus-800 rounded-xl px-4 py-2.5 text-xs text-nexus-text outline-none focus:border-nexus-arcane shadow-inner"
+                                            />
+                                            <button onClick={() => {
+                                                const val = aliasInput.trim();
+                                                if (val && !editData.aliases.includes(val)) {
+                                                    setEditData({...editData, aliases: [...editData.aliases, val]});
+                                                    setAliasInput('');
+                                                }
+                                            }} className="p-2.5 bg-nexus-800 border border-nexus-700 rounded-xl text-nexus-muted hover:text-nexus-arcane transition-colors"><Plus size={16}/></button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 min-h-[40px] p-1">
+                                            {editData.aliases?.map((a: string) => (
+                                                <span key={a} className="flex items-center gap-2 px-3 py-1 bg-nexus-900 border border-nexus-800 rounded-lg text-[10px] font-bold text-nexus-arcane">
+                                                    {a}
+                                                    <button onClick={() => setEditData({...editData, aliases: editData.aliases.filter((al: string) => al !== a)})} className="hover:text-red-500 transition-colors"><X size={10}/></button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest ml-2 flex items-center gap-2">
+                                            <Tag size={12} className="text-nexus-essence" /> Semantic Markers
+                                        </label>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <input 
+                                                value={tagInput}
+                                                onChange={(e) => setTagInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        const val = tagInput.trim();
+                                                        if (val && !editData.tags.includes(val)) {
+                                                            setEditData({...editData, tags: [...editData.tags, val]});
+                                                        }
+                                                        setTagInput('');
+                                                    }
+                                                }}
+                                                placeholder="Add tag..."
+                                                className="flex-1 bg-nexus-950 border border-nexus-800 rounded-xl px-4 py-2.5 text-xs text-nexus-text outline-none focus:border-nexus-essence shadow-inner"
+                                            />
+                                            <button onClick={() => {
+                                                const val = tagInput.trim();
+                                                if (val && !editData.tags.includes(val)) {
+                                                    setEditData({...editData, tags: [...editData.tags, val]});
+                                                    setTagInput('');
+                                                }
+                                            }} className="p-2.5 bg-nexus-800 border border-nexus-700 rounded-xl text-nexus-muted hover:text-nexus-essence transition-colors"><Plus size={16}/></button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 min-h-[40px] p-1">
+                                            {editData.tags?.map((t: string) => (
+                                                <span key={t} className="flex items-center gap-2 px-3 py-1 bg-nexus-900 border border-nexus-800 rounded-lg text-[10px] font-bold text-nexus-essence">
+                                                    #{t}
+                                                    <button onClick={() => setEditData({...editData, tags: editData.tags.filter((ta: string) => ta !== t)})} className="hover:text-red-500 transition-colors"><X size={10}/></button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 relative">
                                     <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest">Primary Records (Markdown)</label>
-                                    <textarea 
-                                        value={editData.prose_content || ''}
-                                        onChange={(e) => setEditData({...editData, prose_content: e.target.value})}
-                                        className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-6 text-sm font-sans text-nexus-text focus:border-nexus-accent outline-none resize-none h-64 shadow-inner no-scrollbar leading-relaxed"
-                                        placeholder="# The history of this unit..."
-                                    />
+                                    <div className="space-y-3 relative">
+                                        <MarkdownToolbar 
+                                            textareaRef={sectionProseRef}
+                                            content={editData.prose_content || ''}
+                                            onUpdate={(val) => handleProseChange(val, sectionProseRef.current?.selectionStart || 0)}
+                                        />
+                                        <textarea 
+                                            ref={sectionProseRef}
+                                            value={editData.prose_content || ''}
+                                            onChange={(e) => handleProseChange(e.target.value, e.target.selectionStart)}
+                                            spellCheck={false}
+                                            className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-6 text-[13px] font-mono text-nexus-text focus:border-nexus-accent outline-none resize-none h-64 shadow-inner no-scrollbar leading-[1.8] tracking-tight selection:bg-nexus-accent/30"
+                                            placeholder="# The history of this unit..."
+                                        />
+                                        
+                                        {/* Mention UI in Unit Section Edit */}
+                                        {atMenu && scrySuggestions.length > 0 && (
+                                            <div className="absolute bottom-full left-0 mb-4 w-64 bg-nexus-900 border border-nexus-700 rounded-[32px] shadow-2xl overflow-hidden z-[100] animate-in zoom-in-95 backdrop-blur-2xl">
+                                                <div className="px-5 py-3 border-b border-nexus-800 bg-nexus-950/40 text-[9px] font-black text-nexus-accent uppercase tracking-widest">Neural Scry</div>
+                                                <div className="max-h-48 overflow-y-auto no-scrollbar p-1 space-y-0.5">
+                                                    {scrySuggestions.map((n: any) => (
+                                                        <button key={n.id} onClick={() => insertMention(n.title)} className="w-full flex items-center gap-3 p-3 hover:bg-nexus-accent hover:text-white transition-all text-left group rounded-xl">
+                                                            <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">{n.category_id?.charAt(0)}</div>
+                                                            <div className="text-[10px] font-bold truncate">{n.title}</div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center justify-end gap-4 pt-6 border-t border-nexus-800">
@@ -518,16 +746,16 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                         <div className="space-y-10">
                             <div>
                                 {depth === 0 ? (
-                                    <h1 className="text-5xl md:text-7xl font-display font-black text-nexus-text tracking-tighter mb-4 leading-tight">
+                                    <h1 className="text-5xl md:text-7xl font-display font-black text-nexus-text tracking-tighter mb-4 leading-tight uppercase">
                                         {node.title || node.verb}
                                     </h1>
                                 ) : (
-                                    <h2 className="text-3xl md:text-4xl font-display font-bold text-nexus-text tracking-tight mb-4">
+                                    <h2 className="text-3xl md:text-4xl font-display font-bold text-nexus-text tracking-tight mb-4 uppercase">
                                         {node.title || node.verb}
                                     </h2>
                                 )}
 
-                                <div className="relative pl-6 md:pl-10 border-l-4 py-1 mb-8" style={{ borderColor: themeColor || 'var(--accent-color)' }}>
+                                <div className="relative pl-6 md:pl-10 border-l-4 py-1 mb-8" style={{ borderColor: isStoryNode ? '#e11d48' : themeColor || 'var(--accent-color)' }}>
                                     <p className="text-xl md:text-2xl text-nexus-text/80 font-serif italic leading-relaxed">
                                         "{node.gist || 'This manifestation remains uncharted.'}"
                                     </p>
@@ -547,7 +775,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                 </div>
 
                                 <div className="wiki-content max-w-4xl">
-                                    <MarkdownRenderer content={node.prose_content || ""} color={themeColor} />
+                                    <MarkdownRenderer content={node.prose_content || ""} color={isStoryNode ? '#e11d48' : themeColor} />
                                 </div>
                             </div>
 
@@ -614,27 +842,32 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                    {(Object.values(registry) as NexusObject[]).filter(o => !isLink(o) || isReified(o)).map((node: any) => (
-                        <button 
-                            key={node.id}
-                            onClick={() => onSelect(node.id)}
-                            className="group relative bg-nexus-900 border border-nexus-800/60 hover:border-nexus-accent hover:translate-y-[-4px] p-8 rounded-[40px] text-left transition-all duration-500 shadow-xl hover:shadow-2xl flex flex-col h-full overflow-hidden"
-                        >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-nexus-accent/5 rounded-full blur-3xl group-hover:bg-nexus-accent/10 transition-colors" />
-                            <div className="flex items-center gap-3 mb-8 relative z-10">
-                                <div className="p-3 bg-nexus-800 rounded-2xl border border-nexus-700 text-nexus-accent group-hover:bg-nexus-accent group-hover:text-white transition-all shadow-sm">
-                                    {isReified(node) ? <Share2 size={20} /> : node.category_id === NexusCategory.LOCATION ? <MapPin size={20} /> : <Users size={20} />}
+                    {(Object.values(registry) as NexusObject[]).filter(o => !isLink(o) || isReified(o)).map((node: any) => {
+                        const isStory = node._type === NexusType.STORY_NOTE;
+                        return (
+                            <button 
+                                key={node.id}
+                                onClick={() => onSelect(node.id)}
+                                className={`group relative bg-nexus-900 border hover:translate-y-[-4px] p-8 rounded-[40px] text-left transition-all duration-500 shadow-xl hover:shadow-2xl flex flex-col h-full overflow-hidden ${isStory ? 'border-nexus-ruby/30 hover:border-nexus-ruby' : 'border-nexus-800/60 hover:border-nexus-accent'}`}
+                            >
+                                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl transition-colors ${isStory ? 'bg-nexus-ruby/5 group-hover:bg-nexus-ruby/10' : 'bg-nexus-accent/5 group-hover:bg-nexus-accent/10'}`} />
+                                <div className="flex items-center gap-3 mb-8 relative z-10">
+                                    <div className={`p-3 rounded-2xl border transition-all shadow-sm ${isStory ? 'bg-nexus-ruby/10 border-nexus-ruby/30 text-nexus-ruby group-hover:bg-nexus-ruby group-hover:text-white' : 'bg-nexus-800 border-nexus-700 text-nexus-accent group-hover:bg-nexus-accent group-hover:text-white'}`}>
+                                        {isStory ? <PenTool size={20} /> : isReified(node) ? <Share2 size={20} /> : node.category_id === NexusCategory.LOCATION ? <MapPin size={20} /> : <Users size={20} />}
+                                    </div>
+                                    <span className={`text-[10px] font-display font-black uppercase tracking-widest transition-colors ${isStory ? 'text-nexus-ruby group-hover:text-nexus-ruby' : 'text-nexus-muted group-hover:text-nexus-accent'}`}>
+                                        {isStory ? 'STORY UNIT' : isReified(node) ? 'REIFIED LOGIC' : node.category_id}
+                                    </span>
                                 </div>
-                                <span className="text-[10px] font-display font-black text-nexus-muted group-hover:text-nexus-accent uppercase tracking-widest transition-colors">{isReified(node) ? 'REIFIED LOGIC' : node.category_id}</span>
-                            </div>
-                            <h3 className="text-2xl font-display font-bold text-nexus-text mb-4 leading-tight relative z-10">{node.title || node.verb}</h3>
-                            <p className="text-sm text-nexus-muted italic line-clamp-3 mb-8 font-serif relative z-10">"{node.gist || 'Neural record awaited.'}"</p>
-                            <div className="mt-auto flex items-center justify-between text-[10px] font-display font-black uppercase tracking-widest text-nexus-muted opacity-40 group-hover:opacity-100 transition-opacity relative z-10">
-                                <span>Navigate Unit</span>
-                                <ChevronRight size={16} className="group-hover:translate-x-2 transition-transform" />
-                            </div>
-                        </button>
-                    ))}
+                                <h3 className="text-2xl font-display font-bold text-nexus-text mb-4 leading-tight relative z-10 uppercase">{node.title || node.verb}</h3>
+                                <p className="text-sm text-nexus-muted italic line-clamp-3 mb-8 font-serif relative z-10">"{node.gist || 'Neural record awaited.'}"</p>
+                                <div className="mt-auto flex items-center justify-between text-[10px] font-display font-black uppercase tracking-widest text-nexus-muted opacity-40 group-hover:opacity-100 transition-opacity relative z-10">
+                                    <span>Navigate Unit</span>
+                                    <ChevronRight size={16} className="group-hover:translate-x-2 transition-transform" />
+                                </div>
+                            </button>
+                        );
+                    })}
                     {Object.keys(registry).filter(k => !isLink(registry[k]) || isReified(registry[k])).length === 0 && (
                         <div className="col-span-full py-40 flex flex-col items-center justify-center border-2 border-dashed border-nexus-800 rounded-[64px] opacity-20 text-center">
                             <History size={64} className="mb-6" />
@@ -648,10 +881,10 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
 
     const isL = isLink(currentObject) && !isReified(currentObject);
     const themeColor = (currentObject as any).theme_color;
+    const isStoryActive = currentObject._type === NexusType.STORY_NOTE;
 
     return (
         <div className="flex flex-col h-full bg-nexus-950 overflow-hidden md:flex-row relative font-sans">
-            {/* Ambient Background */}
             {(currentObject as any).background_url && (
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
                     <img 
@@ -686,9 +919,9 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                     <li key={item.id} style={{ marginLeft: `${item.depth * 16}px` }}>
                                         <button 
                                             onClick={() => handleScrollToSection(item.id)}
-                                            className="text-sm font-display font-bold text-nexus-text/70 hover:text-nexus-accent transition-all flex items-center gap-3 group text-left w-full"
+                                            className="text-sm font-display font-bold text-nexus-text/70 hover:text-nexus-accent transition-all flex items-center gap-3 group text-left w-full uppercase"
                                         >
-                                            <span className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${selectedId === item.id ? 'bg-nexus-accent scale-150 shadow-[0_0_10px_var(--accent-color)]' : 'bg-nexus-800 group-hover:bg-nexus-accent'}`} />
+                                            <span className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${selectedId === item.id ? (isStoryActive ? 'bg-nexus-ruby' : 'bg-nexus-accent') + ' scale-150 shadow-lg' : 'bg-nexus-800 group-hover:bg-nexus-accent'}`} />
                                             {item.title}
                                         </button>
                                     </li>
@@ -712,7 +945,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({ registry, selectedId, 
                                         <span className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1.5 opacity-60 group-hover:text-nexus-accent">
                                             {conn.verb}
                                         </span>
-                                        <span className="text-[13px] font-display font-bold text-nexus-text/90 group-hover:text-nexus-text truncate">
+                                        <span className="text-[13px] font-display font-bold text-nexus-text/90 group-hover:text-nexus-text truncate uppercase">
                                             {conn.neighbor.title || conn.neighbor.verb}
                                         </span>
                                     </button>

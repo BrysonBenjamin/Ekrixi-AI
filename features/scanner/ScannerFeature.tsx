@@ -6,7 +6,10 @@ import {
     NexusType, 
     NexusCategory, 
     isLink, 
+    // Added isContainer to imports to resolve narrowing issues and allow access to children_ids property
+    isContainer,
     ContainmentType, 
+    DefaultLayout,
     HierarchyType, 
     ConflictStatus 
 } from '../../types';
@@ -81,63 +84,141 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({ onCommitBatch, r
 
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            setStatusMsg('The Architect: Reconciling seeds with intel...');
+            setStatusMsg('The Architect: Reconciling seeds with structural intel...');
             
+            // Analyze the text to find links between detected seeds and extract content for them
             const architectResponse = await ai.models.generateContent({
                 model: 'gemini-3-pro-preview',
                 config: {
-                    systemInstruction: `You are 'The Architect'. Your task is to extract a knowledge graph. Output JSON only.`,
+                    systemInstruction: `You are 'The Architect'. Your task is to extract a knowledge graph from text.
+                    1. IDENTIFY HIERARCHY: If A is a component, member, or part of B, mark as a 'HIERARCHICAL' link.
+                    2. IDENTIFY ASSOCIATIONS: If A relates to B but doesn't live inside it, mark as 'SEMANTIC'.
+                    3. EXTRACT CONTENT: For each entity, provide a concise gist and more detailed records from the text.
+                    4. Output JSON only. Format: { "links": [{ "source": "Title", "target": "Title", "verb": "contains", "type": "HIERARCHICAL" | "SEMANTIC" }], "updates": [{ "title": "Title", "gist": "Summary", "records": "Markdown content" }] }`,
                     responseMimeType: 'application/json'
                 },
-                contents: [{ parts: [{ text: `CONTEXT: ${inputText.slice(0, 10000)}` }] }]
+                contents: [{ parts: [{ text: `CONTEXT: ${inputText}\n\nTARGET ENTITIES: ${seeds.map(s => s.title).join(', ')}` }] }]
             });
 
-            const architecture = safeParseJson(architectResponse.text || '{"resolved_units": [], "links": []}', { resolved_units: [], links: [] });
+            const architecture = safeParseJson(architectResponse.text || '{"links": [], "updates": []}', { links: [], updates: [] });
 
             const finalBatch: ExtractedItem[] = [];
             const idMap: Record<string, string> = {};
             const now = new Date().toISOString();
 
-            // 1. Process Seeds & Units
+            // 1. Process Seeds and suggested children
             (seeds || []).forEach(s => {
-                idMap[s.title] = s.id;
-                idMap[s.id] = s.id;
+                idMap[s.title.toLowerCase()] = s.id;
                 const childIds: string[] = [];
+                
                 (s.suggestedChildren || []).forEach(childBlueprint => {
                     const childId = generateId();
                     childIds.push(childId);
+                    idMap[childBlueprint.title.toLowerCase()] = childId;
+                    
                     finalBatch.push({
-                        id: childId, _type: 'SIMPLE_NOTE', title: childBlueprint.title, gist: childBlueprint.gist, category_id: childBlueprint.category, 
-                        is_author_note: childBlueprint.isAuthorNote, created_at: now, last_modified: now, link_ids: [], internal_weight: 1.0, total_subtree_mass: 0
+                        id: childId,
+                        _type: 'SIMPLE_NOTE',
+                        title: childBlueprint.title,
+                        gist: childBlueprint.gist,
+                        category_id: childBlueprint.category,
+                        is_author_note: childBlueprint.isAuthorNote,
+                        created_at: now,
+                        last_modified: now,
+                        link_ids: [],
+                        internal_weight: 1.0,
+                        total_subtree_mass: 0
                     } as any);
+                    
+                    // Create hierarchical link for suggested child
                     finalBatch.push({
-                        id: generateId(), _type: 'HIERARCHICAL_LINK', source_id: s.id, target_id: childId, verb: 'contains', verb_inverse: 'part of',
-                        hierarchy_type: HierarchyType.PARENT_OF, created_at: now, last_modified: now, link_ids: [], internal_weight: 1.0, total_subtree_mass: 0
+                        id: generateId(),
+                        _type: 'HIERARCHICAL_LINK',
+                        source_id: s.id,
+                        target_id: childId,
+                        verb: 'contains',
+                        verb_inverse: 'part of',
+                        hierarchy_type: HierarchyType.PARENT_OF,
+                        created_at: now,
+                        last_modified: now,
+                        link_ids: [],
+                        internal_weight: 1.0,
+                        total_subtree_mass: 0
                     } as any);
                 });
+
+                // Get content update for this seed
+                const update = architecture.updates?.find((u: any) => u.title.toLowerCase() === s.title.toLowerCase());
+
                 finalBatch.push({
-                    id: s.id, _type: (childIds.length > 0) ? 'CONTAINER_NOTE' : 'SIMPLE_NOTE', title: s.title, gist: s.gist, category_id: s.category, 
-                    is_author_note: s.isAuthorNote, created_at: now, last_modified: now, link_ids: [], internal_weight: 1.0, total_subtree_mass: 0,
-                    ...( (childIds.length > 0) ? { children_ids: childIds, containment_type: 'FOLDER' as ContainmentType } : {})
+                    id: s.id,
+                    _type: (childIds.length > 0) ? 'CONTAINER_NOTE' : 'SIMPLE_NOTE',
+                    title: s.title,
+                    gist: update?.gist || s.gist || 'Identity established via extraction.',
+                    prose_content: update?.records || '',
+                    category_id: s.category,
+                    is_author_note: s.isAuthorNote,
+                    created_at: now,
+                    last_modified: now,
+                    link_ids: [],
+                    internal_weight: 1.0,
+                    total_subtree_mass: 0,
+                    ...( (childIds.length > 0) ? { 
+                        children_ids: childIds, 
+                        containment_type: ContainmentType.FOLDER, 
+                        is_collapsed: false, 
+                        default_layout: DefaultLayout.GRID 
+                    } : {})
                 } as any);
             });
 
-            // 2. Conflict Analysis
-            setStatusMsg('The Chronicler: Scrying for Redundancies...');
+            // 2. Resolve Links from AI Architecture
+            setStatusMsg('The Chronicler: Binding relationships...');
             const tempRegistry: Record<string, NexusObject> = { ...registry };
             finalBatch.forEach(item => { tempRegistry[item.id] = item; });
 
             (architecture.links || []).forEach((l: any) => {
-                const sId = idMap[l.source] || l.source;
-                const tId = idMap[l.target] || l.target;
+                const sId = idMap[l.source.toLowerCase()];
+                const tId = idMap[l.target.toLowerCase()];
                 
-                if (tempRegistry[sId] && tempRegistry[tId]) {
-                    // Critical Fix: Explicitly pass SEMANTIC_LINK type to analyzer so it checks redundancy correctly
-                    const integrity = GraphIntegrityService.analyzeLinkIntegrity(sId, tId, tempRegistry, NexusType.SEMANTIC_LINK);
+                if (sId && tId && sId !== tId) {
+                    const isHierarchical = l.type === 'HIERARCHICAL';
+                    const linkType = isHierarchical ? NexusType.HIERARCHICAL_LINK : NexusType.SEMANTIC_LINK;
+                    
+                    const integrity = GraphIntegrityService.analyzeLinkIntegrity(sId, tId, tempRegistry, linkType);
+                    
                     const newLink: ExtractedItem = {
-                        id: generateId(), _type: 'SEMANTIC_LINK', source_id: sId, target_id: tId, verb: l.verb, verb_inverse: l.verb_inverse,
-                        created_at: now, last_modified: now, link_ids: [], internal_weight: 1.0, total_subtree_mass: 0, conflict: integrity
+                        id: generateId(), 
+                        _type: linkType as any, 
+                        source_id: sId, 
+                        target_id: tId, 
+                        verb: l.verb || (isHierarchical ? 'contains' : 'relates to'), 
+                        verb_inverse: l.verb_inverse || (isHierarchical ? 'part of' : 'associated with'),
+                        created_at: now, 
+                        last_modified: now, 
+                        link_ids: [], 
+                        internal_weight: 1.0, 
+                        total_subtree_mass: 0, 
+                        conflict: integrity
                     } as any;
+
+                    if (isHierarchical) {
+                        (newLink as any).hierarchy_type = HierarchyType.PARENT_OF;
+                        // Also update parent's child list
+                        const parent = finalBatch.find(i => i.id === sId);
+                        // Fixed: Correctly using isContainer type guard to narrow ExtractedItem and allow children_ids access
+                        if (parent && isContainer(parent)) {
+                            parent.children_ids = Array.from(new Set([...parent.children_ids, tId]));
+                        } else if (parent && !isLink(parent)) {
+                             // Upgrade to container
+                             (parent as any)._type = NexusType.CONTAINER_NOTE;
+                             (parent as any).children_ids = [tId];
+                             (parent as any).containment_type = ContainmentType.FOLDER;
+                             (parent as any).is_collapsed = false;
+                             (parent as any).default_layout = DefaultLayout.GRID;
+                        }
+                    }
+
                     finalBatch.push(newLink);
                     tempRegistry[newLink.id] = newLink;
                 }
@@ -146,6 +227,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({ onCommitBatch, r
             setExtractedItems(finalBatch);
             setStage('REVIEW');
         } catch (err: any) {
+            console.error(err);
             setError(err.message || "Extraction Pipeline Interrupted.");
             setStage('INPUT');
         }

@@ -10,13 +10,13 @@ import {
     BookType,
     Map as MapIcon,
     Zap,
-    BookOpenCheck,
+    PenTool,
     FlaskConical
 } from 'lucide-react';
 import { ThemeMode } from '../../App';
 import { Logo } from '../shared/Logo';
 
-export type AppView = 'GENERATOR' | 'LIBRARY' | 'SETTINGS' | 'SCANNER' | 'REFINERY' | 'STRUCTURE' | 'WIKI' | 'DRILLDOWN' | 'ANALYZER' | 'PLAYGROUND';
+export type AppView = 'GENERATOR' | 'LIBRARY' | 'SETTINGS' | 'SCANNER' | 'REFINERY' | 'STRUCTURE' | 'WIKI' | 'DRILLDOWN' | 'STUDIO' | 'PLAYGROUND';
 
 interface AppShellProps {
     currentView: AppView;
@@ -48,7 +48,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onViewChange, c
                 <span className="text-[10px] mt-1 font-display font-medium md:hidden">{label}</span>
                 
                 <span className="
-                    absolute left-full ml-4 px-3 py-2 bg-nexus-900 border border-nexus-800 rounded-lg text-[10px] font-display font-bold text-nexus-text 
+                    absolute left-full ml-4 px-3 py-2 bg-nexus-950 border border-nexus-800 rounded-lg text-[10px] font-display font-bold text-nexus-text 
                     opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50
                     hidden md:block shadow-2xl tracking-widest
                 ">
@@ -71,14 +71,14 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onViewChange, c
                     </div>
 
                     <nav className="flex flex-col w-full gap-2">
-                        <NavItem view="PLAYGROUND" icon={FlaskConical} label="Playground" />
-                        <NavItem view="DRILLDOWN" icon={MapIcon} label="Explorer" />
-                        <NavItem view="ANALYZER" icon={BookOpenCheck} label="Blueprint" />
-                        <NavItem view="STRUCTURE" icon={ScrollText} label="Registry" />
-                        <NavItem view="REFINERY" icon={Hammer} label="Refinery" />
-                        <NavItem view="WIKI" icon={BookType} label="Library" />
                         <NavItem view="GENERATOR" icon={Flame} label="Nexus" />
                         <NavItem view="SCANNER" icon={Eye} label="Scanner" />
+                        <NavItem view="REFINERY" icon={Hammer} label="Refinery" />
+                        <NavItem view="DRILLDOWN" icon={MapIcon} label="Explorer" />
+                        <NavItem view="STRUCTURE" icon={ScrollText} label="Registry" />
+                        <NavItem view="WIKI" icon={BookType} label="Library" />
+                        <NavItem view="STUDIO" icon={PenTool} label="Story Studio" />
+                        <NavItem view="PLAYGROUND" icon={FlaskConical} label="Playground" />
                     </nav>
                 </div>
 
@@ -108,13 +108,14 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onViewChange, c
 
             <nav className="
                 md:hidden h-20 bg-nexus-900 border-t border-nexus-800 
-                flex items-center justify-around px-2 z-50 shrink-0 pb-safe
+                flex items-center justify-around px-2 z-50 shrink-0 pb-safe overflow-x-auto no-scrollbar
             ">
-                <NavItem view="PLAYGROUND" icon={FlaskConical} label="Dev" />
+                <NavItem view="GENERATOR" icon={Flame} label="Nexus" />
+                <NavItem view="SCANNER" icon={Eye} label="Scanner" />
+                <NavItem view="REFINERY" icon={Hammer} label="Refinery" />
                 <NavItem view="DRILLDOWN" icon={MapIcon} label="Explore" />
                 <NavItem view="WIKI" icon={BookType} label="Library" />
-                <NavItem view="GENERATOR" icon={Flame} label="Nexus" />
-                <NavItem view="REFINERY" icon={Hammer} label="Refinery" />
+                <NavItem view="STUDIO" icon={PenTool} label="Studio" />
             </nav>
 
         </div>

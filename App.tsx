@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppShell, AppView } from './components/layout/AppShell';
 import { UniverseGeneratorFeature } from './features/universe-generator/UniverseGeneratorFeature';
@@ -8,7 +7,7 @@ import { StructureFeature } from './features/structure/StructureFeature';
 import { SystemFeature } from './features/system/SystemFeature';
 import { WikiFeature } from './features/wiki/WikiFeature';
 import { DrilldownFeature } from './features/drilldown/DrilldownFeature';
-import { ManuscriptAnalyzerFeature } from './features/manuscript-analyzer/ManuscriptAnalyzerFeature';
+import { StoryStudioFeature } from './features/story-studio/StoryStudioFeature';
 import { PlaygroundFeature } from './features/playground/PlaygroundFeature';
 import { Library } from 'lucide-react';
 import { NexusObject, isLink, NexusType, NexusCategory, ContainmentType, DefaultLayout } from './types';
@@ -125,6 +124,12 @@ export default function App() {
                     <PlaygroundFeature 
                         onSeedRefinery={(items, name) => handleBatchToRefinery(items, 'IMPORT', name)}
                         onSeedRegistry={(items) => setRegistry(prev => ({...prev, ...items}))}
+                        onSeedManifesto={(blocks) => {
+                            // Specialized logic to jump to studio with pre-filled manifesto
+                            // We can use a window event or custom state if we expanded the feature
+                            window.dispatchEvent(new CustomEvent('nexus-seed-manifesto', { detail: blocks }));
+                            setCurrentView('STUDIO');
+                        }}
                     />
                 )}
                 {currentView === 'DRILLDOWN' && (
@@ -140,9 +145,18 @@ export default function App() {
                         }}
                     />
                 )}
-                {currentView === 'ANALYZER' && (
-                    <ManuscriptAnalyzerFeature 
-                        onCommitBatch={(items) => handleBatchToRefinery(items, 'MANUAL', 'BLUEPRINT_DRAFT')} 
+                {currentView === 'STUDIO' && (
+                    <StoryStudioFeature 
+                        onCommitBatch={(items) => {
+                            setRegistry(prev => {
+                                const next = { ...prev };
+                                items.forEach(item => {
+                                    next[item.id] = item;
+                                });
+                                return next;
+                            });
+                        }} 
+                        registry={registry}
                     />
                 )}
                 {currentView === 'GENERATOR' && (

@@ -1,8 +1,9 @@
-
 /**
  * NEXUS.TS
- * Version: 4.1 (Types & Core Utils Only)
+ * Version: 4.3 (Dramaturgical Storage Extension)
  */
+
+import { StudioBlock } from './features/story-studio/StoryStudioFeature';
 
 export interface NexusElement {
   id: string;
@@ -42,6 +43,7 @@ export interface TraitLink {
 export enum NexusType {
   SIMPLE_NOTE = 'SIMPLE_NOTE',
   CONTAINER_NOTE = 'CONTAINER_NOTE',
+  STORY_NOTE = 'STORY_NOTE',
   SIMPLE_LINK = 'SIMPLE_LINK',
   SEMANTIC_LINK = 'SEMANTIC_LINK',
   HIERARCHICAL_LINK = 'HIERARCHICAL_LINK',
@@ -56,14 +58,30 @@ export enum NexusCategory {
   EVENT = 'EVENT',
   CONCEPT = 'CONCEPT',
   META = 'META',
-  ORGANIZATION = 'ORGANIZATION'
+  ORGANIZATION = 'ORGANIZATION',
+  STORY = 'STORY'
+}
+
+export enum StoryType {
+  BOOK = 'BOOK',
+  CHAPTER = 'CHAPTER',
+  SCENE = 'SCENE',
+  BEAT = 'BEAT'
+}
+
+export enum NarrativeStatus {
+  VOID = 'VOID',
+  OUTLINE = 'OUTLINE',
+  DRAFT = 'DRAFT',
+  POLISHED = 'POLISHED'
 }
 
 export enum ContainmentType {
   FOLDER = 'FOLDER',
   REGION = 'REGION',
   FACTION = 'FACTION',
-  PLOT_ARC = 'PLOT_ARC'
+  PLOT_ARC = 'PLOT_ARC',
+  MANUSCRIPT = 'MANUSCRIPT'
 }
 
 export enum DefaultLayout {
@@ -80,7 +98,7 @@ export enum HierarchyType {
 }
 
 export interface SimpleNote extends NexusElement {
-  _type: 'SIMPLE_NOTE';
+  _type: 'SIMPLE_NOTE' | 'STORY_NOTE';
   title: string;
   aliases: string[];
   tags: string[];
@@ -94,7 +112,17 @@ export interface SimpleNote extends NexusElement {
 }
 
 export interface ContainerNote extends Omit<SimpleNote, '_type'>, TraitContainer {
-  _type: 'CONTAINER_NOTE';
+  _type: 'CONTAINER_NOTE' | 'STORY_NOTE';
+}
+
+export interface StoryNote extends ContainerNote {
+  _type: 'STORY_NOTE';
+  story_type: StoryType;
+  sequence_index: number;
+  tension_level: number; 
+  status: NarrativeStatus;
+  pov_id?: string; 
+  manifesto_data?: StudioBlock[]; // Stored drafting state
 }
 
 export interface SimpleLink extends NexusElement, TraitLink {
@@ -122,6 +150,7 @@ export interface AggregatedHierarchicalLink extends Omit<HierarchicalLink, '_typ
 export type NexusObject = 
   | SimpleNote 
   | ContainerNote 
+  | StoryNote
   | SimpleLink 
   | SemanticLink
   | HierarchicalLink
@@ -136,6 +165,10 @@ export const isLink = (obj: NexusObject): obj is (NexusObject & TraitLink) => {
   return 'source_id' in obj && 'target_id' in obj;
 };
 
+export const isStory = (obj: NexusObject): obj is StoryNote => {
+  return obj._type === NexusType.STORY_NOTE;
+};
+
 export const isReified = (obj: NexusObject): boolean => {
   return 'is_reified' in obj && (obj as any).is_reified === true;
 };
@@ -143,7 +176,8 @@ export const isReified = (obj: NexusObject): boolean => {
 export const isStrictHierarchy = (obj: NexusObject): boolean => {
   return obj._type === NexusType.HIERARCHICAL_LINK || 
          obj._type === NexusType.AGGREGATED_HIERARCHICAL_LINK ||
-         obj._type === NexusType.CONTAINER_NOTE;
+         obj._type === NexusType.CONTAINER_NOTE ||
+         obj._type === NexusType.STORY_NOTE;
 };
 
 export type ConflictStatus = 'APPROVED' | 'IMPLIED' | 'REDUNDANT';
@@ -154,7 +188,7 @@ export const NexusGraphUtils = {
     return { updatedParent: updatedSource, updatedChild: updatedTarget, newLink: link };
   },
 
-  createNode: (title: string, type: NexusType = NexusType.SIMPLE_NOTE): SimpleNote | ContainerNote => {
+  createNode: (title: string, type: NexusType = NexusType.SIMPLE_NOTE): SimpleNote | ContainerNote | StoryNote => {
     const now = new Date().toISOString();
     const base = {
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `node-${Date.now()}`,
@@ -171,6 +205,22 @@ export const NexusGraphUtils = {
       last_modified: now,
       link_ids: []
     };
+
+    if (type === NexusType.STORY_NOTE) {
+        return {
+            ...base,
+            _type: NexusType.STORY_NOTE,
+            category_id: NexusCategory.STORY,
+            containment_type: ContainmentType.MANUSCRIPT,
+            is_collapsed: false,
+            default_layout: DefaultLayout.TIMELINE,
+            children_ids: [],
+            story_type: StoryType.SCENE,
+            sequence_index: 0,
+            tension_level: 50,
+            status: NarrativeStatus.VOID
+        } as StoryNote;
+    }
 
     if (type === NexusType.CONTAINER_NOTE) {
       return {

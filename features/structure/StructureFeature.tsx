@@ -31,13 +31,39 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({ registry, on
     const { startTutorial } = useTutorial();
 
     const filteredRegistry = useMemo(() => {
-        if (showAuthorNotes) return registry;
         const next: Record<string, NexusObject> = {};
-        (Object.values(registry) as NexusObject[]).forEach(obj => {
-            if (!(obj as any).is_author_note) {
+        const all = Object.values(registry) as NexusObject[];
+        
+        // 1. First pass: Filter Nodes
+        all.forEach(obj => {
+            if (isLink(obj)) return;
+            
+            const isStory = obj._type === NexusType.STORY_NOTE;
+            const isAuthor = (obj as any).is_author_note;
+            
+            // Strictly exclude Story units from Structural views
+            if (!isStory && (!isAuthor || showAuthorNotes)) {
                 next[obj.id] = obj;
             }
         });
+
+        // 2. Second pass: Filter Links
+        all.forEach(obj => {
+            if (!isLink(obj)) return;
+            
+            const source = registry[obj.source_id];
+            const target = registry[obj.target_id];
+            
+            // Logic: Hide links if they are story transitions or connect to story nodes
+            const isStoryLink = source?._type === NexusType.STORY_NOTE || target?._type === NexusType.STORY_NOTE;
+            if (isStoryLink) return;
+
+            // Also hide if either endpoint is currently hidden (e.g., hidden Author Notes)
+            if (!next[obj.source_id] || !next[obj.target_id]) return;
+
+            next[obj.id] = obj;
+        });
+
         return next;
     }, [registry, showAuthorNotes]);
 
@@ -45,9 +71,22 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({ registry, on
         const newNode = NexusGraphUtils.createNode('New Unit', NexusType.SIMPLE_NOTE);
         onRegistryUpdate(prev => {
             const parent = prev[parentId];
-            if (!parent || !isContainer(parent)) return prev;
-            const { updatedParent, updatedChild, newLink } = NexusGraphUtils.reconcileHierarchy(parent, newNode, NexusType.HIERARCHICAL_LINK);
-            return { ...prev, [newNode.id]: updatedChild, [parentId]: updatedParent, ...(newLink ? { [newLink.id]: newLink } : {}) };
+            if (!parent || isLink(parent)) return prev;
+
+            // Omni-container logic: Promote any leaf node to container status upon child addition
+            const updatedParent = isContainer(parent)
+                ? { ...parent, children_ids: [...parent.children_ids, newNode.id] }
+                : { 
+                    ...parent, 
+                    _type: parent._type === NexusType.STORY_NOTE ? NexusType.STORY_NOTE : NexusType.CONTAINER_NOTE, 
+                    children_ids: [newNode.id], 
+                    containment_type: ContainmentType.FOLDER, 
+                    is_collapsed: false, 
+                    default_layout: DefaultLayout.GRID 
+                  } as any;
+
+            const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(updatedParent, newNode, NexusType.HIERARCHICAL_LINK, 'contains');
+            return { ...prev, [newNode.id]: updatedTarget as any, [parentId]: updatedSource as any, [link.id]: link };
         });
         setSelectedId(newNode.id);
     }, [onRegistryUpdate]);
@@ -154,7 +193,10 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({ registry, on
                 } else {
                     const op = next[oldParentId];
                     if (op && isContainer(op)) next[oldParentId] = { ...op, children_ids: op.children_ids.filter(id => id !== sourceId) } as any;
-                    Object.keys(next).forEach(k => { const o = next[k]; if (isLink(o) && o._type === NexusType.HIERARCHICAL_LINK && o.source_id === oldParentId && o.target_id === sourceId) delete next[k]; });
+                    Object.keys(next).forEach(k => { 
+                      const o = next[k]; 
+                      if (isLink(o) && o._type === NexusType.HIERARCHICAL_LINK && o.source_id === oldParentId && o.target_id === sourceId) delete next[k]; 
+                    });
                 }
             }
             if (targetId === 'root') {
@@ -164,8 +206,21 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({ registry, on
             }
             const targetNode = next[targetId];
             if (!targetNode || isLink(targetNode)) return next;
-            if (!isContainer(targetNode)) next[targetId] = { ...targetNode, _type: NexusType.CONTAINER_NOTE, children_ids: [sourceId] } as any;
-            else next[targetId] = { ...targetNode, children_ids: Array.from(new Set([...targetNode.children_ids, sourceId])) } as any;
+            
+            // Promote to container if not already one
+            if (!isContainer(targetNode)) {
+                next[targetId] = { 
+                    ...targetNode, 
+                    _type: targetNode._type === NexusType.STORY_NOTE ? NexusType.STORY_NOTE : NexusType.CONTAINER_NOTE, 
+                    children_ids: [sourceId], 
+                    containment_type: ContainmentType.FOLDER, 
+                    is_collapsed: false, 
+                    default_layout: DefaultLayout.GRID 
+                } as any;
+            } else {
+                next[targetId] = { ...targetNode, children_ids: Array.from(new Set([...targetNode.children_ids, sourceId])) } as any;
+            }
+            
             const shadowLink = NexusGraphUtils.createShadowLink(targetId, sourceId);
             next[shadowLink.id] = shadowLink;
             return next;

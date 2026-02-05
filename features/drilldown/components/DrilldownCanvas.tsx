@@ -2,25 +2,11 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { Share2, Link2, X, Activity } from 'lucide-react';
-import { NexusObject, isLink, isReified, NexusType } from '../../../types';
+import { NexusObject, isLink, isReified, NexusType, isContainer } from '../../../types';
 import { DrillNode } from './DrillNode';
 import { VisibleNode } from '../DrilldownFeature';
 import { DrilldownContextMenu } from './DrilldownContextMenu';
 import { GraphIntegrityService, IntegrityReport } from '../../integrity/GraphIntegrityService';
-
-interface DrilldownCanvasProps {
-    registry: Record<string, VisibleNode>;
-    fullRegistry: Record<string, NexusObject>;
-    onDrilldown: (id: string) => void;
-    onInspect: (id: string) => void;
-    focusId?: string;
-    onDelete?: (id: string) => void;
-    onReifyLink?: (id: string) => void;
-    onReifyNode?: (id: string) => void;
-    onReifyNodeToLink?: (nodeId: string, sourceId: string, targetId: string) => void;
-    onEstablishLink?: (sourceId: string, targetId: string, verb: string) => void;
-    integrityFocus?: { linkId: string, path?: string[], mode: 'CENTER' | 'DRILL' } | null;
-}
 
 interface SimulationNode extends d3.SimulationNodeDatum {
     id: string;
@@ -42,8 +28,23 @@ interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
     originalTargetId?: string;
 }
 
+interface DrilldownCanvasProps {
+    registry: Record<string, VisibleNode>;
+    fullRegistry: Record<string, NexusObject>;
+    onDrilldown: (id: string) => void;
+    onInspect: (id: string) => void;
+    focusId?: string;
+    onDelete?: (id: string) => void;
+    onReifyLink?: (id: string) => void;
+    onReifyNode?: (id: string) => void;
+    onReifyNodeToLink?: (nodeId: string, sourceId: string, targetId: string) => void;
+    onEstablishLink?: (sourceId: string, targetId: string, verb: string) => void;
+    onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
+    integrityFocus?: { linkId: string, path?: string[], mode: 'CENTER' | 'DRILL' } | null;
+}
+
 export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({ 
-    registry, fullRegistry, onDrilldown, onInspect, focusId, onDelete, onReifyLink, onReifyNode, onReifyNodeToLink, onEstablishLink, integrityFocus
+    registry, fullRegistry, onDrilldown, onInspect, focusId, onDelete, onReifyLink, onReifyNode, onReifyNodeToLink, onEstablishLink, onReparent, integrityFocus
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<SVGSVGElement>(null);
@@ -56,6 +57,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
     const [lockedId, setLockedId] = useState<string | null>(null);
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [linkingSourceId, setLinkingSourceId] = useState<string | null>(null);
+    const [dragOverNodeId, setDragOverNodeId] = useState<string | null>(null);
     
     const positionMap = useRef<Map<string, { x: number, y: number }>>(new Map());
     const simulationRef = useRef<d3.Simulation<SimulationNode, SimulationLink> | null>(null);
@@ -287,8 +289,41 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
                             const isNodeFocus = node.id === focusId || linkingSourceId === node.id || lockedId === node.id || isPartOfAnomaly;
                             
                             return (
-                                <g key={node.id} transform={`translate(${node.x || 0},${node.y || 0})`} onMouseEnter={() => setHoveredId(node.id)} onMouseLeave={() => setHoveredId(null)} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ id: node.id, x: e.clientX, y: e.clientY }); }} onDoubleClick={(e) => { e.stopPropagation(); onDrilldown(node.id); }} onClick={(e) => { e.stopPropagation(); if (linkingSourceId) { if (linkingSourceId !== node.id && onEstablishLink) onEstablishLink(linkingSourceId, node.id, "mentions"); setLinkingSourceId(null); } else { setLockedId(lockedId === node.id ? null : node.id); } setContextMenu(null); }}>
-                                    <DrillNode object={node.object} zoomScale={zoomTransform.k} fullRegistry={fullRegistry} isFocus={isNodeFocus} isHovered={node.id === hoveredId} integrityReport={integrityMap[node.id]} />
+                                <g 
+                                    key={node.id} 
+                                    transform={`translate(${node.x || 0},${node.y || 0})`} 
+                                    onMouseEnter={() => setHoveredId(node.id)} 
+                                    onMouseLeave={() => setHoveredId(null)} 
+                                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ id: node.id, x: e.clientX, y: e.clientY }); }} 
+                                    onDoubleClick={(e) => { e.stopPropagation(); onDrilldown(node.id); }} 
+                                    onClick={(e) => { e.stopPropagation(); if (linkingSourceId) { if (linkingSourceId !== node.id && onEstablishLink) onEstablishLink(linkingSourceId, node.id, "mentions"); setLinkingSourceId(null); } else { setLockedId(lockedId === node.id ? null : node.id); } setContextMenu(null); }}
+                                    onDragOver={(e) => { e.preventDefault(); setDragOverNodeId(node.id); }}
+                                    onDragLeave={() => setDragOverNodeId(null)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        setDragOverNodeId(null);
+                                        const sourceId = e.dataTransfer.getData("text/plain");
+                                        const oldParentId = e.dataTransfer.getData("application/nexus-parent-id");
+                                        if (sourceId && sourceId !== node.id && onReparent) {
+                                            onReparent(sourceId, node.id, oldParentId);
+                                        }
+                                    }}
+                                >
+                                    {/* Fix: cast draggable attribute to any to allow it on SVGGElement props in React */}
+                                    <g onDragStart={(e) => {
+                                        e.dataTransfer.setData("text/plain", node.id);
+                                        const parent = (Object.values(fullRegistry) as NexusObject[]).find(o => isContainer(o) && o.children_ids.includes(node.id));
+                                        e.dataTransfer.setData("application/nexus-parent-id", parent?.id || 'root');
+                                    }} {...({ draggable: "true" } as any)}>
+                                        <DrillNode 
+                                            object={node.object} 
+                                            zoomScale={zoomTransform.k} 
+                                            fullRegistry={fullRegistry} 
+                                            isFocus={isNodeFocus || dragOverNodeId === node.id} 
+                                            isHovered={node.id === hoveredId} 
+                                            integrityReport={integrityMap[node.id]} 
+                                        />
+                                    </g>
                                 </g>
                             );
                         })}

@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { 
     Zap, Sparkles, Plus, X, List, ChevronRight, 
     AtSign, Edit3, Target, MousePointer2, Wand2,
     Database, Hash, ArrowRight, UserCircle2, Trash2,
     RotateCw, Link, Info, Repeat, MousePointerSquareDashed,
-    Check, MousePointerClick
+    Check, MousePointerClick, ArrowLeft, Save
 } from 'lucide-react';
 import { EntitySeed } from '../ScannerFeature';
 import { NexusCategory } from '../../../types';
@@ -26,6 +26,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
     const [isExpanding, setIsExpanding] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [manualAliasInput, setManualAliasInput] = useState('');
+    const [selectionMenu, setSelectionMenu] = useState<{ x: number, y: number, text: string } | null>(null);
 
     const workbenchRef = useRef<HTMLDivElement>(null);
 
@@ -75,48 +76,48 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
         if (existing) {
             setActiveSeedId(existing.id);
         } else {
-            const newSeed: EntitySeed = {
-                id: generateId(),
-                title: entityText,
-                aliases: [],
-                gist: '',
-                category: NexusCategory.CONCEPT,
-                isManual: true,
-                isAuthorNote: false,
-                suggestedChildren: []
-            };
-            setSeeds(prev => [...prev, newSeed]);
-            setActiveSeedId(newSeed.id);
+            createAnchor(entityText);
         }
     };
 
-    const handleManualSelection = () => {
-        const selection = window.getSelection()?.toString().trim();
-        if (selection) {
-            if (activeSeedId) {
-                // Add as alias to active
-                setSeeds(prev => prev.map(s => 
-                    s.id === activeSeedId 
-                        ? { ...s, aliases: Array.from(new Set([...s.aliases, selection])) } 
-                        : s
-                ));
-            } else {
-                // Create new anchor
-                const newSeed: EntitySeed = {
-                    id: generateId(),
-                    title: selection,
-                    aliases: [],
-                    gist: '',
-                    category: NexusCategory.CONCEPT,
-                    isManual: true,
-                    isAuthorNote: false,
-                    suggestedChildren: []
-                };
-                setSeeds(prev => [...prev, newSeed]);
-                setActiveSeedId(newSeed.id);
-            }
-            window.getSelection()?.removeAllRanges();
+    const handleMouseUp = (e: React.MouseEvent) => {
+        const selection = window.getSelection();
+        const selectedText = selection?.toString().trim();
+        if (selectedText && selectedText.length > 1) {
+            setSelectionMenu({
+                x: e.clientX,
+                y: e.clientY,
+                text: selectedText
+            });
+        } else {
+            setSelectionMenu(null);
         }
+    };
+
+    const createAnchor = (title: string) => {
+        const newSeed: EntitySeed = {
+            id: generateId(),
+            title: title,
+            aliases: [],
+            gist: '',
+            category: NexusCategory.CONCEPT,
+            isManual: true,
+            isAuthorNote: false,
+            suggestedChildren: []
+        };
+        setSeeds(prev => [...prev, newSeed]);
+        setActiveSeedId(newSeed.id);
+        setSelectionMenu(null);
+    };
+
+    const addAsAlias = (title: string) => {
+        if (!activeSeedId) return;
+        setSeeds(prev => prev.map(s => 
+            s.id === activeSeedId 
+                ? { ...s, aliases: Array.from(new Set([...s.aliases, title])) } 
+                : s
+        ));
+        setSelectionMenu(null);
     };
 
     const deleteSeed = (id: string) => {
@@ -242,8 +243,37 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
 
     return (
         <div className="flex h-full w-full overflow-hidden bg-nexus-950 animate-in fade-in duration-500">
+            {/* Selection Tooltip */}
+            {selectionMenu && (
+                <div 
+                    className="fixed z-[1000] bg-nexus-900 border border-nexus-700 rounded-2xl p-1 shadow-2xl flex items-center gap-1 animate-in zoom-in-95"
+                    style={{ left: selectionMenu.x, top: selectionMenu.y - 60 }}
+                >
+                    <button 
+                        onClick={() => createAnchor(selectionMenu.text)}
+                        className="px-4 py-2 hover:bg-nexus-accent hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2"
+                    >
+                        <Plus size={14} /> New Anchor
+                    </button>
+                    {activeSeedId && (
+                        <>
+                            <div className="w-px h-6 bg-nexus-800" />
+                            <button 
+                                onClick={() => addAsAlias(selectionMenu.text)}
+                                className="px-4 py-2 hover:bg-nexus-arcane hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2"
+                            >
+                                <AtSign size={14} /> Add as AKA
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+
             {/* Left Column: The Manifest */}
-            <div className="flex-1 overflow-y-auto no-scrollbar border-r border-nexus-800 p-8 md:p-12 relative">
+            <div 
+                className="flex-1 overflow-y-auto no-scrollbar border-r border-nexus-800 p-8 md:p-12 relative"
+                onMouseUp={handleMouseUp}
+            >
                 <div className="max-w-3xl mx-auto">
                     <div className="flex items-center justify-between mb-10">
                         <div className="flex items-center gap-3 opacity-60">
@@ -251,20 +281,9 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                             <span className="text-[10px] font-display font-black uppercase tracking-[0.4em] text-nexus-muted">The Manifest // Extraction Focus</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button 
-                                onClick={handleManualSelection}
-                                className="flex items-center gap-2 px-4 py-2 bg-nexus-900 border border-nexus-800 hover:border-nexus-accent rounded-xl text-nexus-muted hover:text-nexus-accent transition-all group shadow-sm active:scale-95"
-                                title="Bind highlighted text as alias or anchor"
-                            >
-                                <MousePointerSquareDashed size={16} className="group-hover:rotate-12 transition-transform" />
-                                <span className="text-[10px] font-display font-black uppercase tracking-widest">Bind Selection</span>
-                            </button>
-                            {isAkaMode && (
-                                <div className="flex items-center gap-2 px-3 py-1 bg-nexus-arcane/10 border border-nexus-arcane/30 rounded-full animate-pulse">
-                                    <AtSign size={10} className="text-nexus-arcane" />
-                                    <span className="text-[9px] font-display font-black text-nexus-arcane uppercase tracking-widest">Select Aliases in Text</span>
-                                </div>
-                            )}
+                            <div className="text-[10px] font-mono text-nexus-muted uppercase tracking-widest bg-nexus-900 border border-nexus-800 px-4 py-2 rounded-xl">
+                                Select text to anchor concepts
+                            </div>
                         </div>
                     </div>
                     
@@ -281,15 +300,23 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
             </div>
 
             {/* Right Column: The Workbench */}
-            <aside className="w-[500px] bg-nexus-900 border-l border-nexus-800 flex flex-col relative shrink-0 shadow-[ -10px_0_30px_var(--shadow-color)]">
+            <aside className="w-[500px] bg-nexus-900 border-l border-nexus-800 flex flex-col relative shrink-0 shadow-[-10px_0_30px_var(--shadow-color)]">
                 <header className="h-16 border-b border-nexus-800 flex items-center px-6 justify-between shrink-0 bg-nexus-900/80 backdrop-blur-xl z-20">
                     <div className="flex items-center gap-2">
-                        <Wand2 size={16} className="text-nexus-accent" />
-                        <span className="text-[11px] font-display font-black uppercase tracking-widest text-nexus-muted">Concept Forge</span>
+                        {activeSeedId ? (
+                            <button onClick={() => setActiveSeedId(null)} className="p-2 -ml-2 text-nexus-muted hover:text-nexus-accent transition-colors">
+                                <ArrowLeft size={18} />
+                            </button>
+                        ) : (
+                            <Wand2 size={16} className="text-nexus-accent" />
+                        )}
+                        <span className="text-[11px] font-display font-black uppercase tracking-widest text-nexus-muted">
+                            {activeSeedId ? 'Anchor Refinement' : 'Concept Forge'}
+                        </span>
                     </div>
                     <div className="flex items-center gap-2">
                          <span className="text-[10px] font-mono text-nexus-accent bg-nexus-accent/5 px-3 py-1 rounded-full border border-nexus-accent/20 font-bold uppercase tracking-tighter">
-                            {seeds.length} Anchors Active
+                            {seeds.length} Anchors
                          </span>
                     </div>
                 </header>
@@ -297,7 +324,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                 <div ref={workbenchRef} className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-8 relative">
                     {activeSeed ? (
                         <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                            {/* Parent Anchor Card */}
+                            {/* Parent Anchor Editor */}
                             <div className={`bg-nexus-800/40 border rounded-[32px] p-8 shadow-xl relative overflow-hidden group transition-all duration-500 ${activeSeed.isAuthorNote ? 'border-amber-500/40 bg-amber-500/5' : 'border-nexus-700'}`}>
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-3">
@@ -317,8 +344,8 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                         >
                                             <Trash2 size={16} />
                                         </button>
-                                        <button onClick={() => setActiveSeedId(null)} className="p-2 text-nexus-muted hover:text-nexus-text transition-colors bg-nexus-900 border border-nexus-800 rounded-xl">
-                                            <X size={18} />
+                                        <button onClick={() => setActiveSeedId(null)} className="p-2 bg-nexus-accent text-white rounded-xl shadow-lg shadow-nexus-accent/20 transition-all hover:scale-105 active:scale-95" title="Done Refining">
+                                            <Check size={18} />
                                         </button>
                                     </div>
                                 </div>
@@ -352,7 +379,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                                 onClick={() => updateSeed(activeSeed.id, { isAuthorNote: !activeSeed.isAuthorNote })}
                                                 className={`w-full py-3 rounded-xl border transition-all text-[9px] font-black uppercase tracking-widest h-[46px] ${activeSeed.isAuthorNote ? 'bg-amber-500 text-black border-amber-500' : 'text-nexus-muted border-nexus-700 hover:text-nexus-text hover:bg-nexus-800'}`}
                                             >
-                                                {activeSeed.isAuthorNote ? 'Author Mode Active' : 'Enable Meta Mode'}
+                                                {activeSeed.isAuthorNote ? 'Meta Active' : 'Meta Mode'}
                                             </button>
                                         </div>
                                     </div>
@@ -360,15 +387,13 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                     <div className="space-y-1.5">
                                         <div className="flex items-center justify-between ml-1">
                                             <label className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest">Aliases (AKA)</label>
-                                            <div className="flex items-center gap-2">
-                                                <button 
-                                                    onClick={() => setIsAkaMode(!isAkaMode)}
-                                                    className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border text-[9px] font-black uppercase transition-all shadow-sm ${isAkaMode ? 'bg-nexus-arcane text-white border-nexus-arcane' : 'bg-nexus-950 text-nexus-muted border-nexus-800 hover:text-nexus-arcane hover:border-nexus-arcane'}`}
-                                                >
-                                                    {isAkaMode ? <MousePointerClick size={12} /> : <Plus size={12} />}
-                                                    {isAkaMode ? 'Selecting...' : 'Text Scry'}
-                                                </button>
-                                            </div>
+                                            <button 
+                                                onClick={() => setIsAkaMode(!isAkaMode)}
+                                                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border text-[9px] font-black uppercase transition-all shadow-sm ${isAkaMode ? 'bg-nexus-arcane text-white border-nexus-arcane' : 'bg-nexus-950 text-nexus-muted border-nexus-800 hover:text-nexus-arcane hover:border-nexus-arcane'}`}
+                                            >
+                                                {isAkaMode ? <MousePointerClick size={12} /> : <Plus size={12} />}
+                                                {isAkaMode ? 'Selecting...' : 'Text Scry'}
+                                            </button>
                                         </div>
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
@@ -412,10 +437,10 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                                     </div>
                                                 ))}
                                                 {activeSeed.aliases.length === 0 && !isAkaMode && (
-                                                    <span className="text-[10px] text-nexus-muted/40 italic p-1">No aliases defined. Use "Text Scry" or input manually.</span>
+                                                    <span className="text-[10px] text-nexus-muted/40 italic p-1">No aliases. Select text or type above.</span>
                                                 )}
                                                 {isAkaMode && (
-                                                    <span className="text-[10px] text-nexus-arcane font-black animate-pulse uppercase tracking-widest p-1">Scribing from text...</span>
+                                                    <span className="text-[10px] text-nexus-arcane font-black animate-pulse uppercase tracking-widest p-1">Scrying from text...</span>
                                                 )}
                                             </div>
                                         </div>
@@ -445,7 +470,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                         className="flex items-center gap-2 px-3 py-1.5 bg-nexus-800 hover:bg-nexus-accent text-nexus-muted hover:text-white rounded-xl border border-nexus-700 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
                                     >
                                         {isExpanding ? <RotateCw className="animate-spin" size={12} /> : <Wand2 size={12} />}
-                                        Expand Concept
+                                        Expand
                                     </button>
                                 </div>
 
@@ -466,29 +491,12 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                                         placeholder="Child Title"
                                                     />
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="relative">
-                                                        <select 
-                                                            value={child.category}
-                                                            disabled={child.isAuthorNote}
-                                                            onChange={(e) => {
-                                                                const next = [...activeSeed.suggestedChildren];
-                                                                next[i].category = e.target.value as NexusCategory;
-                                                                updateSeed(activeSeed.id, { suggestedChildren: next });
-                                                            }}
-                                                            className="bg-nexus-950 border border-nexus-800 rounded-lg text-[8px] font-black uppercase text-nexus-muted px-2 pr-6 py-1 outline-none cursor-pointer tracking-widest disabled:opacity-30 appearance-none"
-                                                        >
-                                                            {Object.values(NexusCategory).map(c => <option key={c} value={c}>{c}</option>)}
-                                                        </select>
-                                                        <ChevronRight size={8} className="absolute right-1.5 top-1/2 -translate-y-1/2 rotate-90 text-nexus-muted pointer-events-none" />
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => removeSuggestion(activeSeed.id, i)}
-                                                        className="p-1.5 text-nexus-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
+                                                <button 
+                                                    onClick={() => removeSuggestion(activeSeed.id, i)}
+                                                    className="p-1.5 text-nexus-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                             
                                             <textarea 
@@ -501,81 +509,80 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({ text, onFi
                                                 }}
                                                 className="bg-nexus-950/50 border border-nexus-800/50 rounded-xl p-3 text-[11px] italic text-nexus-muted outline-none w-full h-16 resize-none no-scrollbar font-serif transition-colors focus:border-nexus-accent/30"
                                             />
-                                            
-                                            {child.isAuthorNote && (
-                                                <div className="flex items-center gap-2 text-[8px] font-black text-amber-500 uppercase tracking-widest px-2 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20 self-start">
-                                                    <Sparkles size={8} /> Meta-Commentary Unit
-                                                </div>
-                                            )}
                                         </div>
                                     ))}
-                                    
-                                    {(!activeSeed.suggestedChildren || activeSeed.suggestedChildren.length === 0) && !isExpanding && (
-                                        <div className="py-12 text-center border-2 border-dashed border-nexus-800 rounded-[32px] bg-nexus-950/20">
-                                            <p className="text-[10px] text-nexus-muted font-bold uppercase tracking-[0.2em]">Logical Tree Collapsed</p>
-                                            <p className="text-[9px] text-nexus-muted/60 italic mt-1">Initiate Expansion to see suggested sub-units.</p>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
+
+                            <button onClick={() => setActiveSeedId(null)} className="w-full py-4 bg-nexus-800 text-nexus-text hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                Return to Anchor List
+                            </button>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col gap-6">
-                            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-40">
-                                <MousePointer2 size={48} className="mb-4 animate-pulse text-nexus-muted" />
-                                <h3 className="text-sm font-display font-black uppercase tracking-[0.2em] mb-2 text-nexus-text">Manifest Selection</h3>
-                                <p className="text-[11px] font-serif italic max-w-[200px] text-nexus-muted">Pin a term in the manifest to begin anchoring its logical structure.</p>
-                            </div>
-                            
-                            {seeds.length > 0 && (
-                                <div className="border-t border-nexus-800 pt-6 space-y-3">
-                                    <div className="flex items-center gap-2 px-2 text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest opacity-60">
-                                        <Database size={10} /> Anchor Registry
+                        <div className="h-full flex flex-col">
+                            <div className="flex-1 space-y-3">
+                                <div className="flex items-center gap-2 px-2 text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest opacity-60 mb-4">
+                                    <Database size={10} /> Active Anchor Registry
+                                </div>
+                                
+                                {seeds.length === 0 ? (
+                                    <div className="h-48 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-nexus-800 rounded-[32px] opacity-40">
+                                        <MousePointer2 size={32} className="mb-4 animate-pulse text-nexus-muted" />
+                                        <h3 className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-nexus-text">No Anchors Set</h3>
+                                        <p className="text-[9px] font-serif italic mt-1">Select text in the manifest to define concepts.</p>
                                     </div>
+                                ) : (
                                     <div className="grid grid-cols-1 gap-2">
                                         {seeds.map(s => (
                                             <button 
                                                 key={s.id}
                                                 onClick={() => setActiveSeedId(s.id)}
-                                                className="flex items-center justify-between p-3 bg-nexus-800/40 border border-nexus-800 rounded-2xl hover:border-nexus-accent/40 transition-all text-left group"
+                                                className="flex items-center justify-between p-4 bg-nexus-800/40 border border-nexus-800 rounded-3xl hover:border-nexus-accent transition-all text-left group shadow-sm"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg border ${s.isAuthorNote ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-nexus-accent/10 border-nexus-accent/20 text-nexus-accent'}`}>
-                                                        {s.isAuthorNote ? <UserCircle2 size={14} /> : <Target size={14} />}
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`p-2 rounded-xl border ${s.isAuthorNote ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-nexus-accent/10 border-nexus-accent/20 text-nexus-accent'}`}>
+                                                        {s.isAuthorNote ? <UserCircle2 size={16} /> : <Target size={16} />}
                                                     </div>
                                                     <div>
-                                                        <div className="text-[11px] font-bold text-white uppercase truncate max-w-[150px]">{s.title}</div>
-                                                        <div className="text-[8px] font-mono text-nexus-muted uppercase">{s.category}</div>
+                                                        <div className="text-xs font-bold text-white uppercase tracking-tight truncate max-w-[200px]">{s.title}</div>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <span className="text-[8px] font-mono text-nexus-muted uppercase">{s.category}</span>
+                                                            {s.aliases.length > 0 && <span className="text-[7px] bg-nexus-arcane/20 text-nexus-arcane px-1.5 py-0.5 rounded border border-nexus-arcane/30 font-black">+{s.aliases.length} AKA</span>}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {s.aliases.length > 0 && (
-                                                        <span className="text-[8px] bg-nexus-arcane/10 text-nexus-arcane px-1.5 py-0.5 rounded border border-nexus-arcane/20 font-black">+{s.aliases.length} AKA</span>
-                                                    )}
-                                                    <ChevronRight size={14} className="text-nexus-muted group-hover:text-nexus-accent" />
-                                                </div>
+                                                <ChevronRight size={16} className="text-nexus-muted group-hover:text-nexus-accent transition-transform group-hover:translate-x-1" />
                                             </button>
                                         ))}
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <footer className="p-6 border-t border-nexus-800 bg-nexus-900/90 backdrop-blur-xl shrink-0 z-20">
-                    <div className="flex gap-4">
-                         <button 
-                            onClick={onCancel}
-                            className="flex-1 py-4 rounded-2xl bg-nexus-800 text-nexus-muted text-[10px] font-display font-black uppercase tracking-widest hover:text-nexus-text transition-all border border-nexus-700 shadow-sm"
-                        >
-                            Abort
-                        </button>
+                <footer className="p-8 border-t border-nexus-800 bg-nexus-900/95 backdrop-blur-xl shrink-0 z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
+                    <div className="flex flex-col gap-4">
+                        {!activeSeedId && (
+                            <button 
+                                onClick={() => onFinalize(seeds)}
+                                disabled={seeds.length === 0}
+                                className={`
+                                    w-full py-6 rounded-[32px] font-display font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 transition-all
+                                    ${seeds.length > 0 
+                                        ? 'bg-nexus-accent text-white shadow-2xl shadow-nexus-accent/20 hover:brightness-110 active:scale-95' 
+                                        : 'bg-nexus-800 text-nexus-muted cursor-not-allowed opacity-40 border border-nexus-700'}
+                                `}
+                            >
+                                <Sparkles size={20} />
+                                Run Neural Extraction
+                            </button>
+                        )}
                         <button 
-                            onClick={() => onFinalize(seeds)}
-                            className="flex-[2] py-4 rounded-2xl bg-nexus-accent text-white text-[10px] font-display font-black uppercase tracking-[0.2em] shadow-xl shadow-nexus-accent/20 flex items-center justify-center gap-3 group active:scale-[0.98] transition-all"
+                            onClick={onCancel}
+                            className="w-full py-3 rounded-2xl text-nexus-muted text-[10px] font-display font-black uppercase tracking-widest hover:text-red-500 transition-colors"
                         >
-                            Commit Scaffolding <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                            Abort Preprocessing
                         </button>
                     </div>
                 </footer>

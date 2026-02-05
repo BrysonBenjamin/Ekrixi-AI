@@ -1,4 +1,3 @@
-
 import { NexusCategory, NexusType, ConflictStatus } from '../../../../types';
 
 export const getCategoryColor = (cat: any, reified?: boolean) => {
@@ -33,22 +32,31 @@ export const getCategoryIconSvg = (cat: any, color: string, reified?: boolean) =
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 };
 
-export const createNodeHTML = (d: any, isSelected: boolean, isHovered: boolean, isExpanded: boolean) => {
+export const createNodeHTML = (d: any, isSelected: boolean, isHovered: boolean, isExpanded: boolean, isCollapsed: boolean) => {
     const isReifiedNode = d.data.reified;
     const color = getCategoryColor(d.data.category, isReifiedNode);
     const icon = getCategoryIconSvg(d.data.category, color, isReifiedNode);
     const borderColor = (isSelected || isHovered) ? color : (isReifiedNode ? 'var(--accent-color)' : 'var(--bg-700)');
     const background = isSelected ? 'var(--bg-900)' : (isHovered ? 'var(--bg-800)' : 'var(--bg-900)');
+    const textMain = 'var(--text-main)';
     const textMuted = 'var(--text-muted)';
+
+    // Branch toggle icon
+    const branchIcon = isCollapsed 
+        ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-nexus-accent"><path d="m9 18 6-6-6-6"/></svg>`
+        : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-nexus-muted"><path d="m6 9 6 6 6-6"/></svg>`;
 
     return `
         <div xmlns="http://www.w3.org/1999/xhtml" class="node-pill flex flex-col rounded-2xl border transition-all duration-300 pointer-events-auto cursor-pointer w-full h-full shadow-lg" style="border-color: ${borderColor}; background: ${background};">
             <div class="flex items-center gap-3 p-3 w-full">
                 <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border" style="background: ${color}15; border-color: ${color}30;">${icon}</div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-[13px] font-display font-bold uppercase tracking-tight truncate" style="color: var(--text-main);">${d.data.name}</div>
+                    <div class="text-[13px] font-display font-bold uppercase tracking-tight truncate" style="color: ${textMain};">${d.data.name}</div>
                     <div class="text-[8px] font-mono uppercase tracking-widest mt-0.5 opacity-60" style="color: ${textMuted};">${d.data.category}</div>
                 </div>
+                <button class="collapse-trigger p-1.5 hover:bg-nexus-800 rounded-lg transition-colors shrink-0" data-id="${d.data.id}" title="${isCollapsed ? 'Expand Branch' : 'Collapse Branch'}">
+                    ${branchIcon}
+                </button>
             </div>
             ${isExpanded ? `
                 <div class="px-4 pb-4 border-t border-nexus-800/30 pt-3 bg-black/[0.02]">
@@ -66,16 +74,18 @@ export const createLinkPillHTML = (verb: string, isReified: boolean, isSelected:
     let labelSuffix = '';
 
     if (conflict === 'IMPLIED') {
-        color = '#f59e0b'; // Amber
+        color = '#f59e0b'; 
         borderStyle = 'dashed';
         labelSuffix = ' <span style="opacity: 0.5;">[IMPLIED]</span>';
     } else if (conflict === 'REDUNDANT') {
-        color = '#ef4444'; // Red
+        color = '#ef4444'; 
         opacity = 0.5;
         labelSuffix = ' <span style="opacity: 0.8; text-decoration: line-through;">[REDUNDANT]</span>';
     }
 
     const bg = isSelected ? color : 'var(--bg-950)';
+    // In light mode, if selected, use bg-950 (light) text on accent background.
+    // If not selected, use standard text-main.
     const textColor = isSelected ? 'var(--bg-950)' : 'var(--text-main)';
     
     return `

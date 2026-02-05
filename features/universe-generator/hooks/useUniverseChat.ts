@@ -5,10 +5,26 @@ import { ChatSession, MessageNode } from '../types';
 import { generateId } from '../../../utils/ids';
 import { NexusObject, isLink } from '../../../types';
 
+const STORAGE_KEY = 'ekrixi_nexus_chats';
+
 export const useUniverseChat = (registry: Record<string, NexusObject>) => {
-    const [sessions, setSessions] = useState<ChatSession[]>([]);
+    // Persistent initial state
+    const [sessions, setSessions] = useState<ChatSession[]>(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        try {
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            console.error("Failed to parse saved sessions", e);
+            return [];
+        }
+    });
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Persistence Effect
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }, [sessions]);
 
     // Initial session creation if empty
     useEffect(() => {
@@ -26,8 +42,11 @@ export const useUniverseChat = (registry: Record<string, NexusObject>) => {
             };
             setSessions([initial]);
             setCurrentSessionId(newId);
+        } else if (sessions.length > 0 && !currentSessionId) {
+            // Default to most recent session
+            setCurrentSessionId(sessions[0].id);
         }
-    }, [sessions.length, isLoading]);
+    }, [sessions.length, isLoading, currentSessionId]);
 
     const currentSession = useMemo(() => 
         sessions.find(s => s.id === currentSessionId), 
@@ -74,7 +93,6 @@ export const useUniverseChat = (registry: Record<string, NexusObject>) => {
         }));
 
         try {
-            // Serialize Registry Context
             const knownUnits = (Object.values(registry) as NexusObject[])
                 .filter(o => !isLink(o))
                 .map(o => `- ${(o as any).title}: ${(o as any).gist}`)

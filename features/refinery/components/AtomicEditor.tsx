@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Edit3, Hash, Tag, AtSign, Search, Plus, X, 
@@ -8,6 +9,7 @@ import {
     NexusObject, 
     isLink, 
     isReified, 
+    isContainer,
     NexusCategory, 
     NexusType, 
     HierarchyType,
@@ -72,10 +74,36 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({ object, registry, on
 
     const suggestions = useMemo(() => {
         if (!atMenu) return [];
-        const q = atMenu.query.toLowerCase();
-        return (Object.values(registry) as NexusObject[])
-            .filter(n => 'title' in n && n.id !== object.id && (n as any).title.toLowerCase().includes(q))
-            .slice(0, 6);
+        const q = atMenu.query.replace(/_/g, ' ').toLowerCase();
+        const allItems = Object.values(registry) as NexusObject[];
+        
+        // Seniority calculation
+        const parentMap: Record<string, string[]> = {};
+        allItems.forEach(obj => {
+            if (isContainer(obj)) {
+                obj.children_ids.forEach(cid => {
+                    if (!parentMap[cid]) parentMap[cid] = [];
+                    parentMap[cid].push(obj.id);
+                });
+            }
+        });
+
+        const getDepth = (id: string, visited = new Set<string>()): number => {
+            if (visited.has(id)) return 999;
+            visited.add(id);
+            const parents = parentMap[id] || [];
+            if (parents.length === 0) return 0;
+            return 1 + Math.min(...parents.map(p => getDepth(p, new Set(visited))));
+        };
+
+        const filtered = allItems
+            .filter(n => !isLink(n) && n.id !== object.id && (n as any).title?.toLowerCase().includes(q))
+            .map(n => ({ node: n, depth: getDepth(n.id) }));
+
+        return filtered
+            .sort((a, b) => a.depth - b.depth)
+            .map(f => f.node)
+            .slice(0, 15);
     }, [atMenu, registry, object.id]);
 
     const handleProtocolSwitch = (newType: NexusType) => {
@@ -131,7 +159,6 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({ object, registry, on
 
             {isL && (
                 <div className="space-y-8 mb-12">
-                    {/* Connection Context */}
                     <div className="flex items-center justify-between gap-8 p-10 bg-nexus-950 border border-nexus-800 rounded-[32px] shadow-inner relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                             <GitBranch size={100} />
@@ -159,7 +186,6 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({ object, registry, on
                         </div>
                     </div>
 
-                    {/* Link Identity Matrix */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-nexus-900/40 p-8 rounded-[32px] border border-nexus-800 shadow-sm">
                          <div className="space-y-4">
                             <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
@@ -253,7 +279,6 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({ object, registry, on
                 </div>
             )}
 
-            {/* Content & Metadata (Shared) */}
             <div className="space-y-10">
                 <div className="space-y-4">
                     <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.2em] ml-2 opacity-60">Manifest Abstract (Gist)</label>

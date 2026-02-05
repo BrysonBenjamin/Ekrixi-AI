@@ -1,7 +1,6 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import * as d3 from 'd3';
-import { NexusObject, isLink } from '../../../types';
+import { NexusObject, isLink, isContainer } from '../../../types';
 import { TreeHUD } from './visualizer/TreeHUD';
 import { ResponsiveTree } from './visualizer/ResponsiveTree';
 import { TraditionalContextMenu } from './visualizer/TraditionalContextMenu';
@@ -28,10 +27,15 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
     registry, selectedId, onSelect, onAddChild, onDelete, onDeleteLink, onReifyLink, onReifyNode, onReifyNodeToLink, onInvertLink, onInspect, onViewModeChange, onReparent, onMenuOpened
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const hoveredIdRef = useRef<string | null>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
     const [isMobile, setIsMobile] = useState(false);
     const [orientation, setOrientation] = useState<'HORIZONTAL' | 'VERTICAL'>('HORIZONTAL');
+    
+    // Tracks nodes already evaluated for auto-collapse to avoid annoying re-collapsing
+    const evaluatedIdsRef = useRef<Set<string>>(new Set());
     
     // Traditional Context Menu state
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
@@ -40,6 +44,64 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
 
     const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
     const svgElRef = useRef<SVGSVGElement | null>(null);
+
+    // Default Collapse Logic: 5+ children or depth > 3
+    useEffect(() => {
+        // Fix: Explicitly cast Object.values to NexusObject[] to ensure property 'id' is known
+        const allObjects = Object.values(registry) as NexusObject[];
+        if (allObjects.length === 0) return;
+
+        const childIds = new Set<string>();
+        allObjects.forEach(obj => {
+            if (isContainer(obj)) {
+                obj.children_ids.forEach(cid => childIds.add(cid));
+            }
+        });
+
+        // Fix: Cast roots result to NexusObject[] to fix inference at line 54
+        const roots = allObjects.filter(obj => 
+            (!isLink(obj) || (obj as any).is_reified) && 
+            (!childIds.has(obj.id) || (obj as any).tags?.includes('__is_root__'))
+        ) as NexusObject[];
+
+        const newCollapsed = new Set(collapsedIds);
+        let changed = false;
+
+        const walk = (id: string, depth: number) => {
+            if (evaluatedIdsRef.current.has(id)) {
+                // Fix: Explicitly cast registry access to handle line 60 and 61 errors
+                const node = registry[id] as NexusObject | undefined;
+                if (node && isContainer(node)) {
+                    node.children_ids.forEach(cid => walk(cid, depth + 1));
+                }
+                return;
+            }
+
+            const node = registry[id] as NexusObject | undefined;
+            if (!node) return;
+
+            evaluatedIdsRef.current.add(id);
+
+            const hasManyChildren = isContainer(node) && node.children_ids.length >= 5;
+            const isTooDeep = depth > 3;
+
+            if (hasManyChildren || isTooDeep) {
+                newCollapsed.add(id);
+                changed = true;
+            }
+
+            if (isContainer(node)) {
+                node.children_ids.forEach(cid => walk(cid, depth + 1));
+            }
+        };
+
+        // Fix: line 94 property 'id' does not exist on type 'unknown'
+        roots.forEach(root => walk(root.id, 1));
+
+        if (changed) {
+            setCollapsedIds(newCollapsed);
+        }
+    }, [registry]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -56,6 +118,15 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
 
     const toggleExpand = (id: string) => {
         setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleCollapse = (id: string) => {
+        setCollapsedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
             else next.add(id);
@@ -115,16 +186,19 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
                 registry={registry}
                 selectedId={selectedId}
                 expandedIds={expandedIds}
+                collapsedIds={collapsedIds}
                 hoveredId={hoveredId}
                 orientation={orientation}
                 onSelect={onSelect}
                 onToggleExpand={toggleExpand}
+                onToggleCollapse={toggleCollapse}
                 onHover={setHoveredId}
                 onViewModeChange={onViewModeChange}
                 onContextMenu={handleContextMenu}
                 onLongPress={handleLongPress}
                 setZoomRef={(z) => zoomRef.current = z}
                 setSvgRef={(s) => svgElRef.current = s}
+                onReparent={onReparent}
             />
 
             {contextObject && contextMenu && (

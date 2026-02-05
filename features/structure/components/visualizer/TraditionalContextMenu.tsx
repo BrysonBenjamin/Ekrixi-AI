@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { 
     Plus, Trash2, Share2, X, ChevronRight,
@@ -116,10 +115,11 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
                             />
                         )}
 
-                        {(isC || reified) && (
+                        {/* ANY non-link node can established a sub-unit now */}
+                        {(!isLink(object) || reified) && (
                             <MenuItem 
                                 icon={Plus} 
-                                label="Sub-Unit" 
+                                label="Establish Sub-Unit" 
                                 color="text-nexus-essence"
                                 onClick={() => { if(onAddChild) onAddChild(object.id); onClose(); }} 
                             />

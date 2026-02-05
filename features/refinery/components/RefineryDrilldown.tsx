@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { DrilldownCanvas } from '../../drilldown/components/DrilldownCanvas';
-import { NexusObject, isContainer, isLink, isReified } from '../../../types';
+import { NexusObject, isContainer, isLink, isReified, NexusType } from '../../../types';
 import { VisibleNode } from '../../drilldown/DrilldownFeature';
 import { ChevronRight, Home, Compass } from 'lucide-react';
 
@@ -48,7 +48,9 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
             if (depth > 2) continue; 
             if (visited.has(id) && visited.get(id)! <= depth) continue;
             const obj = registry[id];
-            if (!obj) continue;
+            
+            // Strictly exclude Story units
+            if (!obj || obj._type === NexusType.STORY_NOTE) continue;
 
             const isNode = !isLink(obj) || isReified(obj);
             if (isNode) {

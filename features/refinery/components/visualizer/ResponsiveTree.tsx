@@ -13,22 +13,23 @@ interface ResponsiveTreeProps {
     onSelect: (id: string) => void;
     onToggleExpand: (id: string) => void;
     onHover: (id: string | null) => void;
+    onContextMenu?: (id: string, x: number, y: number) => void;
     onDoubleClick?: (id: string) => void;
-    onLongPress?: (id: string, x: number, y: number) => void;
     onViewModeChange?: (mode: 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR') => void;
     setZoomRef: (zoom: d3.ZoomBehavior<SVGSVGElement, unknown>) => void;
     setSvgRef: (svg: SVGSVGElement | null) => void;
+    onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
 }
 
 export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({ 
     registry, selectedId, expandedIds, hoveredId, orientation, 
-    onSelect, onToggleExpand, onHover, onDoubleClick, onLongPress, onViewModeChange,
-    setZoomRef, setSvgRef
+    onSelect, onToggleExpand, onHover, onContextMenu, onDoubleClick, onViewModeChange,
+    setZoomRef, setSvgRef, onReparent
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const currentTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-    const holdTimerRef = useRef<any>(null);
     const isVertical = orientation === 'VERTICAL';
+    const [dragOverNodeId, setDragOverNodeId] = useState<string | null>(null);
 
     const zoomBehavior = useMemo(() => {
         return d3.zoom<SVGSVGElement, unknown>()
@@ -51,7 +52,6 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         
         const roots = allObjects.filter((o: NexusObject) => {
             if (isLink(o) && !isReified(o)) return false;
-            // Root if no container has it OR if it has the manual root tag
             const inContainer = allObjects.some((p: NexusObject) => isContainer(p) && p.children_ids.includes(o.id));
             const isManualRoot = (o as any).tags?.includes('__is_root__');
             return !inContainer || isManualRoot;
@@ -144,26 +144,13 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
                 .style("overflow", "visible")
                 .html(() => createLinkPillHTML(verb, isLinkReified, selectedId === linkId));
 
-            fo.on("mousedown touchstart", (e) => {
-                const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-                const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-                if (linkId && onLongPress) {
-                    holdTimerRef.current = setTimeout(() => onLongPress(linkId, clientX, clientY), 500);
-                }
-            });
-
             fo.on("contextmenu", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const clientX = e.clientX;
-                const clientY = e.clientY;
-                if (linkId && onLongPress) {
-                    onLongPress(linkId, clientX, clientY);
+                if (linkId && onContextMenu) {
+                    onContextMenu(linkId, e.clientX, e.clientY);
                 }
             });
-
-            const clearTimer = () => { if(holdTimerRef.current) clearTimeout(holdTimerRef.current); };
-            fo.on("mouseup touchend mouseleave touchmove", clearTimer);
 
             fo.on("click", (e) => {
                 e.stopPropagation();
@@ -191,33 +178,44 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         nodeGroups.each(function(d: any) {
             const isExpanded = expandedIds.has(d.data.id);
             const foHeight = isExpanded ? 200 : 54;
+            const isDraggingOver = dragOverNodeId === d.data.id;
             
             const fo = d3.select(this).selectAll("foreignObject").data([d]).join("foreignObject")
               .attr("width", 260)
               .attr("height", foHeight)
               .style("overflow", "visible")
-              .html(() => createNodeHTML(d, selectedId === d.data.id, hoveredId === d.data.id, isExpanded));
-
-            fo.on("mousedown touchstart", (e) => {
-                const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-                const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-                if (onLongPress) {
-                    holdTimerRef.current = setTimeout(() => onLongPress(d.data.id, clientX, clientY), 500);
-                }
-            });
+              .html(() => createNodeHTML(d, selectedId === d.data.id, hoveredId === d.data.id || isDraggingOver, isExpanded));
 
             fo.on("contextmenu", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const clientX = e.clientX;
-                const clientY = e.clientY;
-                if (onLongPress) {
-                    onLongPress(d.data.id, clientX, clientY);
+                if (onContextMenu) {
+                    onContextMenu(d.data.id, e.clientX, e.clientY);
                 }
             });
 
-            const clearTimer = () => { if(holdTimerRef.current) clearTimeout(holdTimerRef.current); };
-            fo.on("mouseup touchend mouseleave touchmove", clearTimer);
+            fo.attr("draggable", "true")
+              .on("dragstart", (e) => {
+                e.dataTransfer.setData("text/plain", d.data.id);
+                const parent = (Object.values(registry) as NexusObject[]).find(o => isContainer(o) && o.children_ids.includes(d.data.id));
+                e.dataTransfer.setData("application/nexus-parent-id", parent?.id || 'root');
+              })
+              .on("dragover", (e) => {
+                e.preventDefault();
+                setDragOverNodeId(d.data.id);
+              })
+              .on("dragleave", () => {
+                setDragOverNodeId(null);
+              })
+              .on("drop", (e) => {
+                e.preventDefault();
+                setDragOverNodeId(null);
+                const sourceId = e.dataTransfer.getData("text/plain");
+                const oldParentId = e.dataTransfer.getData("application/nexus-parent-id");
+                if (sourceId && sourceId !== d.data.id && onReparent) {
+                    onReparent(sourceId, d.data.id, oldParentId);
+                }
+              });
         });
 
         const handleClick = (e: MouseEvent) => {
@@ -281,7 +279,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
             svg.on("mouseover", null);
             svg.on("mouseout", null);
         };
-    }, [hierarchyData, registry, selectedId, expandedIds, hoveredId, orientation, isVertical, zoomBehavior, onSelect, onToggleExpand, onHover, onDoubleClick, onLongPress, onViewModeChange]);
+    }, [hierarchyData, registry, selectedId, expandedIds, hoveredId, orientation, isVertical, zoomBehavior, onSelect, onToggleExpand, onHover, onDoubleClick, onContextMenu, onViewModeChange, dragOverNodeId, onReparent]);
 
     return <svg ref={svgRef} className="w-full h-full block cursor-grab active:cursor-grabbing outline-none" />;
 };
