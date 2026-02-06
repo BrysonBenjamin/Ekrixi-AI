@@ -107,7 +107,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             ) : (
               <Bot size={12} className="text-nexus-arcane" />
             )}
-            <span className="text-[10px] font-display font-black tracking-[0.2em] uppercase text-nexus-text">
+            <span className="text-xs md:text-[10px] font-display font-black tracking-[0.2em] uppercase text-nexus-text">
               {isUser ? 'User' : 'Assistant'}
             </span>
           </div>
@@ -140,7 +140,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <div className="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-nexus-800">
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 rounded-xl text-[10px] font-display font-bold text-nexus-muted hover:text-nexus-text transition-all flex items-center gap-2 uppercase tracking-widest"
+                  className="px-4 py-3 md:py-2 rounded-xl text-xs md:text-[10px] font-display font-bold text-nexus-muted hover:text-nexus-text transition-all flex items-center gap-2 uppercase tracking-widest"
                 >
                   <X size={12} /> Cancel
                 </button>

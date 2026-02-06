@@ -1,37 +1,34 @@
 import js from '@eslint/js';
 import globals from 'globals';
-import reactHooks from 'eslint-plugin-react-hooks';
-import reactRefresh from 'eslint-plugin-react-refresh';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
-  {
-    ignores: ['dist', '.eslintrc.cjs', 'backend/dist'],
-  },
   js.configs.recommended,
   {
-    files: ['**/*.{ts,tsx}'],
+    ignores: ['dist/'],
+    files: ['**/*.ts'],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
       globals: {
-        ...globals.browser,
-        ...globals.es2020,
+        ...globals.node,
+        ...globals.es2021,
       },
       parser: tsParser,
+      parserOptions: {
+        project: './tsconfig.json',
+      },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'no-undef': 'off', // TypeScript takes care of this
+      'no-undef': 'off', // TypeScript handles this
+      '@typescript-eslint/no-var-requires': 'off', // Allow CommonJS require
     },
   },
 ];

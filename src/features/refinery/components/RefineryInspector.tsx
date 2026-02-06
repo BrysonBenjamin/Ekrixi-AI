@@ -37,7 +37,7 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-nexus-900 font-sans">
-      <header className="h-20 border-b border-nexus-800 flex items-center justify-between px-8 shrink-0 bg-nexus-900/80 backdrop-blur-xl z-20">
+      <header className="h-20 border-b border-nexus-800 flex items-center justify-between px-4 md:px-8 shrink-0 bg-nexus-900/80 backdrop-blur-xl z-20">
         <div className="flex items-center gap-4">
           <div
             className={`p-3 rounded-2xl border ${isL ? 'bg-nexus-arcane/10 border-nexus-arcane/30 text-nexus-arcane' : isStory ? 'bg-nexus-ruby/10 border-nexus-ruby/30 text-nexus-ruby' : 'bg-nexus-accent/10 border-nexus-accent/30 text-nexus-accent'}`}

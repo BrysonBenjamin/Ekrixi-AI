@@ -142,7 +142,7 @@ export const Composer: React.FC<ComposerProps> = ({
           className={`absolute bottom-full left-0 mb-4 w-full max-w-sm bg-nexus-900 border border-nexus-700 rounded-[28px] shadow-2xl overflow-hidden backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200 z-[110] ${isExpanded ? 'ml-0' : ''}`}
         >
           <div className="px-5 py-3 border-b border-nexus-800 flex items-center justify-between bg-nexus-950/40">
-            <span className="text-[10px] font-display font-black text-nexus-accent uppercase tracking-widest flex items-center gap-2">
+            <span className="text-xs md:text-[10px] font-display font-black text-nexus-accent uppercase tracking-widest flex items-center gap-2">
               <Sparkles size={12} /> Neural Registry Scry
             </span>
             <button
@@ -212,14 +212,14 @@ export const Composer: React.FC<ComposerProps> = ({
           className={`flex items-center justify-between ${isExpanded ? 'px-8 pb-8 pt-4' : 'px-5 pb-4 pt-1'}`}
         >
           <div className="flex items-center gap-3">
-            <button className="p-2 rounded-xl text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all">
+            <button className="p-3 md:p-2 rounded-xl text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all">
               <Plus size={18} />
             </button>
 
             <div className="relative">
               <button
                 onClick={() => setShowContextOverlay(!showContextOverlay)}
-                className={`flex items-center gap-2 transition-all py-2 px-4 rounded-xl text-[10px] font-display font-black uppercase tracking-widest ${showContextOverlay ? 'bg-nexus-accent text-white' : 'text-nexus-muted hover:text-nexus-accent hover:bg-nexus-800'}`}
+                className={`flex items-center gap-2 transition-all p-3 md:py-2 md:px-4 rounded-xl text-xs md:text-[10px] font-display font-black uppercase tracking-widest ${showContextOverlay ? 'bg-nexus-accent text-white' : 'text-nexus-muted hover:text-nexus-accent hover:bg-nexus-800'}`}
               >
                 <StickyNote size={14} />
                 <span>Memory: {registrySize} Units</span>
@@ -229,7 +229,7 @@ export const Composer: React.FC<ComposerProps> = ({
                 <div className="absolute bottom-full left-0 mb-4 w-64 bg-nexus-900 border border-nexus-800 rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-2 duration-300">
                   <div className="flex items-center gap-3 mb-4">
                     <Database size={16} className="text-nexus-accent" />
-                    <h4 className="text-[10px] font-black uppercase tracking-widest">
+                    <h4 className="text-xs md:text-[10px] font-black uppercase tracking-widest">
                       Active Scry Context
                     </h4>
                   </div>
@@ -255,7 +255,7 @@ export const Composer: React.FC<ComposerProps> = ({
                 onClick={handleSend}
                 disabled={isLoading}
                 className={`
-                                    flex items-center justify-center w-10 h-10 rounded-full transition-all
+                                    flex items-center justify-center w-12 h-12 md:w-10 md:h-10 rounded-full transition-all
                                     ${
                                       !isLoading
                                         ? 'bg-nexus-accent text-white hover:bg-nexus-text hover:scale-105 active:scale-95 shadow-lg shadow-nexus-accent/20'

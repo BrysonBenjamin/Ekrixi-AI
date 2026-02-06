@@ -38,6 +38,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
 
   return (
     <div className="flex h-full bg-nexus-950 text-nexus-text relative overflow-hidden font-sans">
+      {/* Left Panel ... (rest is same) */}
       {/* Left Panel - Mobile Overlay */}
       <div
         className={`
@@ -63,6 +64,10 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
               setIsSidebarOpen(false);
             }}
             onDelete={deleteSession}
+            onSuggestionClick={(text) => {
+              setIsSidebarOpen(false);
+              sendMessage(text);
+            }}
           />
         </div>
       </div>
@@ -74,7 +79,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 rounded-xl transition-all"
+              className="p-3 md:p-2 text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 rounded-xl transition-all"
               title={isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
             >
               {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeft size={20} />}
@@ -101,7 +106,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all">
+            <button className="p-3 md:p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all">
               <MoreHorizontal size={20} />
             </button>
           </div>
