@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { PanelLeftClose, PanelLeft, Plus, ChevronDown, MoreHorizontal } from 'lucide-react';
+import gsap from 'gsap';
+import Flip from 'gsap/Flip';
 import { useUniverseChat } from './hooks/useUniverseChat';
 import { Sidebar } from './components/Sidebar';
 import { MessageList } from './components/MessageList';
 import { Composer } from './components/Composer';
 import { EmptyState } from './components/EmptyState';
+import { IntroOverlay } from './components/IntroOverlay';
 import { NexusObject } from '../../types';
+
+gsap.registerPlugin(Flip);
+
+// ... existing interface ...
 
 interface UniverseGeneratorFeatureProps {
   onScan: (text: string) => void;
@@ -34,10 +41,68 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
   } = useUniverseChat(registry, activeUniverseId);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Only show intro if no active thread (fresh landing on empty state)
   const hasMessages = thread.length > 0;
+  // Check session storage to ensure intro only runs once per session
+  const [showIntro, setShowIntro] = useState(() => {
+    if (thread.length > 0) return false;
+    // Check if we've already shown the intro in this session
+    try {
+      const hasSeen = sessionStorage.getItem('ekrixi_intro_seen');
+      return !hasSeen;
+    } catch {
+      return true; // Fallback if storage fails
+    }
+  });
+
+  const handleIntroComplete = () => {
+    // Mark intro as seen
+    try {
+      sessionStorage.setItem('ekrixi_intro_seen', 'true');
+    } catch (e) {
+      console.warn('Failed to save intro state', e);
+    }
+
+    // Strategy: Fit the Overlay Logo to match the Target Logo position BEFORE unmounting.
+    // This ensures continuity and avoids the "black flash" of an unmount/mount gap.
+
+    const overlayLogo = document.querySelector('#intro-logo');
+    const targetLogo = document.querySelector('[data-flip-id="hero-logo"]');
+
+    if (overlayLogo && targetLogo) {
+      // 1. Get the geometry of where we want to go
+      const state = Flip.getState(targetLogo);
+
+      // Ensure target is hidden so we don't see double during the flight
+      gsap.set(targetLogo, { opacity: 0 });
+
+      // 2. Animate the Overlay Logo to fit that geometry
+      Flip.fit(overlayLogo, state, {
+        duration: 1.2,
+        ease: 'power4.inOut',
+        scale: true,
+        zIndex: 60, // Ensure it stays on top during flight
+        onStart: () => {
+          // Fade out the independent background layer
+          gsap.to('#intro-background', { opacity: 0, duration: 1.0, ease: 'power2.inOut' });
+        },
+        onComplete: () => {
+          // 3. Reveal the target logo and remove the overlay
+          gsap.set(targetLogo, { opacity: 1 });
+          setShowIntro(false);
+        },
+      });
+    } else {
+      // Fallback
+      setShowIntro(false);
+    }
+  };
 
   return (
     <div className="flex h-full bg-nexus-950 text-nexus-text relative overflow-hidden font-sans">
+      {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
+
+      {/* Left Panel ... (rest is same) */}
       {/* Left Panel - Mobile Overlay */}
       <div
         className={`
@@ -63,6 +128,10 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
               setIsSidebarOpen(false);
             }}
             onDelete={deleteSession}
+            onSuggestionClick={(text) => {
+              setIsSidebarOpen(false);
+              sendMessage(text);
+            }}
           />
         </div>
       </div>
@@ -74,7 +143,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 rounded-xl transition-all"
+              className="p-3 md:p-2 text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 rounded-xl transition-all"
               title={isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
             >
               {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeft size={20} />}
@@ -101,7 +170,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all">
+            <button className="p-3 md:p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all">
               <MoreHorizontal size={20} />
             </button>
           </div>

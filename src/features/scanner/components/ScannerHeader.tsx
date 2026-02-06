@@ -17,17 +17,22 @@ export const ScannerHeader: React.FC<ScannerHeaderProps> = ({ stage, onReset }) 
   ];
 
   return (
-    <header className="h-20 border-b border-nexus-800 bg-nexus-900/50 backdrop-blur-md flex items-center px-8 justify-between shrink-0 z-50">
-      <div className="flex items-center gap-4">
-        <div className="p-2.5 bg-nexus-accent/10 rounded-xl border border-nexus-accent/30 flex items-center justify-center">
-          <Logo size={32} />
+    <header className="h-16 md:h-20 border-b border-nexus-800 bg-nexus-900/50 backdrop-blur-md flex items-center px-4 md:px-8 justify-between shrink-0 z-50">
+      <div className="flex items-center gap-3 md:gap-4">
+        <div className="p-2 md:p-2.5 bg-nexus-accent/10 rounded-xl border border-nexus-accent/30 flex items-center justify-center">
+          <Logo size={24} className="md:w-8 md:h-8" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-black text-nexus-text tracking-tight leading-none mb-1 uppercase">
-            Ekrixi <span className="text-nexus-accent">AI Scanner</span>
+          <h1 className="text-base md:text-xl font-display font-black text-nexus-text tracking-tight leading-none mb-1 uppercase">
+            Ekrixi <span className="text-nexus-accent hidden sm:inline">AI Scanner</span>
+            <span className="text-nexus-accent sm:hidden">Scanner</span>
           </h1>
-          <p className="text-[10px] text-nexus-muted font-mono uppercase tracking-[0.2em]">
-            Intel-to-Unit Pipeline
+          <p className="text-[9px] md:text-[10px] text-nexus-muted font-mono uppercase tracking-[0.2em] flex items-center gap-2">
+            <span className="hidden sm:inline">Intel-to-Unit Pipeline</span>
+            <span className="lg:hidden text-nexus-accent flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-nexus-accent animate-pulse" />
+              {steps.find((s) => s.id === stage)?.label}
+            </span>
           </p>
         </div>
       </div>

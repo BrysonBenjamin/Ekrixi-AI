@@ -185,7 +185,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
             onDrop={(e) => handleDrop(e, node.id)}
             onClick={() => onSelect(node.id)}
             className={`
-                            group flex items-center gap-2 px-2 py-2 rounded-xl text-[11px] transition-all cursor-pointer border relative
+                            group flex items-center gap-2 px-2 py-3 md:py-2 rounded-xl text-[11px] transition-all cursor-pointer border relative
                             ${
                               isAuthorNote
                                 ? isActive
@@ -291,7 +291,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
   }
 
   return (
-    <aside className="w-72 md:w-80 border-r border-nexus-800 bg-nexus-900 flex flex-col overflow-hidden shrink-0 transition-all duration-300 relative z-20 shadow-2xl">
+    <aside className="w-full md:w-80 border-r border-nexus-800 bg-nexus-900 flex flex-col overflow-hidden shrink-0 transition-all duration-300 relative z-20 shadow-2xl">
       <div
         className={`p-5 border-b transition-all duration-300 ${dragOverId === 'root' ? 'bg-nexus-accent/10 border-nexus-accent' : 'bg-nexus-900/40 border-nexus-800'}`}
         onDragOver={(e) => handleDragOver(e, 'root')}

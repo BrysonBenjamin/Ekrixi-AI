@@ -51,45 +51,49 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
 
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500 max-w-6xl mx-auto">
-      <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-nexus-800/50 pb-8">
+      <header className="mb-6 md:mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-nexus-800/50 pb-6 md:pb-8 shrink-0">
         <div>
-          <h2 className="text-3xl font-display font-black text-nexus-text tracking-tight flex items-center gap-4 uppercase">
-            <div className="p-2 bg-nexus-accent/10 rounded-xl">
-              <CheckCircle className="text-nexus-accent" size={28} />
+          <h2 className="text-2xl md:text-3xl font-display font-black text-nexus-text tracking-tight flex items-center gap-3 md:gap-4 uppercase">
+            <div className="p-1.5 md:p-2 bg-nexus-accent/10 rounded-xl">
+              <CheckCircle className="text-nexus-accent" size={20} />
             </div>
             Extraction <span className="text-nexus-accent">Verified</span>
           </h2>
-          <p className="text-sm text-nexus-muted mt-2 font-medium">
+          <p className="text-xs md:text-sm text-nexus-muted mt-2 font-medium">
             Discovered <span className="text-nexus-text font-bold">{nodes.length}</span> atomic
-            units and <span className="text-nexus-text font-bold">{links.length}</span> potential
+            units and <span className="text-nexus-text font-bold">{links.length}</span>{' '}
             associations.
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 md:gap-4">
           {totalConflicts > 0 && (
-            <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
-              <span className="text-[10px] font-display font-black text-amber-500 uppercase tracking-widest">
-                {totalConflicts} Logic Flags Found
+            <div className="px-3 py-1.5 md:px-4 md:py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2 md:gap-3">
+              <span className="text-[9px] md:text-[10px] font-display font-black text-amber-500 uppercase tracking-widest">
+                {totalConflicts} Flags
               </span>
             </div>
           )}
-          <button
-            onClick={onCancel}
-            className="px-6 py-3 rounded-2xl border border-nexus-700 text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all text-[10px] font-display font-black uppercase tracking-widest"
-          >
-            Abort
-          </button>
-          <button
-            onClick={handleApproveAll}
-            className="px-8 py-3 rounded-2xl bg-nexus-accent hover:brightness-110 text-white shadow-xl shadow-nexus-accent/20 transition-all text-[10px] font-display font-black uppercase tracking-[0.2em] flex items-center gap-3 active:scale-95"
-          >
-            Commit to Refinery <ChevronRight size={14} />
-          </button>
+          <div className="flex items-center gap-2 md:gap-4 ml-auto md:ml-0">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2.5 md:px-6 md:py-3 rounded-xl md:rounded-2xl border border-nexus-700 text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all text-[9px] md:text-[10px] font-display font-black uppercase tracking-widest"
+            >
+              Abort
+            </button>
+            <button
+              onClick={handleApproveAll}
+              className="px-5 py-2.5 md:px-8 md:py-3 rounded-xl md:rounded-2xl bg-nexus-accent hover:brightness-110 text-white shadow-lg md:shadow-xl shadow-nexus-accent/20 transition-all text-[9px] md:text-[10px] font-display font-black uppercase tracking-[0.2em] flex items-center gap-2 md:gap-3 active:scale-95"
+            >
+              <span className="hidden md:inline">Commit to Refinery</span>
+              <span className="md:hidden">Commit</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 flex-1 overflow-hidden min-h-0 pb-10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 flex-1 overflow-hidden min-h-0 pb-4 md:pb-10">
         <div className="flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-5 px-2">
             <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.3em] flex items-center gap-2.5">

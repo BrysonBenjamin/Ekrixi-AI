@@ -386,7 +386,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             <h1 className="text-4xl font-display font-black uppercase text-nexus-text tracking-tighter">
               Refinery <span className="text-nexus-accent">Inbox</span>
             </h1>
-            <div className="flex items-center gap-4 text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
+            <div className="flex items-center gap-4 text-xs md:text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
               Intel Ready: {batches.length} BATCHES
             </div>
           </div>
@@ -444,14 +444,14 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                     <div className="p-3 bg-nexus-950 rounded-2xl border border-nexus-800 text-nexus-muted group-hover:text-nexus-accent transition-colors">
                       <Package size={20} />
                     </div>
-                    <div className="text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
+                    <div className="text-xs md:text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
                       {b.source}
                     </div>
                   </div>
                   <div className="text-xl font-display font-bold text-nexus-text mb-2 truncate group-hover:text-nexus-accent transition-colors">
                     {b.name}
                   </div>
-                  <div className="text-[10px] text-nexus-muted uppercase font-black tracking-widest">
+                  <div className="text-xs md:text-[10px] text-nexus-muted uppercase font-black tracking-widest">
                     {b.items.length} Structural Units
                   </div>
                   <div className="mt-8 flex items-center justify-between text-[9px] font-black text-nexus-muted uppercase tracking-widest opacity-30 group-hover:opacity-100 transition-opacity">
@@ -503,14 +503,43 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             </div>
           </header>
           <div className="flex-1 flex overflow-hidden relative">
-            <HierarchyExplorer
-              items={localQueue}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onReparent={handleReparent}
-              onDeleteUnit={handleDeleteItem}
-            />
-            <main className="flex-1 bg-[#050508] relative overflow-hidden">
+            <div
+              className={`
+                            ${selectedId ? 'hidden md:flex' : 'flex'} 
+                            flex-col h-full shrink-0 z-20 transition-all duration-300 relative shadow-2xl
+                            w-full md:w-auto
+                        `}
+            >
+              <HierarchyExplorer
+                items={localQueue}
+                selectedId={selectedId}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                }}
+                onReparent={handleReparent}
+                onDeleteUnit={handleDeleteItem}
+              />
+            </div>
+
+            <main
+              className={`
+                            ${!selectedId ? 'hidden md:block' : 'block'} 
+                            flex-1 bg-[#050508] relative overflow-hidden h-full
+                        `}
+            >
+              {/* Mobile "Back" Header for Details View */}
+              <div className="md:hidden h-12 bg-nexus-900 border-b border-nexus-800 flex items-center px-4 shrink-0">
+                <button
+                  onClick={() => {
+                    setSelectedId(null);
+                    setShowInspector(false);
+                  }}
+                  className="flex items-center gap-2 text-xs font-bold text-nexus-muted hover:text-nexus-text"
+                >
+                  <ArrowLeft size={14} /> Back to List
+                </button>
+              </div>
+
               {activeView === 'EXPLORER' ? (
                 <RefineryDrilldown
                   registry={registry}
@@ -553,9 +582,9 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
 
               <div
                 className={`
-                                fixed inset-y-0 right-0 w-[420px] bg-nexus-900 border-l border-nexus-800 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] z-[500]
+                                fixed inset-0 md:inset-y-0 md:left-auto md:right-0 md:w-[420px] bg-nexus-900 md:border-l border-nexus-800 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] z-[500]
                                 transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)
-                                ${showInspector && selectedId ? 'translate-x-0' : 'translate-x-full'}
+                                ${showInspector && selectedId ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'}
                              `}
               >
                 {selectedObject && (

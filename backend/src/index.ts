@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -36,12 +36,12 @@ if (!GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
+app.get('/health', (_req: ExpressRequest, res: ExpressResponse) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Generate text endpoint
-app.post('/api/generate-text', async (req: Request, res: Response) => {
+app.post('/api/generate-text', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp' } = req.body;
 
@@ -69,7 +69,7 @@ app.post('/api/generate-text', async (req: Request, res: Response) => {
 });
 
 // Generate content endpoint (for chat and structured generation)
-app.post('/api/generate-content', async (req: Request, res: Response) => {
+app.post('/api/generate-content', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     const {
       model = 'gemini-1.5-pro-002',
