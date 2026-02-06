@@ -12,11 +12,15 @@ export const useLLM = () => {
   const activeKey = apiKeys?.gemini;
 
   useEffect(() => {
-    const client = getGeminiClient();
-    setModel(client);
+    // Only initialize client if not using backend proxy
+    if (!config.useBackendProxy) {
+      const client = getGeminiClient();
+      setModel(client);
+    }
   }, [activeKey]);
 
   const generateText = async (prompt: string, systemInstruction?: string) => {
+    // Mode 1: Local LLM
     if (config.useLocalLLM) {
       try {
         const messages = [];
@@ -44,6 +48,33 @@ export const useLLM = () => {
       }
     }
 
+    // Mode 2: Backend Proxy
+    if (config.useBackendProxy) {
+      try {
+        const response = await fetch(`${config.backendUrl}/api/generate-text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            systemInstruction,
+            model: GEMINI_MODELS.FLASH,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Backend proxy error');
+        }
+
+        const data = await response.json();
+        return data.text;
+      } catch (err) {
+        console.error('Backend Proxy Error', err);
+        throw err;
+      }
+    }
+
+    // Mode 3: Direct API (user's own key)
     if (!model) throw new Error('LLM not initialized: Missing API Key');
 
     try {
@@ -66,6 +97,7 @@ export const useLLM = () => {
     contents: Content[];
     generationConfig?: GenerationConfig;
   }) => {
+    // Mode 1: Local LLM
     if (config.useLocalLLM) {
       try {
         const messages = [];
@@ -112,6 +144,42 @@ export const useLLM = () => {
       }
     }
 
+    // Mode 2: Backend Proxy
+    if (config.useBackendProxy) {
+      try {
+        const response = await fetch(`${config.backendUrl}/api/generate-content`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: options.model || GEMINI_MODELS.PRO,
+            systemInstruction: options.systemInstruction,
+            contents: options.contents,
+            generationConfig: options.generationConfig,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Backend proxy error');
+        }
+
+        const data = await response.json();
+
+        // Mimic Gemini response structure
+        return {
+          response: Promise.resolve({
+            text: () => data.text,
+            candidates: data.candidates,
+            usageMetadata: data.usageMetadata,
+          }),
+        };
+      } catch (err) {
+        console.error('Backend Proxy Error', err);
+        throw err;
+      }
+    }
+
+    // Mode 3: Direct API (user's own key)
     if (!model) throw new Error('LLM not initialized: Missing API Key');
 
     try {
@@ -135,8 +203,9 @@ export const useLLM = () => {
   };
 
   return {
-    isReady: !!model || config.useLocalLLM,
-    hasKey: !!activeKey || config.useLocalLLM,
+    isReady: !!model || config.useLocalLLM || config.useBackendProxy,
+    hasKey: !!activeKey || config.useLocalLLM || config.useBackendProxy,
+    requiresUserKey: !config.useBackendProxy && !config.useLocalLLM,
     setKey: (key: string) => setApiKey('gemini', key),
     generateText,
     generateContent,

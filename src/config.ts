@@ -9,6 +9,14 @@ export const config = {
   },
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
   geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
+
+  // Backend proxy configuration
+  // If backendUrl is set, API calls will go through the backend proxy
+  // Otherwise, they'll use the client-side API key (if provided)
+  backendUrl: import.meta.env.VITE_BACKEND_URL || '',
+  useBackendProxy: !!import.meta.env.VITE_BACKEND_URL,
+
+  // Local LLM configuration (for development)
   useLocalLLM: import.meta.env.VITE_USE_LOCAL_LLM === 'true',
   localLLMUrl: import.meta.env.VITE_LOCAL_LLM_URL || 'http://localhost:8080/v1/chat/completions',
   localLLMModel: import.meta.env.VITE_LOCAL_LLM_MODEL || 'mlx-model',
