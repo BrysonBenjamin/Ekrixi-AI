@@ -6,14 +6,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Fingerprint,
-  BarChart3,
   TrendingUp,
   Zap,
 } from 'lucide-react';
-import { NexusObject, StoryType, isLink } from '../../../types';
+import { NexusObject, StoryType, isLink, SimpleNote, StoryNote } from '../../../types';
 
 interface StudioValidationProps {
-  delta: any;
+  delta: { startWeight: number; endWeight: number };
   studioItems: NexusObject[];
   worldRegistry: Record<string, NexusObject>;
 }
@@ -23,11 +22,11 @@ export const StudioValidation: React.FC<StudioValidationProps> = ({
   studioItems,
   worldRegistry,
 }) => {
-  const chapters = studioItems.filter((i) => (i as any).story_type === StoryType.CHAPTER);
+  const chapters = studioItems.filter((i) => (i as StoryNote).story_type === StoryType.CHAPTER);
   const mentions = useMemo(() => {
-    const allText = studioItems.map((i) => (i as any).prose_content || '').join(' ');
+    const allText = studioItems.map((i) => (i as SimpleNote).prose_content || '').join(' ');
     const worldNodes = (Object.values(worldRegistry) as NexusObject[]).filter((n) => !isLink(n));
-    return worldNodes.filter((n) => allText.includes(`[[${(n as any).title}]]`));
+    return worldNodes.filter((n) => allText.includes(`[[${(n as SimpleNote).title}]]`));
   }, [studioItems, worldRegistry]);
 
   const progressPercent = Math.min(100, Math.floor((chapters.length / 5) * 100)); // Arbitrary target 5 ch for demo
@@ -145,7 +144,14 @@ export const StudioValidation: React.FC<StudioValidationProps> = ({
   );
 };
 
-const InsightItem = ({ type, icon: Icon, title, content }: any) => (
+interface InsightItemProps {
+  type: 'WARNING' | 'SUCCESS';
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  title: string;
+  content: string;
+}
+
+const InsightItem = ({ type, icon: Icon, title, content }: InsightItemProps) => (
   <div
     className={`p-6 rounded-3xl border flex items-start gap-6 transition-all hover:bg-nexus-950/40 ${type === 'WARNING' ? 'border-red-500/20 bg-red-500/5' : 'border-nexus-essence/20 bg-nexus-essence/5'}`}
   >

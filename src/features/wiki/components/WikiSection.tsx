@@ -13,7 +13,8 @@ import {
 import {
   NexusObject,
   NexusType,
-  NexusCategory,
+  SimpleNote,
+  SimpleLink,
   isLink,
   isContainer,
   isReified,
@@ -21,6 +22,7 @@ import {
 } from '../../../types';
 import { WikiEditForm } from './WikiEditForm';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
+import { WikiEditData } from '../types';
 
 interface WikiSectionProps {
   node: NexusObject;
@@ -28,12 +30,12 @@ interface WikiSectionProps {
   visited: Set<string>;
   registry: Record<string, NexusObject>;
   editingNodeId: string | null;
-  editData: any;
+  editData: WikiEditData;
   currentObject: NexusObject; // The root object being viewed
   onSelect: (id: string) => void;
   handleStartEdit: (node: NexusObject) => void;
   handleSaveEdit: (id: string) => void;
-  setEditData: (data: any) => void;
+  setEditData: (data: WikiEditData) => void;
   setEditingNodeId: (id: string | null) => void;
 }
 
@@ -66,7 +68,7 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
   // SECTION 1: LINK RENDERING
   if (isLinkNode && !reified) {
     // Special rendering for pure links
-    const link = node as any;
+    const link = node as SimpleLink;
     const source = registry[link.source_id];
     const target = registry[link.target_id];
     const isHierarchical = isStrictHierarchy(link);
@@ -120,7 +122,7 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                   Origin Node
                 </span>
                 <div className="text-xl font-display font-bold text-nexus-text truncate px-4">
-                  {(source as any)?.title || 'Uncharted'}
+                  {(source as SimpleNote)?.title || 'Uncharted'}
                 </div>
                 <button
                   onClick={() => onSelect(link.source_id)}
@@ -157,7 +159,7 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                   Terminal Node
                 </span>
                 <div className="text-xl font-display font-bold text-nexus-text truncate px-4">
-                  {(target as any)?.title || 'Uncharted'}
+                  {(target as SimpleNote)?.title || 'Uncharted'}
                 </div>
                 <button
                   onClick={() => onSelect(link.target_id)}
@@ -175,7 +177,10 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                 </label>
                 <div className="bg-nexus-900/40 border border-nexus-800/50 rounded-[32px] p-10 backdrop-blur-sm">
                   <p className="text-xl md:text-2xl font-serif italic text-nexus-text/90 leading-relaxed">
-                    "{link.gist || 'This connection has not yet been structurally abstracted.'}"
+                    "
+                    {(link as unknown as SimpleNote).gist ||
+                      'This connection has not yet been structurally abstracted.'}
+                    "
                   </p>
                 </div>
               </div>
@@ -186,7 +191,7 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                 </label>
                 <div className="wiki-content p-4">
                   <NexusMarkdown
-                    content={link.prose_content || ''}
+                    content={(link as unknown as SimpleNote).prose_content || ''}
                     registry={registry}
                     onLinkClick={onSelect}
                   />
@@ -203,11 +208,11 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
   const children = isContainer(node)
     ? node.children_ids
         .map((id: string) => registry[id])
-        .filter((child: any) => !!child && (!isLink(child) || isReified(child))) // Recursively render non-link children (or reified ones)
+        .filter((child) => !!child && (!isLink(child) || isReified(child))) // Recursively render non-link children (or reified ones)
     : [];
 
   // Determine theme color inheritance
-  const themeColor = (node as any).theme_color || (currentObject as any)?.theme_color;
+  const themeColor = (node as SimpleNote).theme_color || (currentObject as SimpleNote)?.theme_color;
 
   return (
     <section
@@ -234,15 +239,16 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                 ? 'STORY UNIT'
                 : reified
                   ? 'REIFIED LOGIC'
-                  : node.category_id || 'CONCEPT'}
+                  : (node as SimpleNote).category_id || 'CONCEPT'}
             </span>
             {reified && (
               <div className="flex items-center gap-2 text-[8px] font-mono text-nexus-muted uppercase tracking-widest opacity-60">
-                {(registry[node.source_id] as any)?.title} <ArrowRight size={8} />{' '}
-                {(registry[node.target_id] as any)?.title}
+                {(registry[(node as SimpleLink).source_id] as SimpleNote)?.title}{' '}
+                <ArrowRight size={8} />{' '}
+                {(registry[(node as SimpleLink).target_id] as SimpleNote)?.title}
               </div>
             )}
-            {node.is_author_note && (
+            {(node as SimpleNote).is_author_note && (
               <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-500 text-[9px] font-black uppercase tracking-widest">
                 <ShieldCheck size={12} /> Author Protocol
               </span>
@@ -281,11 +287,11 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
             <div>
               {depth === 0 ? (
                 <h1 className="text-5xl md:text-7xl font-display font-black text-nexus-text tracking-tighter mb-4 leading-tight uppercase">
-                  {(node as any).title || (node as any).verb}
+                  {(node as SimpleNote).title || (node as unknown as SimpleLink).verb}
                 </h1>
               ) : (
                 <h2 className="text-3xl md:text-4xl font-display font-bold text-nexus-text tracking-tight mb-4 uppercase">
-                  {(node as any).title || (node as any).verb}
+                  {(node as SimpleNote).title || (node as unknown as SimpleLink).verb}
                 </h2>
               )}
 
@@ -296,14 +302,14 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                 }}
               >
                 <p className="text-xl md:text-2xl text-nexus-text/80 font-serif italic leading-relaxed">
-                  "{node.gist || 'This manifestation remains uncharted.'}"
+                  "{(node as SimpleNote).gist || 'This manifestation remains uncharted.'}"
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2 mb-10">
-                {(node as any).aliases &&
-                  (node as any).aliases.length > 0 &&
-                  (node as any).aliases.map((a: string) => (
+                {(node as SimpleNote).aliases &&
+                  (node as SimpleNote).aliases!.length > 0 &&
+                  (node as SimpleNote).aliases!.map((a: string) => (
                     <span
                       key={a}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-nexus-800/20 border border-nexus-700/50 rounded-lg text-[10px] font-display font-bold text-nexus-muted uppercase tracking-widest shadow-sm"
@@ -311,9 +317,9 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
                       <AtSign size={10} className="text-nexus-accent" /> {a}
                     </span>
                   ))}
-                {(node as any).tags &&
-                  (node as any).tags.length > 0 &&
-                  (node as any).tags.map((t: string) => (
+                {(node as SimpleNote).tags &&
+                  (node as SimpleNote).tags!.length > 0 &&
+                  (node as SimpleNote).tags!.map((t: string) => (
                     <span
                       key={t}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-nexus-800/20 border border-nexus-700/50 rounded-lg text-[10px] font-display font-bold text-nexus-muted uppercase tracking-widest shadow-sm"
@@ -325,7 +331,7 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
 
               <div className="wiki-content max-w-4xl">
                 <NexusMarkdown
-                  content={(node as any).prose_content || ''}
+                  content={(node as SimpleNote).prose_content || ''}
                   color={isStoryNode ? '#e11d48' : themeColor}
                   registry={registry}
                   onLinkClick={onSelect}
@@ -335,7 +341,7 @@ export const WikiSection: React.FC<WikiSectionProps> = ({
 
             {children.length > 0 && (
               <div className="pt-16 border-t border-nexus-800/30 ml-4 lg:ml-12">
-                {children.map((child: any) => (
+                {children.map((child) => (
                   <WikiSection
                     key={child.id}
                     node={child}

@@ -1,5 +1,3 @@
-import { NexusObject, NexusCategory, StoryType, NarrativeStatus } from '../../types';
-
 export type StudioStage = 'BLUEPRINT' | 'SPINE';
 
 export type BlockType =
@@ -14,7 +12,7 @@ export type BlockType =
 export interface StudioBlock {
   id: string;
   type: BlockType;
-  data: any;
+  data: Record<string, any>;
 }
 
 export type RightWidgetMode = 'CHAT' | 'LIBRARY' | 'NOTES' | null;
@@ -23,13 +21,13 @@ export interface LiteraryArchetype {
   id: string;
   label: string;
   type: 'Linear' | 'Nonlinear' | 'Expansionist' | 'Classical' | 'Non-Traditional';
-  icon: any;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   desc: string;
   hook: string;
   slides: Array<{
     title: string;
     content: string;
-    icon: any;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
     visual?: string;
   }>;
 }

@@ -45,7 +45,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
       try {
         const imported = JSON.parse(ev.target?.result as string);
         studio.setBlocks(imported);
-      } catch (err) {
+      } catch (_err) {
         alert('Invalid Blueprint format.');
       }
     };

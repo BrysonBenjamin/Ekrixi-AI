@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Scissors, Merge, Dna, ShieldAlert, Sparkles, X } from 'lucide-react';
+import { Merge, Dna, ShieldAlert, Sparkles, X } from 'lucide-react';
 import { NexusObject } from '../../../types';
 
 interface AutomataToolbarProps {

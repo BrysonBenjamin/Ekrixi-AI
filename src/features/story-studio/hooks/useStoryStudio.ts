@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   NexusObject,
   NexusType,
@@ -10,6 +10,7 @@ import {
   NarrativeStatus,
   isLink,
   isContainer,
+  SimpleNote,
 } from '../../../types';
 import { StudioBlock, StudioStage } from '../types';
 import { generateId } from '../../../utils/ids';
@@ -79,7 +80,7 @@ export const useStoryStudio = (
           if (isSourceActive || isTargetActive) {
             const peerId = isSourceActive ? item.target_id : item.source_id;
             const peer = registry[peerId];
-            if (peer && (peer as any).is_author_note) {
+            if (peer && (peer as SimpleNote).is_author_note) {
               itemsToLoad.set(item.id, item);
               itemsToLoad.set(peer.id, peer);
             }
@@ -149,9 +150,9 @@ export const useStoryStudio = (
       }
     } else {
       const finalItems = [...studioItems];
-      const bookIdx = finalItems.findIndex((i) => (i as any).story_type === StoryType.BOOK);
+      const bookIdx = finalItems.findIndex((i) => (i as StoryNote).story_type === StoryType.BOOK);
       if (bookIdx !== -1) {
-        finalItems[bookIdx] = { ...finalItems[bookIdx], manifesto_data: blocks } as any;
+        finalItems[bookIdx] = { ...finalItems[bookIdx], manifesto_data: blocks } as StoryNote;
       }
       onCommitBatch(finalItems);
     }

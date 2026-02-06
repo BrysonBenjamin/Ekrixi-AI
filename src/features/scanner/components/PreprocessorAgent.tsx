@@ -1,31 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  Zap,
-  Sparkles,
-  Plus,
-  X,
-  List,
-  ChevronRight,
-  AtSign,
-  Edit3,
-  Target,
-  MousePointer2,
-  Wand2,
-  Database,
-  Hash,
-  ArrowRight,
-  UserCircle2,
-  Trash2,
-  RotateCw,
-  Link,
-  Info,
-  Repeat,
-  MousePointerSquareDashed,
-  Check,
-  MousePointerClick,
-  ArrowLeft,
-  Save,
-} from 'lucide-react';
+import { Plus, List, AtSign, Wand2, ArrowLeft } from 'lucide-react';
 import { EntitySeed } from '../ScannerFeature';
 import { NexusCategory } from '../../../types';
 import { generateId } from '../../../utils/ids';
@@ -67,7 +41,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
           generationConfig: {
             responseMimeType: 'application/json',
           },
-          contents: [{ parts: [{ text: text.slice(0, 8000) }] }],
+          contents: [{ role: 'user', parts: [{ text: text.slice(0, 8000) }] }],
         });
         try {
           const result = await response.response;
@@ -194,7 +168,9 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
         generationConfig: {
           responseMimeType: 'application/json',
         },
-        contents: [{ parts: [{ text: `Original Context Fragment: ${text.slice(0, 5000)}` }] }],
+        contents: [
+          { role: 'user', parts: [{ text: `Original Context Fragment: ${text.slice(0, 5000)}` }] },
+        ],
       });
       try {
         const result = await response.response;

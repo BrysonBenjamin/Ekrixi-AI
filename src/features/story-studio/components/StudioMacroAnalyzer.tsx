@@ -4,17 +4,11 @@ import {
   Compass,
   Sparkles,
   BrainCircuit,
-  Zap,
-  ChevronRight,
   Layers,
   Target,
   X,
   RotateCw,
   AlertCircle,
-  CheckCircle2,
-  ArrowRight,
-  Search,
-  BookOpen,
 } from 'lucide-react';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../types';
@@ -29,6 +23,19 @@ interface StudioMacroAnalyzerProps {
   registry: Record<string, NexusObject>;
 }
 
+interface AnalysisAlternative {
+  archetype: string;
+  rationale: string;
+  fidelityGain: number;
+}
+
+interface AnalysisResult {
+  fitScore: number;
+  critique: string;
+  frictionPoints: string[];
+  alternatives: AnalysisAlternative[];
+}
+
 export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({
   blocks,
   onUpdateBlocks,
@@ -37,7 +44,7 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({
 }) => {
   const { generateContent } = useLLM();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   const thesis = blocks.find((b) => b.type === 'THESIS')?.data.text || '';
   const approach = blocks.find((b) => b.type === 'LITERARY_APPROACH')?.data || {
@@ -74,7 +81,7 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({
       const response = await generateContent({
         model: GEMINI_MODELS.PRO,
         systemInstruction: systemInstruction,
-        contents: [{ parts: [{ text: 'Evaluate structural blueprint fidelity.' }] }],
+        contents: [{ role: 'user', parts: [{ text: 'Evaluate structural blueprint fidelity.' }] }],
         generationConfig: { responseMimeType: 'application/json' },
       });
 
@@ -256,7 +263,7 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {analysisResult.alternatives.map((alt: any, i: number) => (
+                {analysisResult.alternatives.map((alt: AnalysisAlternative, i: number) => (
                   <div
                     key={i}
                     className="group bg-nexus-900 border border-nexus-800 p-6 rounded-[32px] hover:border-nexus-ruby transition-all flex flex-col gap-4"

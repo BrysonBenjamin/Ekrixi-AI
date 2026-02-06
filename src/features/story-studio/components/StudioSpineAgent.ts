@@ -1,13 +1,14 @@
 import { getGeminiClient, GEMINI_MODELS } from '../../../core/llm';
-// Fix: Import StudioBlock from types
-import { StudioBlock } from '../types';
+// Fix: Import StudioBlock, BlockType from types
+import { StudioBlock, BlockType } from '../types';
 import {
   NexusObject,
   NexusType,
   NexusCategory,
   StoryType,
   NarrativeStatus,
-  HierarchyType,
+  SimpleNote,
+  StoryNote,
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
 
@@ -48,9 +49,9 @@ export const StudioSpineAgent = {
 
     const response = await result.response;
     const rawBlocks = JSON.parse(response.text() || '[]');
-    return rawBlocks.map((b: any) => ({
+    return rawBlocks.map((b: { type: string; data: Record<string, unknown> }) => ({
       id: generateId(),
-      type: b.type,
+      type: b.type as BlockType,
       data: b.data,
     }));
   },
@@ -64,21 +65,39 @@ export const StudioSpineAgent = {
     intent: string,
     manifesto: StudioBlock[],
     registry: Record<string, NexusObject>,
-  ): Promise<any> {
+  ): Promise<{
+    category: string;
+    gist: string;
+    aliases: string[];
+    tags: string[];
+    thematicWeight: string;
+  }> {
     const ai = getGeminiClient();
     if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
 
-    const thesis = manifesto.find((b) => b.type === 'THESIS')?.data.text || '';
-    const approach = manifesto.find((b) => b.type === 'LITERARY_APPROACH')?.data || {};
+    const thesis = manifesto.find((b) => b.type === 'THESIS')?.data as { text?: string };
+    const thesisText = thesis?.text || '';
+    const approach =
+      (manifesto.find((b) => b.type === 'LITERARY_APPROACH')?.data as {
+        archetype?: string;
+        rationale?: string;
+      }) || {};
     const contextStr = manifesto
       .filter((b) => b.type === 'CONTEXT' || b.type === 'ORACLE_PROMPT')
-      .map((b) => b.data.text || b.data.fact)
+      .map(
+        (b) =>
+          (b.data as { text?: string; fact?: string }).text ||
+          (b.data as { text?: string; fact?: string }).fact,
+      )
       .join(' | ');
 
     const knownUnits = (Object.values(registry) as NexusObject[])
       .filter((o) => o._type === NexusType.SIMPLE_NOTE || o._type === NexusType.CONTAINER_NOTE)
       .slice(0, 20)
-      .map((o) => `${(o as any).title}: ${(o as any).gist}`)
+      .map((o) => {
+        const note = o as SimpleNote;
+        return `${note.title}: ${note.gist}`;
+      })
       .join('\n');
 
     const prompt = `
@@ -86,7 +105,7 @@ export const StudioSpineAgent = {
             TASK: Suggest metadata for a new unit titled "${title}".
             
             USER INTENT: ${intent || 'Establish logical narrative footprint.'}
-            BLUEPRINT THESIS: ${thesis}
+            BLUEPRINT THESIS: ${thesisText}
             LITERARY APPROACH: ${approach.archetype} (${approach.rationale})
             ADDITIONAL CONTEXT: ${contextStr}
  
@@ -139,7 +158,7 @@ export const StudioSpineAgent = {
     const now = new Date().toISOString();
 
     return (resultJson.chapters || []).map(
-      (ch: any, idx: number) =>
+      (ch: { title: string; gist: string; tension_level?: number }, idx: number) =>
         ({
           id: generateId(),
           _type: NexusType.STORY_NOTE,
@@ -156,7 +175,7 @@ export const StudioSpineAgent = {
           children_ids: [],
           internal_weight: 1.0,
           total_subtree_mass: 0,
-        }) as any,
+        }) as StoryNote,
     );
   },
 
@@ -195,7 +214,7 @@ export const StudioSpineAgent = {
     const now = new Date().toISOString();
 
     return (resultJson.scenes || []).map(
-      (sc: any, idx: number) =>
+      (sc: { title: string; gist: string; tension_level?: number }, idx: number) =>
         ({
           id: generateId(),
           _type: NexusType.STORY_NOTE,
@@ -212,20 +231,21 @@ export const StudioSpineAgent = {
           children_ids: [],
           internal_weight: 1.0,
           total_subtree_mass: 0,
-        }) as any,
+        }) as StoryNote,
     );
   },
 
   async autoFillMetadata(
-    target: any,
-    prev: any | null,
-    next: any | null,
+    target: StoryNote,
+    prev: StoryNote | null,
+    next: StoryNote | null,
     globalBlocks: StudioBlock[],
     userPrompt: string,
   ): Promise<{ title: string; gist: string }> {
     const ai = getGeminiClient();
     if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
-    const thesis = globalBlocks.find((b) => b.type === 'THESIS')?.data.text || '';
+    const thesis =
+      (globalBlocks.find((b) => b.type === 'THESIS')?.data as { text?: string })?.text || '';
 
     const prompt = `
             ACT AS: The Ekrixi Neural Architect.
@@ -250,14 +270,14 @@ export const StudioSpineAgent = {
   },
 
   async completeDraft(
-    target: any,
-    prev: any | null,
-    next: any | null,
+    target: StoryNote,
+    prev: StoryNote | null,
+    next: StoryNote | null,
     blocks: StudioBlock[],
   ): Promise<{ gist: string; content: string }> {
     const ai = getGeminiClient();
     if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
-    const thesis = blocks.find((b) => b.type === 'THESIS')?.data.text || '';
+    const thesis = (blocks.find((b) => b.type === 'THESIS')?.data as { text?: string })?.text || '';
 
     const prompt = `
             ACT AS: The Ekrixi Neural Draftsman.
@@ -284,12 +304,22 @@ export const StudioSpineAgent = {
     return JSON.parse(response.text() || '{ "gist": "", "content": "" }');
   },
 
-  async analyzeStructure(blocks: StudioBlock[], chapters: NexusObject[]): Promise<any> {
+  async analyzeStructure(
+    blocks: StudioBlock[],
+    chapters: NexusObject[],
+  ): Promise<{
+    status: 'SUITABLE' | 'NEEDS_REFACTOR';
+    critique: string;
+    alternatives: Array<{ name: string; rationale: string }>;
+  }> {
     const ai = getGeminiClient();
     if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
     const summary = blocks.map((b) => `${b.type}: ${JSON.stringify(b.data)}`).join('\n');
     const chapterList = chapters
-      .map((c) => `CH_${(c as any).sequence_index}: ${(c as any).title}`)
+      .map((c) => {
+        const ch = c as StoryNote;
+        return `CH_${ch.sequence_index}: ${ch.title}`;
+      })
       .join('\n');
 
     const prompt = `

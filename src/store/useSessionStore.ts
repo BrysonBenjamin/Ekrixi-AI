@@ -47,7 +47,7 @@ const DEFAULT_UNIVERSE_ID = 'default';
 
 export const useSessionStore = create<SessionState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       universes: [
         {
           id: DEFAULT_UNIVERSE_ID,

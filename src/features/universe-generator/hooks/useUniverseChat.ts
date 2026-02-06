@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChatSession, MessageNode } from '../types';
 import { generateId } from '../../../utils/ids';
-import { NexusObject, isLink } from '../../../types';
+import { NexusObject, isLink, SimpleNote } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
 
 const STORAGE_KEY = 'ekrixi_nexus_chats';
@@ -10,7 +10,7 @@ export const useUniverseChat = (
   registry: Record<string, NexusObject>,
   activeUniverseId?: string,
 ) => {
-  const { generateText, isReady } = useLLM();
+  const { generateText } = useLLM();
   // Persistent initial state
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -124,7 +124,10 @@ export const useUniverseChat = (
       try {
         const knownUnits = (Object.values(registry) as NexusObject[])
           .filter((o) => !isLink(o))
-          .map((o) => `- ${(o as any).title}: ${(o as any).gist}`)
+          .map((o) => {
+            const note = o as SimpleNote;
+            return `- ${note.title}: ${note.gist}`;
+          })
           .join('\n');
 
         const historyText = historyNodes
@@ -370,7 +373,7 @@ export const useUniverseChat = (
 
           let newActiveId = '';
           const newMap = { ...s.messageMap };
-          let newRootIds = s.rootNodeIds;
+
           let newSelectedRoot = s.selectedRootId;
 
           if (node.parentId && s.messageMap[node.parentId]) {

@@ -64,7 +64,7 @@ import {
   isLink,
   isContainer,
   NexusType,
-  HierarchyType,
+  SimpleNote,
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
 import { StudioSpineAgent } from './StudioSpineAgent';
@@ -300,6 +300,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
   onJumpToSpine,
   onCommitUnit,
   onSeedTemplate,
+  accentColor: _accentColor,
   context = 'GLOBAL',
 }) => {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
@@ -319,7 +320,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
     const query = (atMenu ? atMenu.query : searchQuery).toLowerCase();
     if (!query && !atMenu) return [];
     return (Object.values(registry) as NexusObject[])
-      .filter((n) => !isLink(n) && (n as any).title?.toLowerCase().includes(query))
+      .filter((n) => !isLink(n) && (n as { title?: string }).title?.toLowerCase().includes(query))
       .slice(0, 10);
   }, [registry, searchQuery, atMenu]);
 
@@ -370,7 +371,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
     }
   };
 
-  const updateBlockData = (id: string, newData: any) => {
+  const updateBlockData = (id: string, newData: Partial<StudioBlock['data']>) => {
     onUpdateBlocks(
       blocks.map((b) => (b.id === id ? { ...b, data: { ...b.data, ...newData } } : b)),
     );
@@ -411,7 +412,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
   };
 
   const isGlobal = context === 'GLOBAL';
-  const activeColorHex = isGlobal ? 'var(--nexus-ruby)' : 'var(--arcane-color)';
+  const _activeColorHex = isGlobal ? 'var(--nexus-ruby)' : 'var(--arcane-color)';
   const activeColorClass = isGlobal ? 'nexus-ruby' : 'nexus-arcane';
 
   return (
@@ -631,16 +632,16 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
             Neural Search
           </div>
           <div className="max-h-48 overflow-y-auto no-scrollbar p-1 space-y-0.5">
-            {suggestions.map((node: any) => (
+            {suggestions.map((node) => (
               <button
                 key={node.id}
-                onClick={() => insertMention(node.title)}
+                onClick={() => insertMention((node as SimpleNote).title)}
                 className={`w-full flex items-center gap-3 p-3 hover:bg-${activeColorClass} hover:text-white transition-all text-left group rounded-xl`}
               >
                 <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">
-                  {node.category_id?.charAt(0)}
+                  {(node as SimpleNote).category_id?.charAt(0)}
                 </div>
-                <div className="text-[10px] font-bold truncate">{node.title}</div>
+                <div className="text-[10px] font-bold truncate">{(node as SimpleNote).title}</div>
               </button>
             ))}
           </div>
@@ -668,7 +669,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
               placeholder="Find world unit..."
             />
             <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar">
-              {suggestions.map((n: any) => (
+              {suggestions.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => {
@@ -688,9 +689,9 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
                   className={`w-full flex items-center gap-3 p-3 rounded-xl bg-nexus-950/50 border border-nexus-800 hover:border-${activeColorClass} transition-all text-left`}
                 >
                   <div className="w-8 h-8 rounded-lg bg-nexus-900 flex items-center justify-center text-[10px] font-black">
-                    {n.category_id?.charAt(0)}
+                    {(n as SimpleNote).category_id?.charAt(0)}
                   </div>
-                  <div className="text-xs font-bold">{n.title}</div>
+                  <div className="text-xs font-bold">{(n as SimpleNote).title}</div>
                 </button>
               ))}
             </div>
@@ -773,7 +774,19 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
   );
 };
 
-const TemplateCard = ({ title, framework, desc, onClick, colorClass = 'nexus-ruby' }: any) => (
+const TemplateCard = ({
+  title,
+  framework,
+  desc,
+  onClick,
+  colorClass = 'nexus-ruby',
+}: {
+  title: string;
+  framework: string;
+  desc: string;
+  onClick: () => void;
+  colorClass?: string;
+}) => (
   <button
     onClick={onClick}
     className={`p-8 bg-nexus-900 border border-nexus-800 rounded-[40px] hover:border-${colorClass} transition-all group text-left space-y-6 shadow-xl w-full min-h-[180px] flex flex-col justify-center`}
@@ -821,7 +834,19 @@ const BlockIcon = ({ type, activeColorClass }: { type: BlockType; activeColorCla
   }
 };
 
-const BlockPickerItem = ({ icon: Icon, label, desc, onClick, activeColorClass }: any) => (
+const BlockPickerItem = ({
+  icon: Icon,
+  label,
+  desc,
+  onClick,
+  activeColorClass,
+}: {
+  icon: React.ComponentType<{ size: number; className: string }>;
+  label: string;
+  desc: string;
+  onClick: () => void;
+  activeColorClass: string;
+}) => (
   <button
     onClick={onClick}
     className={`p-6 rounded-3xl bg-nexus-950/40 border border-nexus-800 hover:border-${activeColorClass} hover:bg-${activeColorClass}/5 text-left transition-all group`}
@@ -834,7 +859,7 @@ const BlockPickerItem = ({ icon: Icon, label, desc, onClick, activeColorClass }:
 
 const StudioBlockEditor: React.FC<{
   block: StudioBlock;
-  onUpdate: (d: any) => void;
+  onUpdate: (d: Partial<StudioBlock['data']>) => void;
   onInput: (id: string, f: string, v: string, p: number) => void;
   registry: Record<string, NexusObject>;
   allBlocks: StudioBlock[];
@@ -891,14 +916,10 @@ const StudioBlockEditor: React.FC<{
           {...commonTextProps('text')}
           value={block.data.text}
           onChange={(e) => onInput(block.id, 'text', e.target.value, e.target.selectionStart || 0)}
-          onSelect={(e) =>
-            onInput(
-              block.id,
-              'text',
-              (e.target as any).value,
-              (e.target as any).selectionStart || 0,
-            )
-          }
+          onSelect={(e) => {
+            const el = e.currentTarget;
+            onInput(block.id, 'text', el.value, el.selectionStart || 0);
+          }}
           placeholder="State the core objective... (Drag lore here to link)"
           className={`${commonTextProps('text').className} h-32 shadow-inner`}
         />
@@ -1020,14 +1041,10 @@ const StudioBlockEditor: React.FC<{
               onChange={(e) =>
                 onInput(block.id, 'rationale', e.target.value, e.target.selectionStart || 0)
               }
-              onSelect={(e) =>
-                onInput(
-                  block.id,
-                  'rationale',
-                  (e.target as any).value,
-                  (e.target as any).selectionStart || 0,
-                )
-              }
+              onSelect={(e) => {
+                const el = e.currentTarget;
+                onInput(block.id, 'rationale', el.value, el.selectionStart || 0);
+              }}
               placeholder="Why does this structure serve your blueprint? (Drag lore here to link)"
               className={`${commonTextProps('rationale').className} h-28 shadow-inner`}
             />
@@ -1052,7 +1069,7 @@ const StudioBlockEditor: React.FC<{
             </label>
             {sub ? (
               <div className="flex items-center gap-2 px-3 py-1 bg-nexus-accent/10 border border-nexus-accent/20 rounded-full text-[10px] font-bold text-nexus-accent uppercase animate-in slide-in-from-right-2">
-                <Target size={12} /> {(sub as any).title}
+                <Target size={12} /> {(sub as SimpleNote).title}
               </div>
             ) : (
               <span className="text-[8px] text-nexus-muted italic font-mono uppercase opacity-40">
@@ -1067,14 +1084,10 @@ const StudioBlockEditor: React.FC<{
               onChange={(e) =>
                 onInput(block.id, 'start', e.target.value, e.target.selectionStart || 0)
               }
-              onSelect={(e) =>
-                onInput(
-                  block.id,
-                  'start',
-                  (e.target as any).value,
-                  (e.target as any).selectionStart || 0,
-                )
-              }
+              onSelect={(e) => {
+                const el = e.currentTarget;
+                onInput(block.id, 'start', el.value, el.selectionStart || 0);
+              }}
               placeholder="Alpha state... (Drag lore here to link)"
               className={`${commonTextProps('start').className} h-24`}
             />
@@ -1084,14 +1097,10 @@ const StudioBlockEditor: React.FC<{
               onChange={(e) =>
                 onInput(block.id, 'end', e.target.value, e.target.selectionStart || 0)
               }
-              onSelect={(e) =>
-                onInput(
-                  block.id,
-                  'end',
-                  (e.target as any).value,
-                  (e.target as any).selectionStart || 0,
-                )
-              }
+              onSelect={(e) => {
+                const el = e.currentTarget;
+                onInput(block.id, 'end', el.value, el.selectionStart || 0);
+              }}
               placeholder="Omega state... (Drag lore here to link)"
               className={`${commonTextProps('end').className} h-24`}
             />
@@ -1127,7 +1136,7 @@ const StudioBlockEditor: React.FC<{
       const commitToRegistry = () => {
         if (!block.data.title || !onCommit) return;
         const now = new Date().toISOString();
-        const unit: any = {
+        const unit: NexusObject = {
           id: generateId(),
           _type: NexusType.SIMPLE_NOTE,
           title: block.data.title,
@@ -1141,6 +1150,7 @@ const StudioBlockEditor: React.FC<{
           created_at: now,
           last_modified: now,
           link_ids: [],
+          is_ghost: false,
         };
         onCommit(unit);
         alert(`${block.data.title} reified into Project Registry.`);
@@ -1199,14 +1209,10 @@ const StudioBlockEditor: React.FC<{
                 onChange={(e) =>
                   onInput(block.id, 'draftPrompt', e.target.value, e.target.selectionStart || 0)
                 }
-                onSelect={(e) =>
-                  onInput(
-                    block.id,
-                    'draftPrompt',
-                    (e.target as any).value,
-                    (e.target as any).selectionStart || 0,
-                  )
-                }
+                onSelect={(e) => {
+                  const el = e.currentTarget;
+                  onInput(block.id, 'draftPrompt', el.value, el.selectionStart || 0);
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && runSearch()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => handleDropText(e, 'draftPrompt')}
@@ -1239,14 +1245,10 @@ const StudioBlockEditor: React.FC<{
                 onChange={(e) =>
                   onInput(block.id, 'gist', e.target.value, e.target.selectionStart || 0)
                 }
-                onSelect={(e) =>
-                  onInput(
-                    block.id,
-                    'gist',
-                    (e.target as any).value,
-                    (e.target as any).selectionStart || 0,
-                  )
-                }
+                onSelect={(e) => {
+                  const el = e.currentTarget;
+                  onInput(block.id, 'gist', el.value, el.selectionStart || 0);
+                }}
                 placeholder="Suggested abstract... (Drag lore here to link)"
                 className={`${commonTextProps('gist').className} h-20`}
               />
@@ -1339,8 +1341,8 @@ const StudioBlockEditor: React.FC<{
                   <div
                     dangerouslySetInnerHTML={{
                       __html: getCategoryIconSvg(
-                        (imported as any).category_id,
-                        getCategoryColor((imported as any).category_id),
+                        (imported as SimpleNote).category_id,
+                        getCategoryColor((imported as SimpleNote).category_id),
                       ),
                     }}
                     className="scale-[2.5]"
@@ -1361,10 +1363,10 @@ const StudioBlockEditor: React.FC<{
                     </div>
                   </div>
                   <h3 className="text-2xl font-display font-black text-nexus-text uppercase tracking-tight">
-                    {(imported as any).title}
+                    {(imported as SimpleNote).title}
                   </h3>
                   <p className="text-sm text-nexus-muted italic font-serif line-clamp-1 mt-1">
-                    "{(imported as any).gist}"
+                    "{(imported as SimpleNote).gist}"
                   </p>
                 </div>
                 <button
@@ -1405,14 +1407,10 @@ const StudioBlockEditor: React.FC<{
                 onChange={(e) =>
                   onInput(block.id, 'significance', e.target.value, e.target.selectionStart || 0)
                 }
-                onSelect={(e) =>
-                  onInput(
-                    block.id,
-                    'significance',
-                    (e.target as any).value,
-                    (e.target as any).selectionStart || 0,
-                  )
-                }
+                onSelect={(e) => {
+                  const el = e.currentTarget;
+                  onInput(block.id, 'significance', el.value, el.selectionStart || 0);
+                }}
                 placeholder="Document resonance... (Drag lore here to link)"
                 className={`${commonTextProps('significance').className} h-24`}
               />
@@ -1437,14 +1435,10 @@ const StudioBlockEditor: React.FC<{
             onChange={(e) =>
               onInput(block.id, 'text', e.target.value, e.target.selectionStart || 0)
             }
-            onSelect={(e) =>
-              onInput(
-                block.id,
-                'text',
-                (e.target as any).value,
-                (e.target as any).selectionStart || 0,
-              )
-            }
+            onSelect={(e) => {
+              const el = e.currentTarget;
+              onInput(block.id, 'text', el.value, el.selectionStart || 0);
+            }}
             placeholder="Instruct the Architect... (Drag lore here to link)"
             className={`${commonTextProps('text').className} font-mono h-32 shadow-inner`}
           />
@@ -1458,14 +1452,10 @@ const StudioBlockEditor: React.FC<{
           {...commonTextProps('fact')}
           value={block.data.fact}
           onChange={(e) => onInput(block.id, 'fact', e.target.value, e.target.selectionStart || 0)}
-          onSelect={(e) =>
-            onInput(
-              block.id,
-              'fact',
-              (e.target as any).value,
-              (e.target as any).selectionStart || 0,
-            )
-          }
+          onSelect={(e) => {
+            const el = e.currentTarget;
+            onInput(block.id, 'fact', el.value, el.selectionStart || 0);
+          }}
           placeholder="Narrative facts & thematic weights... (Drag lore here to link)"
           className={`${commonTextProps('fact').className} h-24 shadow-inner`}
         />

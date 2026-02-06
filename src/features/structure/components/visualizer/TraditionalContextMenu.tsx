@@ -3,7 +3,6 @@ import {
   Plus,
   Trash2,
   Share2,
-  X,
   ChevronRight,
   Repeat,
   ArrowUpRight,
@@ -11,8 +10,16 @@ import {
   BookOpen,
   GitBranch,
   Compass,
+  LucideIcon,
 } from 'lucide-react';
-import { NexusObject, isLink, isContainer, isReified, NexusGraphUtils } from '../../../../types';
+import {
+  NexusObject,
+  isLink,
+  isContainer,
+  isReified,
+  SimpleNote,
+  SimpleLink,
+} from '../../../../types';
 import { GraphIntegrityService } from '../../../integrity/GraphIntegrityService';
 
 interface TraditionalContextMenuProps {
@@ -77,7 +84,9 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
       })
       .map((l) => {
         const neighborId =
-          (l as any).source_id === object.id ? (l as any).target_id : (l as any).source_id;
+          (l as SimpleLink).source_id === object.id
+            ? (l as SimpleLink).target_id
+            : (l as SimpleLink).source_id;
         return registry[neighborId];
       })
       .filter(Boolean);
@@ -126,7 +135,7 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
                     : 'Atomic Unit'}
         </div>
         <div className="text-[12px] font-display font-black text-nexus-text truncate">
-          {(object as any).title || (object as any).verb || 'Untitled'}
+          {(object as SimpleNote).title || (object as unknown as SimpleLink).verb || 'Untitled'}
         </div>
       </div>
 
@@ -250,25 +259,31 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
           <div className="p-1 space-y-1">
             {neighbors
               .filter((n) => n.id !== reifySelection.sourceId)
-              .map((node: any) => (
-                <button
-                  key={node.id}
-                  onClick={() => handleReifyChoice(node.id)}
-                  className="w-full flex items-center justify-between p-2 rounded-xl bg-nexus-950/40 hover:bg-amber-500/10 transition-all text-left group border border-transparent hover:border-amber-500/30"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <div className="w-6 h-6 rounded-lg bg-nexus-900 border border-nexus-800 flex items-center justify-center shrink-0">
-                      <div className="text-[8px] font-black text-nexus-muted group-hover:text-amber-500">
-                        {node.category_id?.charAt(0)}
+              .map((node) => {
+                const sn = node as SimpleNote;
+                return (
+                  <button
+                    key={node.id}
+                    onClick={() => handleReifyChoice(node.id)}
+                    className="w-full flex items-center justify-between p-2 rounded-xl bg-nexus-950/40 hover:bg-amber-500/10 transition-all text-left group border border-transparent hover:border-amber-500/30"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <div className="w-6 h-6 rounded-lg bg-nexus-900 border border-nexus-800 flex items-center justify-center shrink-0">
+                        <div className="text-[8px] font-black text-nexus-muted group-hover:text-amber-500">
+                          {sn.category_id?.charAt(0)}
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-nexus-text group-hover:text-white truncate">
+                        {sn.title}
                       </div>
                     </div>
-                    <div className="text-[11px] font-bold text-nexus-text group-hover:text-white truncate">
-                      {node.title}
-                    </div>
-                  </div>
-                  <ChevronRight size={10} className="text-nexus-muted group-hover:text-amber-500" />
-                </button>
-              ))}
+                    <ChevronRight
+                      size={10}
+                      className="text-nexus-muted group-hover:text-amber-500"
+                    />
+                  </button>
+                );
+              })}
             <button
               onClick={() => setMenuState('DEFAULT')}
               className="w-full py-2 text-[9px] font-black text-nexus-muted uppercase hover:text-nexus-text"
@@ -282,7 +297,21 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
   );
 };
 
-const MenuItem = ({ icon: Icon, label, desc, onClick, color = 'text-nexus-muted' }: any) => (
+interface MenuItemProps {
+  icon: LucideIcon;
+  label: string;
+  desc?: string;
+  onClick: () => void;
+  color?: string;
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({
+  icon: Icon,
+  label,
+  desc,
+  onClick,
+  color = 'text-nexus-muted',
+}) => (
   <button
     onClick={(e) => {
       e.stopPropagation();

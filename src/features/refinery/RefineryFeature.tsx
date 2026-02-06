@@ -23,6 +23,8 @@ import {
   NexusCategory,
   HierarchyType,
   NexusGraphUtils,
+  SimpleNote,
+  SimpleLink,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { HierarchyExplorer } from './components/HierarchyExplorer';
@@ -43,7 +45,7 @@ export interface RefineryBatch {
 interface RefineryFeatureProps {
   batches: RefineryBatch[];
   onUpdateBatch: (batchId: string, items: NexusObject[]) => void;
-  onDeleteBatch: (id: string) => void;
+  _onDeleteBatch: (id: string) => void;
   onCommitBatch: (batchId: string, items: NexusObject[]) => void;
 }
 
@@ -58,7 +60,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
   const [showInspector, setShowInspector] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localQueue, setLocalQueue] = useState<NexusObject[]>([]);
-  const [toasts, setToasts] = useState<any[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   const lastLoadedBatchId = useRef<string | null>(null);
   const [drillStack, setDrillStack] = useState<string[]>([]);
@@ -101,7 +103,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
     (id: string, updates: Partial<NexusObject>) => {
       const nextQueue = localQueue.map((item) => {
         if (item.id === id) {
-          return { ...item, ...updates, last_modified: new Date().toISOString() } as any;
+          return { ...item, ...updates, last_modified: new Date().toISOString() } as NexusObject;
         }
         return item;
       });
@@ -130,7 +132,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             containment_type: ContainmentType.FOLDER,
             is_collapsed: false,
             default_layout: DefaultLayout.GRID,
-          } as any);
+          } as NexusObject);
 
       const hierarchyLink = {
         id: generateId(),
@@ -179,14 +181,17 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             i.id === sourceId
               ? ({
                   ...i,
-                  tags: (i as any).tags?.filter((t: string) => t !== '__is_root__') || [],
-                } as any)
+                  tags: (i as SimpleNote).tags?.filter((t: string) => t !== '__is_root__') || [],
+                } as NexusObject)
               : i,
           );
         } else {
           nextQueue = nextQueue.map((i) => {
             if (i.id === oldParentId && isContainer(i)) {
-              return { ...i, children_ids: i.children_ids.filter((id) => id !== sourceId) } as any;
+              return {
+                ...i,
+                children_ids: i.children_ids.filter((id) => id !== sourceId),
+              } as ContainerNote;
             }
             return i;
           });
@@ -209,8 +214,8 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
           i.id === sourceId
             ? ({
                 ...i,
-                tags: Array.from(new Set([...((i as any).tags || []), '__is_root__'])),
-              } as any)
+                tags: Array.from(new Set([...((i as SimpleNote).tags || []), '__is_root__'])),
+              } as NexusObject)
             : i,
         );
       } else {
@@ -220,7 +225,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               return {
                 ...i,
                 children_ids: Array.from(new Set([...i.children_ids, sourceId])),
-              } as any;
+              } as NexusObject;
             return {
               ...i,
               _type:
@@ -229,7 +234,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               containment_type: ContainmentType.FOLDER,
               is_collapsed: false,
               default_layout: DefaultLayout.GRID,
-            } as any;
+            } as ContainerNote;
           }
           return i;
         });
@@ -258,7 +263,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               ? NexusType.AGGREGATED_HIERARCHICAL_LINK
               : NexusType.AGGREGATED_SEMANTIC_LINK,
           is_reified: true,
-          title: `${(source as any)?.title || 'Origin'} → ${(target as any)?.title || 'Terminal'}`,
+          title: `${(source as SimpleNote)?.title || 'Origin'} → ${(target as SimpleNote)?.title || 'Terminal'}`,
           gist: `Logic: ${item.verb}`,
           category_id: NexusCategory.META,
           children_ids: [],

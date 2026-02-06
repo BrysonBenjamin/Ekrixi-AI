@@ -2,29 +2,33 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
 import {
   Sparkles,
-  Send,
   RotateCw,
   ShieldCheck,
   Bot,
-  User,
-  Zap,
-  Activity,
   ArrowRight,
   Quote,
   X,
   FileText,
   Layers,
-  PenTool,
 } from 'lucide-react';
-import { NexusObject, StoryType, NexusType, NarrativeStatus } from '../../../types';
+import { NexusObject, StoryType, SimpleNote, StoryNote } from '../../../types';
 import { generateId } from '../../../utils/ids';
 import { useLLM } from '../../system/hooks/useLLM';
 import { GEMINI_MODELS } from '../../../core/llm';
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  text?: string;
+  reply?: string;
+  selection?: string;
+  proseSuggestion?: string;
+  logicObservation?: string;
+}
+
 interface WeaverChatAssistantProps {
-  chapter: any;
+  chapter: StoryNote | SimpleNote | null;
   isChapterMode: boolean;
-  notes: any[];
+  notes: SimpleNote[];
   studioItems: NexusObject[];
   onUpdate: (items: NexusObject[]) => void;
   worldRegistry: Record<string, NexusObject>;
@@ -44,7 +48,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
 }) => {
   const { generateContent } = useLLM();
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -67,10 +71,10 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
     try {
       const chapterContext = isChapterMode
         ? `COMPOSITE CHAPTER VIEW: Editing multiple scenes simultaneously. Stack: ${studioItems
-            .filter((i) => (i as any).story_type === StoryType.SCENE)
-            .map((s) => (s as any).title)
+            .filter((i) => (i as StoryNote).story_type === StoryType.SCENE)
+            .map((s) => (s as StoryNote).title)
             .join(', ')}`
-        : `SCENE FOCUS: ${chapter?.title}. Gist: ${chapter?.gist}`;
+        : `SCENE FOCUS: ${(chapter as StoryNote)?.title}. Gist: ${(chapter as StoryNote)?.gist}`;
 
       const noteContext = notes.map((n) => `- ${n.title}: ${n.gist}`).join('\n');
 
@@ -103,7 +107,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
       const resultJson = await response.response;
       const result = JSON.parse(resultJson.text() || '{}');
       setMessages((prev) => [...prev, { role: 'assistant', ...result }]);
-    } catch (err) {
+    } catch (_err) {
       setMessages((prev) => [
         ...prev,
         {

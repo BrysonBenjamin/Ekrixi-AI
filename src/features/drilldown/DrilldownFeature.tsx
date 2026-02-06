@@ -9,6 +9,10 @@ import {
   NexusCategory,
   ContainmentType,
   DefaultLayout,
+  SimpleNote,
+  SimpleLink,
+  ContainerNote,
+  StoryNote,
 } from '../../types';
 import { DrilldownCanvas } from './components/DrilldownCanvas';
 import { ChevronRight, Home, Orbit, Compass, UserCircle2, Zap, ShieldAlert } from 'lucide-react';
@@ -50,7 +54,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
 
   useEffect(() => {
     if (integrityFocus && integrityFocus.mode === 'DRILL' && registry[integrityFocus.linkId]) {
-      const link = registry[integrityFocus.linkId] as any;
+      const link = registry[integrityFocus.linkId] as SimpleLink;
       if (link.source_id) {
         queueMicrotask(() => {
           setNavStack([link.source_id]);
@@ -96,15 +100,15 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
 
       // 2. Exclude Reified Links (Aggregated Links) that connect to Story units
       if (isReified(obj)) {
-        const source = registry[(obj as any).source_id];
-        const target = registry[(obj as any).target_id];
+        const source = registry[(obj as SimpleLink).source_id];
+        const target = registry[(obj as SimpleLink).target_id];
         const isConnectedToStory =
           source?._type === NexusType.STORY_NOTE || target?._type === NexusType.STORY_NOTE;
         if (isConnectedToStory) continue;
       }
 
       // 3. Exclude Author units unless toggled
-      if ((obj as any).is_author_note && !showAuthorNotes) continue;
+      if ((obj as SimpleNote).is_author_note && !showAuthorNotes) continue;
 
       // Safe access to children_ids to prevent crashes
       const childrenIds = (isContainer(obj) ? obj.children_ids : []) || [];
@@ -184,9 +188,9 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
               ? NexusType.AGGREGATED_HIERARCHICAL_LINK
               : NexusType.AGGREGATED_SEMANTIC_LINK,
           is_reified: true,
-          title: `${(source as any).title || 'Origin'} → ${(target as any).title || 'Terminal'}`,
+          title: `${(source as SimpleNote).title || 'Origin'} → ${(target as SimpleNote).title || 'Terminal'}`,
           gist: `Logic: ${link.verb}`,
-          prose_content: `Relationship between ${(source as any).title} and ${(target as any).title}.`,
+          prose_content: `Relationship between ${(source as SimpleNote).title} and ${(target as SimpleNote).title}.`,
           category_id: NexusCategory.META,
           children_ids: [],
           containment_type: ContainmentType.FOLDER,
@@ -195,7 +199,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           is_ghost: false,
           aliases: [],
           tags: ['reified'],
-        } as any;
+        } as NexusObject;
         return { ...prev, [linkId]: reifiedUnit };
       });
     },
@@ -216,7 +220,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           default_layout: DefaultLayout.GRID,
           children_ids: [],
           tags: [...(node.tags || []), 'promoted-logic'],
-        } as any;
+        } as NexusObject;
         return { ...prev, [nodeId]: updatedNode };
       });
     },
@@ -263,7 +267,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           children_ids: [],
           is_collapsed: false,
           default_layout: DefaultLayout.GRID,
-        } as any;
+        } as NexusObject;
 
         next[nodeId] = reifiedUnit;
         return next;
@@ -287,8 +291,8 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
         );
         return {
           ...prev,
-          [sourceId]: updatedSource as any,
-          [targetId]: updatedTarget as any,
+          [sourceId]: updatedSource,
+          [targetId]: updatedTarget,
           [link.id]: link,
         };
       });
@@ -306,7 +310,11 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           const o = next[k];
           if (isLink(o) && (o.source_id === id || o.target_id === id)) delete next[k];
           if (isContainer(o) && o.children_ids.includes(id)) {
-            next[k] = { ...o, children_ids: o.children_ids.filter((cid) => cid !== id) } as any;
+            const container = o as ContainerNote;
+            next[k] = {
+              ...container,
+              children_ids: container.children_ids.filter((cid) => cid !== id),
+            };
           }
         });
         return next;

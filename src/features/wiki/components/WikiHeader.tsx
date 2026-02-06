@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Palette, Link2, X, ImageIcon, RotateCw, Wand2, Trash2 } from 'lucide-react';
-import { NexusObject, isLink, isReified } from '../../../types';
+import { NexusObject, isLink, isReified, SimpleNote } from '../../../types';
+import { WikiViewMode } from '../types';
 
 interface WikiHeaderProps {
   currentObject: NexusObject;
-  viewMode: 'NOTE' | 'ENCYCLOPEDIA';
-  setViewMode: (mode: 'NOTE' | 'ENCYCLOPEDIA') => void;
+  viewMode: WikiViewMode;
+  setViewMode: (mode: WikiViewMode) => void;
   onUpdateObject: (id: string, updates: Partial<NexusObject>) => void;
   handleGenerateBg: () => void;
   isGeneratingBg: boolean;
@@ -79,7 +80,7 @@ export const WikiHeader: React.FC<WikiHeaderProps> = ({
                   <button
                     key={c.hex}
                     onClick={() => onUpdateObject(currentObject.id, { theme_color: c.hex })}
-                    className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${(currentObject as any).theme_color === c.hex ? 'border-white' : 'border-transparent'}`}
+                    className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${(currentObject as SimpleNote).theme_color === c.hex ? 'border-white' : 'border-transparent'}`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -109,7 +110,7 @@ export const WikiHeader: React.FC<WikiHeaderProps> = ({
                   )}
                   Manifest Atmosphere
                 </button>
-                {(currentObject as any).background_url && (
+                {(currentObject as SimpleNote).background_url && (
                   <button
                     onClick={() => onUpdateObject(currentObject.id, { background_url: undefined })}
                     className="w-full py-3 border border-red-500/20 text-red-500 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-red-500/10 transition-all"

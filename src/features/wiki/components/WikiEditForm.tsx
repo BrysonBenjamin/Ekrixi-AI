@@ -19,14 +19,15 @@ import {
   HierarchyType,
   isLink,
   isReified,
-  isContainer,
+  SimpleNote,
 } from '../../../types';
 import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
+import { WikiEditData } from '../types';
 
 interface WikiEditFormProps {
   node: NexusObject;
-  editData: any;
-  setEditData: (data: any) => void;
+  editData: WikiEditData;
+  setEditData: (data: WikiEditData) => void;
   onSave: (id: string) => void;
   onCancel: () => void;
   registry: Record<string, NexusObject>;
@@ -69,7 +70,7 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
     // Use a simplified depth calculation or heuristic since we don't have full graph traversal here easily
     // Or reconstruct a localized hierarchy map if needed. For now, simple title match.
     const filtered = allItems
-      .filter((n) => !isLink(n) && (n as any).title?.toLowerCase().includes(q))
+      .filter((n) => !isLink(n) && (n as SimpleNote).title?.toLowerCase().includes(q))
       .slice(0, 15);
 
     return filtered;
@@ -97,7 +98,7 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
             </label>
             <select
               value={editData._type}
-              onChange={(e) => setEditData({ ...editData, _type: e.target.value })}
+              onChange={(e) => setEditData({ ...editData, _type: e.target.value as NexusType })}
               className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner"
             >
               <option value={NexusType.SEMANTIC_LINK}>Semantic Association</option>
@@ -114,7 +115,9 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
               </label>
               <select
                 value={editData.hierarchy_type}
-                onChange={(e) => setEditData({ ...editData, hierarchy_type: e.target.value })}
+                onChange={(e) =>
+                  setEditData({ ...editData, hierarchy_type: e.target.value as HierarchyType })
+                }
                 className="w-full bg-nexus-900 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-essence outline-none focus:border-nexus-essence transition-all shadow-inner"
               >
                 <option value={HierarchyType.PARENT_OF}>Parent Of (A contains B)</option>
@@ -188,18 +191,21 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
                   Neural Scry
                 </div>
                 <div className="max-h-48 overflow-y-auto no-scrollbar p-1 space-y-0.5">
-                  {scrySuggestions.map((n: any) => (
-                    <button
-                      key={n.id}
-                      onClick={() => insertMention(n.title)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-nexus-accent hover:text-white transition-all text-left group rounded-xl"
-                    >
-                      <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">
-                        {n.category_id?.charAt(0)}
-                      </div>
-                      <div className="text-[10px] font-bold truncate">{n.title}</div>
-                    </button>
-                  ))}
+                  {scrySuggestions.map((n) => {
+                    const note = n as SimpleNote;
+                    return (
+                      <button
+                        key={note.id}
+                        onClick={() => insertMention(note.title)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-nexus-accent hover:text-white transition-all text-left group rounded-xl"
+                      >
+                        <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">
+                          {note.category_id?.charAt(0)}
+                        </div>
+                        <div className="text-[10px] font-bold truncate">{note.title}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -439,18 +445,21 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
                   Neural Scry
                 </div>
                 <div className="max-h-48 overflow-y-auto no-scrollbar p-1 space-y-0.5">
-                  {scrySuggestions.map((n: any) => (
-                    <button
-                      key={n.id}
-                      onClick={() => insertMention(n.title)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-nexus-accent hover:text-white transition-all text-left group rounded-xl"
-                    >
-                      <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">
-                        {n.category_id?.charAt(0)}
-                      </div>
-                      <div className="text-[10px] font-bold truncate">{n.title}</div>
-                    </button>
-                  ))}
+                  {scrySuggestions.map((n) => {
+                    const note = n as SimpleNote;
+                    return (
+                      <button
+                        key={note.id}
+                        onClick={() => insertMention(note.title)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-nexus-accent hover:text-white transition-all text-left group rounded-xl"
+                      >
+                        <div className="w-6 h-6 rounded bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[8px] font-black group-hover:bg-white/20">
+                          {note.category_id?.charAt(0)}
+                        </div>
+                        <div className="text-[10px] font-bold truncate">{note.title}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

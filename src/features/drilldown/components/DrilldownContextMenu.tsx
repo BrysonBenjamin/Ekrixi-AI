@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 /* Added ChevronRight to the lucide-react import list */
 import {
-  BookOpen,
   Link2,
   Trash2,
   X,
@@ -10,11 +9,8 @@ import {
   Sparkles,
   Plus,
   Database,
-  Pencil,
   Compass,
   GitBranch,
-  ArrowRight,
-  MousePointer2,
   ChevronRight,
 } from 'lucide-react';
 import { NexusObject, isLink, isReified, isContainer } from '../../../types';

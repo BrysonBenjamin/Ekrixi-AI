@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useGoogleLogin, googleLogout, TokenResponse } from '@react-oauth/google';
 import { NexusObject } from '../../../types';
 import { useSessionStore } from '../../../store/useSessionStore';
-import { config } from '../../../config';
 
 // Scopes needed for App Data Folder access
 const SCOPES = 'https://www.googleapis.com/auth/drive.file email profile openid';

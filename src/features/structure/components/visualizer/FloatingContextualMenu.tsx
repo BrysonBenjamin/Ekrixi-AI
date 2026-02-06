@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Search, Plus, Trash2, Share2, Repeat, X, ArrowUpRight, Zap, Box } from 'lucide-react';
-import { NexusObject, isLink, isContainer, isReified } from '../../../../types';
+import React from 'react';
+import { Search, Plus, Trash2, Share2, Repeat, X } from 'lucide-react';
+import { NexusObject, isLink, isReified } from '../../../../types';
 
 interface FloatingContextualMenuProps {
   object: NexusObject;

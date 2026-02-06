@@ -1,7 +1,15 @@
 import React from 'react';
 import { History, PenTool, MapPin, Users, Share2, ChevronRight } from 'lucide-react';
 import { Logo } from '../../../components/shared/Logo';
-import { NexusObject, NexusCategory, NexusType, isLink, isReified } from '../../../types';
+import {
+  NexusObject,
+  NexusCategory,
+  NexusType,
+  isLink,
+  isReified,
+  SimpleNote,
+  SimpleLink,
+} from '../../../types';
 
 interface WikiRegistryViewProps {
   registry: Record<string, NexusObject>;
@@ -26,7 +34,8 @@ export const WikiRegistryView: React.FC<WikiRegistryViewProps> = ({ registry, on
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
         {(Object.values(registry) as NexusObject[])
           .filter((o) => !isLink(o) || isReified(o))
-          .map((node: any) => {
+          .map((n) => {
+            const node = n as SimpleNote;
             const isStory = node._type === NexusType.STORY_NOTE;
             return (
               <button
@@ -58,7 +67,7 @@ export const WikiRegistryView: React.FC<WikiRegistryViewProps> = ({ registry, on
                   </span>
                 </div>
                 <h3 className="text-2xl font-display font-bold text-nexus-text mb-4 leading-tight relative z-10 uppercase">
-                  {node.title || node.verb}
+                  {node.title || (node as unknown as SimpleLink).verb}
                 </h3>
                 <p className="text-sm text-nexus-muted italic line-clamp-3 mb-8 font-serif relative z-10">
                   "{node.gist || 'Neural record awaited.'}"

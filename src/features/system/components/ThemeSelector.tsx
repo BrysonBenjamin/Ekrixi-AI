@@ -1,5 +1,5 @@
 import React from 'react';
-import { Monitor, Moon, Sun, Palette, Layers, Terminal, CheckCircle } from 'lucide-react';
+import { Monitor, Moon, Sun, Palette, Terminal, CheckCircle, LucideIcon } from 'lucide-react';
 import { ThemeMode } from '../../../store/useUIStore';
 
 interface ThemeSelectorProps {
@@ -53,7 +53,23 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ theme, onThemeChan
   );
 };
 
-const ThemeButton = ({ mode, currentMode, onSelect, title, sub, icon: Icon }: any) => {
+interface ThemeButtonProps {
+  mode: ThemeMode;
+  currentMode: ThemeMode;
+  onSelect: (mode: ThemeMode) => void;
+  title: string;
+  sub: string;
+  icon: LucideIcon;
+}
+
+const ThemeButton: React.FC<ThemeButtonProps> = ({
+  mode,
+  currentMode,
+  onSelect,
+  title,
+  sub,
+  icon: Icon,
+}) => {
   const isActive = currentMode === mode;
   return (
     <button

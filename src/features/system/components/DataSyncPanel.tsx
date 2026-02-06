@@ -1,15 +1,5 @@
 import React, { useRef, useState } from 'react';
-import {
-  Download,
-  Upload,
-  Cloud,
-  CloudLightning,
-  LogOut,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  Activity,
-} from 'lucide-react';
+import { Download, Upload, Cloud, CloudLightning, LogOut, Loader2 } from 'lucide-react';
 import { NexusObject } from '../../../types';
 import { useGoogleDrive } from '../hooks/useGoogleDrive';
 import { useSessionStore } from '../../../store/useSessionStore';

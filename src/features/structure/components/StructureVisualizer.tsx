@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import * as d3 from 'd3';
-import { NexusObject, isLink, isContainer } from '../../../types';
+import { NexusObject, isLink, isContainer, SimpleNote, isReified } from '../../../types';
 import { TreeHUD } from './visualizer/TreeHUD';
 import { ResponsiveTree } from './visualizer/ResponsiveTree';
 import { TraditionalContextMenu } from './visualizer/TraditionalContextMenu';
@@ -45,11 +45,9 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
   onMenuOpened,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const hoveredIdRef = useRef<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [isMobile, setIsMobile] = useState(false);
   const [orientation, setOrientation] = useState<'HORIZONTAL' | 'VERTICAL'>('HORIZONTAL');
 
   // Tracks nodes already evaluated for auto-collapse to avoid annoying re-collapsing
@@ -81,8 +79,8 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
     // Fix: Cast roots result to NexusObject[] to fix inference at line 54
     const roots = allObjects.filter(
       (obj) =>
-        (!isLink(obj) || (obj as any).is_reified) &&
-        (!childIds.has(obj.id) || (obj as any).tags?.includes('__is_root__')),
+        (!isLink(obj) || isReified(obj)) &&
+        (!childIds.has(obj.id) || (obj as SimpleNote).tags?.includes('__is_root__')),
     ) as NexusObject[];
 
     const newCollapsed = new Set(collapsedIds);
@@ -124,13 +122,12 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
         setCollapsedIds(newCollapsed);
       });
     }
-  }, [registry]);
+  }, [registry, collapsedIds]);
 
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
         const mobile = containerRef.current.clientWidth < 768;
-        setIsMobile(mobile);
         if (mobile) setOrientation('VERTICAL');
       }
     };
@@ -223,10 +220,10 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
         onSelect={onSelect}
         onToggleExpand={toggleExpand}
         onToggleCollapse={toggleCollapse}
-        onHover={setHoveredId}
-        onViewModeChange={onViewModeChange}
+        _onHover={setHoveredId}
+        _onViewModeChange={onViewModeChange}
         onContextMenu={handleContextMenu}
-        onLongPress={handleLongPress}
+        _onLongPress={handleLongPress}
         setZoomRef={(z) => (zoomRef.current = z)}
         setSvgRef={(s) => (svgElRef.current = s)}
         onReparent={onReparent}

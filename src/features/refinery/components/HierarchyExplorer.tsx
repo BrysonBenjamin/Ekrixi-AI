@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   Folder,
@@ -13,18 +13,10 @@ import {
   Move,
   Link as LinkIcon,
   AlertCircle,
-  X as CloseIcon,
   Trash2,
   Scissors,
 } from 'lucide-react';
-import {
-  NexusObject,
-  isContainer,
-  isLink,
-  NexusType,
-  isReified,
-  NexusGraphUtils,
-} from '../../../types';
+import { NexusObject, isContainer, isLink, isReified } from '../../../types';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 
 interface HierarchyExplorerProps {

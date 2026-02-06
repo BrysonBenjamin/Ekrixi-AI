@@ -9,10 +9,8 @@ import {
   Database,
   X,
   Sparkles,
-  ChevronRight,
-  Search,
 } from 'lucide-react';
-import { NexusObject, isLink, isContainer } from '../../../types';
+import { NexusObject, isLink, isContainer, SimpleNote } from '../../../types';
 
 interface ComposerProps {
   isLoading: boolean;
@@ -116,8 +114,8 @@ export const Composer: React.FC<ComposerProps> = ({
     };
 
     const filtered = allItems
-      .filter((n) => !isLink(n) && (n as any).title?.toLowerCase().includes(q))
-      .map((n) => ({ node: n, depth: getDepth(n.id) }));
+      .filter((n) => !isLink(n) && (n as SimpleNote).title?.toLowerCase().includes(q))
+      .map((n) => ({ node: n as SimpleNote, depth: getDepth(n.id) }));
 
     // Prioritize lower depth (most senior parents)
     return filtered
@@ -155,23 +153,26 @@ export const Composer: React.FC<ComposerProps> = ({
             </button>
           </div>
           <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto no-scrollbar">
-            {suggestions.map((node: any) => (
-              <button
-                key={node.id}
-                onClick={() => insertMention(node.title)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl hover:bg-nexus-accent hover:text-white transition-all group text-left"
-              >
-                <div className="w-8 h-8 rounded-xl bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[10px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all">
-                  {node.category_id?.charAt(0) || 'U'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{node.title}</div>
-                  <div className="text-[8px] opacity-60 uppercase font-mono">
-                    {node.category_id}
+            {suggestions.map((n) => {
+              const node = n as SimpleNote;
+              return (
+                <button
+                  key={node.id}
+                  onClick={() => insertMention(node.title)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl hover:bg-nexus-accent hover:text-white transition-all group text-left"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[10px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all">
+                    {node.category_id?.charAt(0) || 'U'}
                   </div>
-                </div>
-              </button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold truncate">{node.title}</div>
+                    <div className="text-[8px] opacity-60 uppercase font-mono">
+                      {node.category_id}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

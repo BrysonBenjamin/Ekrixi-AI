@@ -1,6 +1,14 @@
 import React, { useMemo } from 'react';
 import { ArrowLeft, List, Hash } from 'lucide-react';
-import { NexusObject, isLink, isContainer, isReified } from '../../../types';
+import {
+  NexusObject,
+  isLink,
+  isContainer,
+  isReified,
+  SimpleNote,
+  SimpleLink,
+} from '../../../types';
+import { TocItem, WikiConnection } from '../types';
 
 interface WikiNavigationProps {
   registry: Record<string, NexusObject>;
@@ -19,15 +27,14 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
 }) => {
   const tableOfContents = useMemo(() => {
     if (!currentObject) return [];
-    const walk = (
-      node: any,
-      depth: number,
-      visited: Set<string>,
-      toc: { id: string; title: string; depth: number }[],
-    ) => {
+    const walk = (node: NexusObject, depth: number, visited: Set<string>, toc: TocItem[]) => {
       if (depth > 2 || visited.has(node.id)) return;
       visited.add(node.id);
-      toc.push({ id: node.id, title: node.title || node.verb, depth });
+      toc.push({
+        id: node.id,
+        title: (node as SimpleNote).title || (node as SimpleLink).verb,
+        depth,
+      });
       if (isContainer(node)) {
         node.children_ids.forEach((cid: string) => {
           const child = registry[cid];
@@ -35,7 +42,7 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
         });
       }
     };
-    const result: { id: string; title: string; depth: number }[] = [];
+    const result: TocItem[] = [];
     walk(currentObject, 0, new Set(), result);
     return result;
   }, [currentObject, registry]);
@@ -45,21 +52,25 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
     return (Object.values(registry) as NexusObject[])
       .filter((obj) => {
         if (!isLink(obj)) return false;
-        return obj.source_id === selectedId || obj.target_id === selectedId;
+        return (
+          (obj as SimpleLink).source_id === selectedId ||
+          (obj as SimpleLink).target_id === selectedId
+        );
       })
       .map((link) => {
         const isL = isLink(link);
         if (!isL) return null;
-        const isOutgoing = link.source_id === selectedId;
-        const neighborId = isOutgoing ? link.target_id : link.source_id;
+        const sLink = link as SimpleLink;
+        const isOutgoing = sLink.source_id === selectedId;
+        const neighborId = isOutgoing ? sLink.target_id : sLink.source_id;
         const neighbor = registry[neighborId];
         return {
           linkId: link.id,
-          verb: isOutgoing ? (link as any).verb : (link as any).verb_inverse,
+          verb: isOutgoing ? sLink.verb : sLink.verb_inverse,
           neighbor,
         };
       })
-      .filter((conn) => conn && conn.neighbor);
+      .filter((conn): conn is WikiConnection => !!conn && !!conn.neighbor);
   }, [selectedId, registry]);
 
   const isL = isLink(currentObject) && !isReified(currentObject);
@@ -105,7 +116,7 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
               <Hash size={16} /> Logic Streams
             </h4>
             <div className="space-y-4">
-              {connections.map((conn: any) => (
+              {connections.map((conn) => (
                 <button
                   key={conn.linkId}
                   onClick={() => onSelect(conn.neighbor.id)}
@@ -115,7 +126,7 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
                     {conn.verb}
                   </span>
                   <span className="text-[13px] font-display font-bold text-nexus-text/90 group-hover:text-nexus-text truncate uppercase">
-                    {conn.neighbor.title || conn.neighbor.verb}
+                    {(conn.neighbor as SimpleNote).title || (conn.neighbor as SimpleLink).verb}
                   </span>
                 </button>
               ))}

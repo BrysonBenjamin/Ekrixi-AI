@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
 import {
   Bot,
@@ -32,7 +32,7 @@ const TooltipButton = ({
   onClick,
   disabled,
 }: {
-  icon: any;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   label?: string;
   onClick?: () => void;
   disabled?: boolean;
@@ -91,17 +91,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
     setIsEditing(false);
   };
-
-  const allNodesByTitle = useMemo(() => {
-    const map: Record<string, string> = {};
-    (Object.values(registry) as NexusObject[]).forEach((node) => {
-      const anyNode = node as any;
-      if (anyNode.title) {
-        map[anyNode.title.toLowerCase()] = node.id;
-      }
-    });
-    return map;
-  }, [registry]);
 
   return (
     <div className={`flex w-full mb-10 group ${isUser ? 'justify-end' : 'justify-start'}`}>

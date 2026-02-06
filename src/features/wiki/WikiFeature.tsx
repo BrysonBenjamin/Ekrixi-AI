@@ -8,6 +8,9 @@ import {
   WikiArtifact,
   NexusCategory,
   HierarchyType,
+  NexusType,
+  SimpleNote,
+  SimpleLink,
 } from '../../types';
 import { FileCheck } from 'lucide-react';
 import { WikiNavigation } from './components/WikiNavigation';
@@ -15,6 +18,7 @@ import { WikiHeader } from './components/WikiHeader';
 import { WikiRegistryView } from './components/WikiRegistryView';
 import { WikiEncyclopediaView } from './components/WikiEncyclopediaView';
 import { WikiSection } from './components/WikiSection';
+import { WikiEditData, WikiViewMode } from './types';
 
 interface WikiFeatureProps {
   registry: Record<string, NexusObject>;
@@ -22,8 +26,6 @@ interface WikiFeatureProps {
   onSelect: (id: string) => void;
   onUpdateObject: (id: string, updates: Partial<NexusObject>) => void;
 }
-
-type WikiViewMode = 'NOTE' | 'ENCYCLOPEDIA';
 
 export const WikiFeature: React.FC<WikiFeatureProps> = ({
   registry,
@@ -38,7 +40,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
   const [artifacts, setArtifacts] = useState<Record<string, WikiArtifact>>({});
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
-  const [editData, setEditData] = useState<any>({});
+  const [editData, setEditData] = useState<WikiEditData>({});
   const articleRef = useRef<HTMLDivElement>(null);
 
   const currentObject = useMemo(() => {
@@ -48,23 +50,29 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
 
   const handleStartEdit = (obj: NexusObject) => {
     if (isLink(obj) && !isReified(obj)) {
+      const link = obj as SimpleLink & {
+        hierarchy_type?: HierarchyType;
+        gist?: string;
+        prose_content?: string;
+      };
       setEditData({
-        _type: obj._type,
-        verb: obj.verb,
-        verb_inverse: obj.verb_inverse,
-        hierarchy_type: (obj as any).hierarchy_type || HierarchyType.PARENT_OF,
-        gist: (obj as any).gist || '',
-        prose_content: (obj as any).prose_content || '',
+        _type: obj._type as NexusType,
+        verb: link.verb,
+        verb_inverse: link.verb_inverse,
+        hierarchy_type: link.hierarchy_type || HierarchyType.PARENT_OF,
+        gist: link.gist || '',
+        prose_content: link.prose_content || '',
       });
     } else {
+      const note = obj as SimpleNote;
       setEditData({
-        title: (obj as any).title || (obj as any).verb,
-        gist: (obj as any).gist || '',
-        prose_content: (obj as any).prose_content || '',
-        aliases: [...((obj as any).aliases || [])],
-        tags: [...((obj as any).tags || [])],
-        category_id: (obj as any).category_id || NexusCategory.CONCEPT,
-        is_author_note: (obj as any).is_author_note || false,
+        title: note.title || (note as unknown as SimpleLink).verb,
+        gist: note.gist || '',
+        prose_content: note.prose_content || '',
+        aliases: [...(note.aliases || [])],
+        tags: [...(note.tags || [])],
+        category_id: note.category_id || NexusCategory.CONCEPT,
+        is_author_note: note.is_author_note || false,
       });
     }
     setEditingNodeId(obj.id);
@@ -85,9 +93,10 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
         model: GEMINI_MODELS.PRO,
         contents: [
           {
+            role: 'user',
             parts: [
               {
-                text: `A cinematic high-quality background illustration for a first-class logical unit titled "${(currentObject as any).title || (currentObject as any).verb}". Description: ${(currentObject as any).gist}. Atmospheric, evocative, slightly abstract conceptual art.`,
+                text: `A cinematic high-quality background illustration for a first-class logical unit titled "${(currentObject as SimpleNote).title || (currentObject as SimpleLink).verb}". Description: ${(currentObject as SimpleNote).gist}. Atmospheric, evocative, slightly abstract conceptual art.`,
               },
             ],
           },
@@ -98,8 +107,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
       let imgUrl = '';
       const parts = result.candidates?.[0]?.content?.parts || [];
       for (const part of parts) {
-        if ((part as any).inlineData) {
-          imgUrl = `data:image/png;base64,${(part as any).inlineData.data}`;
+        if ('inlineData' in part && part.inlineData) {
+          imgUrl = `data:image/png;base64,${part.inlineData.data}`;
           break;
         }
       }
@@ -126,20 +135,24 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
     try {
       const projectSummary = (Object.values(registry) as NexusObject[])
         .filter((n) => !isLink(n) || isReified(n))
-        .map((n: any) => `- ${n.title || n.verb}: ${n.gist}`)
+        .map((n) => {
+          const note = n as SimpleNote;
+          const link = n as unknown as SimpleLink;
+          return `- ${note.title || link.verb}: ${note.gist}`;
+        })
         .join('\n');
 
       const systemInstruction = `
                 ACT AS: The Grand Chronicler of the Ekrixi AI Nexus.
-                TASK: Write a definitive, high-fidelity encyclopedia entry for the logical unit known as "${(currentObject as any).title || (currentObject as any).verb}".
-                Knowledge Context: Summary: ${(currentObject as any).gist}. Records: ${(currentObject as any).prose_content || 'N/A'}.
+                TASK: Write a definitive, high-fidelity encyclopedia entry for the logical unit known as "${(currentObject as SimpleNote).title || (currentObject as SimpleLink).verb}".
+                Knowledge Context: Summary: ${(currentObject as SimpleNote).gist}. Records: ${(currentObject as SimpleNote).prose_content || 'N/A'}.
                 Project Scope: ${projectSummary}
             `;
 
       const response = await generateContent({
         model: GEMINI_MODELS.PRO,
         systemInstruction: systemInstruction,
-        contents: [{ parts: [{ text: 'Write the encyclopedia entry.' }] }],
+        contents: [{ role: 'user', parts: [{ text: 'Write the encyclopedia entry.' }] }],
         generationConfig: { temperature: 0.2 },
       });
 
@@ -179,14 +192,14 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-nexus-950 overflow-hidden md:flex-row relative font-sans">
-      {(currentObject as any).background_url && (
+      {(currentObject as SimpleNote).background_url && (
         <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
           <img
-            src={(currentObject as any).background_url}
+            src={(currentObject as SimpleNote).background_url}
             alt="Ambient"
             className="w-full h-full object-cover blur-[80px] scale-125"
             onError={(e) => {
-              (e.target as any).style.display = 'none';
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-nexus-950/40 via-nexus-950/60 to-nexus-950" />

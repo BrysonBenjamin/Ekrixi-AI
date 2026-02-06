@@ -14,7 +14,7 @@ const SuggestionChip = ({
   label,
   onClick,
 }: {
-  icon?: any;
+  icon?: React.ComponentType<{ size?: number; className?: string }>;
   label: string;
   onClick: () => void;
 }) => (

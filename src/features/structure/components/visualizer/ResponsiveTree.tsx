@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { isLink, isReified, isContainer, NexusObject, NexusType } from '../../../../types';
+import {
+  isLink,
+  isReified,
+  isContainer,
+  NexusObject,
+  SimpleNote,
+  SimpleLink,
+} from '../../../../types';
 import { GraphIntegrityService } from '../../../integrity/GraphIntegrityService';
 import { createNodeHTML, createLinkPillHTML } from './NodeTemplates';
 
@@ -14,13 +21,23 @@ interface ResponsiveTreeProps {
   onSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleCollapse?: (id: string) => void;
-  onHover: (id: string | null) => void;
+  _onHover: (id: string | null) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
-  onLongPress?: (id: string, x: number, y: number) => void;
-  onViewModeChange?: (mode: 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR') => void;
+  _onLongPress?: (id: string, x: number, y: number) => void;
+  _onViewModeChange?: (mode: 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR') => void;
   onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
   setZoomRef: (zoom: d3.ZoomBehavior<SVGSVGElement, unknown>) => void;
   setSvgRef: (svg: SVGSVGElement | null) => void;
+}
+
+interface TreeDataNode {
+  id: string;
+  name: string;
+  category?: string;
+  reified: boolean;
+  gist: string;
+  isCollapsed: boolean;
+  children: TreeDataNode[];
 }
 
 export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
@@ -33,10 +50,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
   onSelect,
   onToggleExpand,
   onToggleCollapse,
-  onHover,
+  _onHover,
   onContextMenu,
-  onLongPress,
-  onViewModeChange,
+  _onLongPress,
+  _onViewModeChange,
   onReparent,
   setZoomRef,
   setSvgRef,
@@ -72,10 +89,13 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
     const roots = allObjects.filter((o) => {
       if (isLink(o) && !isReified(o)) return false;
       const inContainer = allObjects.some((p) => isContainer(p) && p.children_ids.includes(o.id));
-      return !inContainer || (o as any).tags?.includes('__is_root__');
+      return !inContainer || (o as SimpleNote).tags?.includes('__is_root__');
     });
 
-    const buildTree = (node: NexusObject, visited: Set<string> = new Set()): any => {
+    const buildTree = (
+      node: NexusObject,
+      visited: Set<string> = new Set(),
+    ): TreeDataNode | null => {
       if (!node || visited.has(node.id)) return null;
       visited.add(node.id);
 
@@ -83,10 +103,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
 
       return {
         id: node.id,
-        name: (node as any).title || 'Untitled',
-        category: (node as any).category_id,
+        name: (node as SimpleNote).title || 'Untitled',
+        category: (node as SimpleNote).category_id,
         reified: isReified(node),
-        gist: (node as any).gist || '',
+        gist: (node as SimpleNote).gist || '',
         isCollapsed: isBranchCollapsed,
         children:
           isContainer(node) && !isBranchCollapsed
@@ -109,7 +129,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-    svg.call(zoomBehavior as any).on('dblclick.zoom', null);
+    svg.call(zoomBehavior as d3.ZoomBehavior<SVGSVGElement, unknown>).on('dblclick.zoom', null);
 
     const mainG = svg
       .append('g')
@@ -119,34 +139,43 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
     const treeLayout = d3.tree().nodeSize(isVertical ? [320, 480] : [140, 560]);
     treeLayout(root);
 
-    const getX = (d: any) => (isVertical ? d.x : d.y);
-    const getY = (d: any) => (isVertical ? d.y : d.x);
+    const getX = (d: d3.HierarchyPointNode<TreeDataNode>) => (isVertical ? d.x : d.y);
+    const getY = (d: d3.HierarchyPointNode<TreeDataNode>) => (isVertical ? d.y : d.x);
 
     const links = root.links().filter((l) => l.source.data.id !== 'VIRTUAL_ROOT');
     const lineLayer = mainG.append('g').attr('class', 'line-layer');
     const linkGroups = lineLayer
       .selectAll('g.link-group')
-      .data(links, (d: any) => `${d.source.data.id}-${d.target.data.id}`)
+      .data(links, (d) => `${d.source.data.id}-${d.target.data.id}`)
       .join('g')
       .attr('class', 'link-group');
 
     linkGroups
       .append('path')
-      .attr('d', (d: any) =>
+      .attr('d', (d) =>
         isVertical
-          ? d3.linkVertical()({
+          ? d3.linkVertical<
+              d3.HierarchyPointLink<TreeDataNode>,
+              d3.HierarchyPointNode<TreeDataNode>
+            >()({
               source: [d.source.x, d.source.y],
               target: [d.target.x, d.target.y],
-            } as any)
-          : d3.linkHorizontal()({
+            })
+          : d3.linkHorizontal<
+              d3.HierarchyPointLink<TreeDataNode>,
+              d3.HierarchyPointNode<TreeDataNode>
+            >()({
               source: [d.source.y, d.source.x],
               target: [d.target.y, d.target.x],
-            } as any),
+            }),
       )
       .attr('fill', 'none')
-      .attr('stroke', (d: any) => {
+      .attr('stroke', (d) => {
         const l = (Object.values(registry) as NexusObject[]).find(
-          (o) => isLink(o) && o.source_id === d.source.data.id && o.target_id === d.target.data.id,
+          (o) =>
+            isLink(o) &&
+            (o as SimpleLink).source_id === d.source.data.id &&
+            (o as SimpleLink).target_id === d.target.data.id,
         );
         const conflict = l ? integrityMap[l.id]?.status : 'APPROVED';
         return conflict === 'REDUNDANT'
@@ -157,18 +186,24 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       })
       .attr('stroke-opacity', 0.4)
       .attr('stroke-width', isVertical ? 3 : 2)
-      .attr('stroke-dasharray', (d: any) => {
+      .attr('stroke-dasharray', (d) => {
         const l = (Object.values(registry) as NexusObject[]).find(
-          (o) => isLink(o) && o.source_id === d.source.data.id && o.target_id === d.target.data.id,
+          (o) =>
+            isLink(o) &&
+            (o as SimpleLink).source_id === d.source.data.id &&
+            (o as SimpleLink).target_id === d.target.data.id,
         );
         return integrityMap[l?.id || '']?.status === 'IMPLIED' ? '6,3' : 'none';
       });
 
-    linkGroups.each(function (d: any) {
+    linkGroups.each(function (d) {
       const midX = isVertical ? (d.source.x + d.target.x) / 2 : (d.source.y + d.target.y) / 2;
       const midY = isVertical ? (d.source.y + d.target.y) / 2 : (d.source.x + d.target.x) / 2;
       const linkObj = (Object.values(registry) as NexusObject[]).find(
-        (o) => isLink(o) && o.source_id === d.source.data.id && o.target_id === d.target.data.id,
+        (o) =>
+          isLink(o) &&
+          (o as SimpleLink).source_id === d.source.data.id &&
+          (o as SimpleLink).target_id === d.target.data.id,
       );
       const conflict = linkObj ? integrityMap[linkObj.id]?.status : 'APPROVED';
       const linkId = linkObj ? linkObj.id : null;
@@ -182,7 +217,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         .style('overflow', 'visible')
         .html(() =>
           createLinkPillHTML(
-            linkObj ? (linkObj as any).verb : 'contains',
+            linkObj ? (linkObj as SimpleLink).verb : 'contains',
             linkObj ? isReified(linkObj) : false,
             selectedId === linkId,
             conflict,
@@ -207,7 +242,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       .attr('class', 'node-group')
       .attr('transform', (d) => `translate(${getX(d) - 130},${getY(d) - 27})`);
 
-    nodeGroups.each(function (d: any) {
+    nodeGroups.each(function (d) {
       const isDraggingOver = dragOverNodeId === d.data.id;
       const fo = d3
         .select(this)
@@ -273,7 +308,11 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         e.stopPropagation();
         onToggleExpand(expandTrigger.getAttribute('data-id')!);
       } else if (pill) {
-        const nodeId = (d3.select(pill.closest('.node-group') as any).datum() as any).data.id;
+        const nodeId = (
+          d3
+            .select(pill.closest('.node-group') as SVGGElement)
+            .datum() as d3.HierarchyPointNode<TreeDataNode>
+        ).data.id;
         // If it's already selected, clicking it again toggles its children
         if (selectedId === nodeId) {
           onToggleCollapse?.(nodeId);

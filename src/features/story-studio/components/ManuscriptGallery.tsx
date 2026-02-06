@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { BookOpen, History, Library, Plus, PlusCircle, Activity } from 'lucide-react';
-import { NexusObject, NexusType, StoryType } from '../../../types';
+import { NexusObject, NexusType, StoryType, StoryNote, SimpleNote } from '../../../types';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../types';
 
@@ -17,7 +17,7 @@ export const ManuscriptGallery: React.FC<ManuscriptGalleryProps> = ({
 }) => {
   const existingBooks = useMemo(() => {
     return (Object.values(registry) as NexusObject[]).filter(
-      (n) => n._type === NexusType.STORY_NOTE && (n as any).story_type === StoryType.BOOK,
+      (n) => n._type === NexusType.STORY_NOTE && (n as StoryNote).story_type === StoryType.BOOK,
     );
   }, [registry]);
 
@@ -66,23 +66,26 @@ export const ManuscriptGallery: React.FC<ManuscriptGalleryProps> = ({
             </p>
           </div>
         ) : (
-          existingBooks.map((book: any) => (
-            <button
-              key={book.id}
-              onClick={() => onLoadBook(book.id)}
-              className="w-full text-left p-4 rounded-2xl bg-nexus-950/40 border border-nexus-800 hover:border-nexus-ruby hover:bg-nexus-ruby/5 transition-all group"
-            >
-              <div className="text-[8px] font-mono text-nexus-ruby uppercase tracking-widest mb-2 font-bold flex items-center gap-1.5">
-                <BookOpen size={10} /> Manuscript
-              </div>
-              <div className="text-xs font-display font-black text-nexus-text uppercase truncate mb-1 group-hover:text-nexus-ruby transition-colors">
-                {book.title}
-              </div>
-              <p className="text-[9px] text-nexus-muted italic line-clamp-1 font-serif">
-                "{book.gist}"
-              </p>
-            </button>
-          ))
+          existingBooks.map((book) => {
+            const sn = book as StoryNote;
+            return (
+              <button
+                key={sn.id}
+                onClick={() => onLoadBook(sn.id)}
+                className="w-full text-left p-4 rounded-2xl bg-nexus-950/40 border border-nexus-800 hover:border-nexus-ruby hover:bg-nexus-ruby/5 transition-all group"
+              >
+                <div className="text-[8px] font-mono text-nexus-ruby uppercase tracking-widest mb-2 font-bold flex items-center gap-1.5">
+                  <BookOpen size={10} /> Manuscript
+                </div>
+                <div className="text-xs font-display font-black text-nexus-text uppercase truncate mb-1 group-hover:text-nexus-ruby transition-colors">
+                  {sn.title}
+                </div>
+                <p className="text-[9px] text-nexus-muted italic line-clamp-1 font-serif">
+                  "{sn.gist}"
+                </p>
+              </button>
+            );
+          })
         )}
       </div>
       <footer className="p-6 border-t border-nexus-800 opacity-40 flex items-center gap-3 shrink-0">

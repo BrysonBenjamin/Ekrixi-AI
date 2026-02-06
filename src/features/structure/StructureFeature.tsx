@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   NexusObject,
   NexusGraphUtils,
@@ -10,12 +10,14 @@ import {
   DefaultLayout,
   HierarchyType,
   isReified,
+  SimpleNote,
+  ContainerNote,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { StructureVisualizer } from './components/StructureVisualizer';
 import { HierarchyExplorer } from '../refinery/components/HierarchyExplorer';
-import { Network, UserCircle2, LayoutPanelLeft, Boxes } from 'lucide-react';
-import { useTutorial, TutorialStep } from '../../components/shared/tutorial/TutorialSystem';
+import { UserCircle2, LayoutPanelLeft } from 'lucide-react';
+import { useTutorial } from '../../components/shared/tutorial/TutorialSystem';
 
 interface StructureFeatureProps {
   registry: Record<string, NexusObject>;
@@ -31,7 +33,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAuthorNotes, setShowAuthorNotes] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
-  const { startTutorial } = useTutorial();
+  useTutorial();
 
   const filteredRegistry = useMemo(() => {
     const next: Record<string, NexusObject> = {};
@@ -40,9 +42,9 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
     // 1. First pass: Filter Nodes
     all.forEach((obj) => {
       if (isLink(obj)) return;
-
-      const isStory = obj._type === NexusType.STORY_NOTE;
-      const isAuthor = (obj as any).is_author_note;
+      const sn = obj as SimpleNote;
+      const isStory = sn._type === NexusType.STORY_NOTE;
+      const isAuthor = sn.is_author_note;
 
       // Strictly exclude Story units from Structural views
       if (!isStory && (!isAuthor || showAuthorNotes)) {
@@ -79,9 +81,9 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         if (!parent || isLink(parent)) return prev;
 
         // Omni-container logic: Promote any leaf node to container status upon child addition
-        const updatedParent = isContainer(parent)
+        const updatedParent: NexusObject = isContainer(parent)
           ? { ...parent, children_ids: [...parent.children_ids, newNode.id] }
-          : ({
+          : {
               ...parent,
               _type:
                 parent._type === NexusType.STORY_NOTE
@@ -91,7 +93,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
               containment_type: ContainmentType.FOLDER,
               is_collapsed: false,
               default_layout: DefaultLayout.GRID,
-            } as any);
+            };
 
         const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(
           updatedParent,
@@ -101,8 +103,8 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         );
         return {
           ...prev,
-          [newNode.id]: updatedTarget as any,
-          [parentId]: updatedSource as any,
+          [newNode.id]: updatedTarget,
+          [parentId]: updatedSource,
           [link.id]: link,
         };
       });
@@ -127,9 +129,9 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
               ? NexusType.AGGREGATED_HIERARCHICAL_LINK
               : NexusType.AGGREGATED_SEMANTIC_LINK,
           is_reified: true,
-          title: `${(source as any).title || 'Origin'} → ${(target as any).title || 'Terminal'}`,
+          title: `${(source as SimpleNote).title || 'Origin'} → ${(target as SimpleNote).title || 'Terminal'}`,
           gist: `Logic: ${link.verb}`,
-          prose_content: `Relationship between ${(source as any).title} and ${(target as any).title}.`,
+          prose_content: `Relationship between ${(source as SimpleNote).title} and ${(target as SimpleNote).title}.`,
           category_id: NexusCategory.META,
           children_ids: [],
           containment_type: ContainmentType.FOLDER,
@@ -138,7 +140,12 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           is_ghost: false,
           aliases: [],
           tags: ['reified'],
-        } as any;
+        } as NexusObject;
+
+        if (reifiedUnit._type === NexusType.AGGREGATED_HIERARCHICAL_LINK) {
+          (reifiedUnit as { hierarchy_type: HierarchyType }).hierarchy_type =
+            HierarchyType.PARENT_OF;
+        }
         return { ...prev, [linkId]: reifiedUnit };
       });
     },
@@ -158,7 +165,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           default_layout: DefaultLayout.GRID,
           children_ids: [],
           tags: [...(node.tags || []), 'promoted-logic'],
-        } as any;
+        };
         return { ...prev, [nodeId]: updatedNode };
       });
     },
@@ -198,7 +205,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           children_ids: [],
           is_collapsed: false,
           default_layout: DefaultLayout.GRID,
-        } as any;
+        };
         next[nodeId] = reifiedUnit;
         return next;
       });
@@ -214,8 +221,9 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         Object.keys(next).forEach((k) => {
           const o = next[k];
           if (isLink(o) && (o.source_id === id || o.target_id === id)) delete next[k];
-          if (isContainer(o) && o.children_ids.includes(id)) {
-            next[k] = { ...o, children_ids: o.children_ids.filter((cid) => cid !== id) } as any;
+          if (isContainer(o)) {
+            const cn = o as ContainerNote;
+            next[k] = { ...cn, children_ids: cn.children_ids.filter((cid) => cid !== id) };
           }
         });
         return next;
@@ -234,18 +242,22 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         if (!isReference && oldParentId) {
           if (oldParentId === 'root') {
             const node = next[sourceId];
-            if (node)
+            if (node) {
+              const sn = node as SimpleNote;
               next[sourceId] = {
-                ...node,
-                tags: ((node as any).tags || []).filter((t: string) => t !== '__is_root__'),
-              } as any;
+                ...sn,
+                tags: (sn.tags || []).filter((t: string) => t !== '__is_root__'),
+              };
+            }
           } else {
             const op = next[oldParentId];
-            if (op && isContainer(op))
+            if (op && isContainer(op)) {
+              const cn = op as ContainerNote;
               next[oldParentId] = {
-                ...op,
-                children_ids: op.children_ids.filter((id) => id !== sourceId),
-              } as any;
+                ...cn,
+                children_ids: cn.children_ids.filter((id) => id !== sourceId),
+              };
+            }
             Object.keys(next).forEach((k) => {
               const o = next[k];
               if (
@@ -260,11 +272,13 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         }
         if (targetId === 'root') {
           const node = next[sourceId];
-          if (node)
+          if (node) {
+            const sn = node as SimpleNote;
             next[sourceId] = {
-              ...node,
-              tags: Array.from(new Set([...((node as any).tags || []), '__is_root__'])),
-            } as any;
+              ...sn,
+              tags: Array.from(new Set([...(sn.tags || []), '__is_root__'])),
+            };
+          }
           return next;
         }
         const targetNode = next[targetId];
@@ -282,12 +296,13 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
             containment_type: ContainmentType.FOLDER,
             is_collapsed: false,
             default_layout: DefaultLayout.GRID,
-          } as any;
+          } as NexusObject;
         } else {
+          const cn = targetNode as ContainerNote;
           next[targetId] = {
-            ...targetNode,
-            children_ids: Array.from(new Set([...targetNode.children_ids, sourceId])),
-          } as any;
+            ...cn,
+            children_ids: Array.from(new Set([...cn.children_ids, sourceId])),
+          };
         }
 
         const shadowLink = NexusGraphUtils.createShadowLink(targetId, sourceId);

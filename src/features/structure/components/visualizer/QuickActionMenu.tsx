@@ -13,7 +13,15 @@ import {
   ArrowDownLeft,
   Repeat,
 } from 'lucide-react';
-import { NexusObject, isLink, isContainer, isReified } from '../../../../types';
+import {
+  NexusObject,
+  isLink,
+  isContainer,
+  isReified,
+  SimpleNote,
+  SimpleLink,
+} from '../../../../types';
+import { LucideIcon } from 'lucide-react';
 
 interface QuickActionMenuProps {
   object: NexusObject;
@@ -42,16 +50,17 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   const isC = isContainer(object);
   const reified = isReified(object);
 
-  const title = (object as any).title || (object as any).verb || 'Untitled';
+  const title = (object as SimpleNote).title || (object as SimpleLink).verb || 'Untitled';
   const type = object._type.replace(/_/g, ' ');
 
   let sourceTitle = 'Unknown';
   let targetTitle = 'Unknown';
   if (isL) {
-    const s = registry[object.source_id];
-    const t = registry[object.target_id];
-    sourceTitle = s ? (s as any).title || 'Untitled' : 'Unknown';
-    targetTitle = t ? (t as any).title || 'Untitled' : 'Unknown';
+    const link = object as SimpleLink;
+    const s = registry[link.source_id];
+    const t = registry[link.target_id];
+    sourceTitle = s ? (s as SimpleNote).title || 'Untitled' : 'Unknown';
+    targetTitle = t ? (t as SimpleNote).title || 'Untitled' : 'Unknown';
   }
 
   const getHeaderIcon = () => {
@@ -87,7 +96,7 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                 </span>
               </div>
               <h3 className="text-2xl font-display font-black text-nexus-text tracking-tight px-4 capitalize italic">
-                "{(object as any).verb}"
+                "{(object as SimpleLink).verb}"
               </h3>
             </div>
           ) : (
@@ -161,7 +170,7 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                 label={`Origin: ${sourceTitle}`}
                 desc="Jump to scrying focus"
                 onClick={() => {
-                  onSelectNode(object.source_id);
+                  onSelectNode((object as SimpleLink).source_id);
                   onClose();
                 }}
               />
@@ -170,7 +179,7 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                 label={`Terminal: ${targetTitle}`}
                 desc="Jump to scrying focus"
                 onClick={() => {
-                  onSelectNode(object.target_id);
+                  onSelectNode((object as SimpleLink).target_id);
                   onClose();
                 }}
               />
@@ -202,7 +211,21 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   );
 };
 
-const ActionButton = ({ icon: Icon, label, desc, onClick, color = 'text-nexus-accent' }: any) => (
+interface ActionButtonProps {
+  icon: LucideIcon;
+  label: string;
+  desc: string;
+  onClick: () => void;
+  color?: string;
+}
+
+const ActionButton = ({
+  icon: Icon,
+  label,
+  desc,
+  onClick,
+  color = 'text-nexus-accent',
+}: ActionButtonProps) => (
   <button
     onClick={onClick}
     className="w-full flex items-center gap-5 p-4 rounded-3xl bg-nexus-950/40 hover:bg-nexus-800 border border-transparent hover:border-nexus-800 transition-all group active:scale-[0.98] text-left"

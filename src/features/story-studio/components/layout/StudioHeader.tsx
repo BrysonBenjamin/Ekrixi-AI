@@ -134,7 +134,14 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   );
 };
 
-const StageButton = ({ active, label, icon: Icon, onClick }: any) => (
+interface StageButtonProps {
+  active: boolean;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  onClick: () => void;
+}
+
+const StageButton = ({ active, label, icon: Icon, onClick }: StageButtonProps) => (
   <button
     onClick={onClick}
     className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${active ? 'bg-nexus-ruby text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
@@ -143,7 +150,15 @@ const StageButton = ({ active, label, icon: Icon, onClick }: any) => (
   </button>
 );
 
-const WidgetButton = ({ active, icon: Icon, color, onClick }: any) => (
+interface WidgetButtonProps {
+  active: boolean;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  color: string;
+  label: string;
+  onClick: () => void;
+}
+
+const WidgetButton = ({ active, icon: Icon, color, onClick }: WidgetButtonProps) => (
   <button
     onClick={onClick}
     className={`p-2.5 rounded-xl border transition-all ${active ? `bg-nexus-900 ${color} border-${color} shadow-lg` : 'bg-nexus-950 border-nexus-800 text-nexus-muted'}`}

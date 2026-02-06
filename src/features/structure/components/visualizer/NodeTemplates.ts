@@ -1,6 +1,18 @@
-import { NexusCategory, NexusType, ConflictStatus } from '../../../../types';
+import { NexusCategory, ConflictStatus } from '../../../../types';
 
-export const getCategoryColor = (cat: any, reified?: boolean) => {
+interface TreeDataNode {
+  id: string;
+  name: string;
+  category?: string;
+  reified: boolean;
+  gist: string;
+}
+
+interface D3HierarchyNode {
+  data: TreeDataNode;
+}
+
+export const getCategoryColor = (cat: NexusCategory | string | undefined, reified?: boolean) => {
   if (reified) return 'var(--accent-color)';
   switch (cat) {
     case NexusCategory.CHARACTER:
@@ -20,7 +32,11 @@ export const getCategoryColor = (cat: any, reified?: boolean) => {
   }
 };
 
-export const getCategoryIconSvg = (cat: any, color: string, reified?: boolean) => {
+export const getCategoryIconSvg = (
+  cat: NexusCategory | string | undefined,
+  color: string,
+  reified?: boolean,
+) => {
   const size = 13;
   let path = '';
   if (reified) {
@@ -60,7 +76,7 @@ export const getCategoryIconSvg = (cat: any, color: string, reified?: boolean) =
 };
 
 export const createNodeHTML = (
-  d: any,
+  d: D3HierarchyNode,
   isSelected: boolean,
   isHovered: boolean,
   isExpanded: boolean,

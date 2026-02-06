@@ -1,18 +1,15 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Activity,
   Plus,
   Trash2,
   Check,
   ShieldAlert,
-  FileCode,
   ArrowUp,
   ArrowDown,
   Maximize2,
   ArrowLeft,
   TrendingUp,
-  Zap,
-  Library,
   Wand2,
   Edit3,
   RotateCw,
@@ -23,13 +20,9 @@ import {
   X,
   GitBranch,
   PenTool,
-  ShieldCheck,
-  Save,
   AlertTriangle,
-  ArrowRight,
   ChevronRight,
   ChevronLeft,
-  LayoutTemplate,
   Layers,
 } from 'lucide-react';
 import {
@@ -41,6 +34,9 @@ import {
   isLink,
   NarrativeStatus,
   isContainer,
+  StoryNote,
+  ContainmentType,
+  DefaultLayout,
 } from '../../../types';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../types';
@@ -72,7 +68,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   onUpdate,
   registry,
   blocks,
-  onUpdateBlocks,
+  onUpdateBlocks: _onUpdateBlocks,
   onCommitBatch,
   onBackToManifesto,
   zoomedChapterId,
@@ -88,7 +84,11 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   const [synthStatus, setSynthStatus] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAudit, setShowAudit] = useState(false);
-  const [auditResult, setAuditResult] = useState<any>(null);
+  const [auditResult, setAuditResult] = useState<{
+    status: 'SUITABLE' | 'NEEDS_REFACTOR';
+    critique: string;
+    alternatives: Array<{ name: string; rationale: string }>;
+  } | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isFillingId, setIsFillingId] = useState<string | null>(null);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
@@ -99,22 +99,26 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   useEffect(() => {
     const nextManifestos: Record<string, StudioBlock[]> = {};
     items.forEach((item) => {
-      if ((item as any).story_type === StoryType.CHAPTER && (item as any).manifesto_data) {
-        nextManifestos[item.id] = (item as any).manifesto_data;
+      const note = item as StoryNote;
+      if (note.story_type === StoryType.CHAPTER && note.manifesto_data) {
+        nextManifestos[item.id] = note.manifesto_data;
       }
     });
     setChapterManifestos(nextManifestos);
   }, [items]);
 
   const bookNode = useMemo(
-    () => items.find((i) => (i as any).story_type === StoryType.BOOK),
+    () =>
+      items.find((i) => (i as StoryNote).story_type === StoryType.BOOK) as StoryNote | undefined,
     [items],
   );
   const chapters = useMemo(
     () =>
       items
-        .filter((i) => (i as any).story_type === StoryType.CHAPTER)
-        .sort((a, b) => (a as any).sequence_index - (b as any).sequence_index),
+        .filter((i) => (i as StoryNote).story_type === StoryType.CHAPTER)
+        .sort(
+          (a, b) => ((a as StoryNote).sequence_index || 0) - ((b as StoryNote).sequence_index || 0),
+        ) as StoryNote[],
     [items],
   );
 
@@ -122,12 +126,15 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
     if (!zoomedChapterId) return [];
     return items
       .filter((i) => {
-        if ((i as any).story_type !== StoryType.SCENE) return false;
+        const note = i as StoryNote;
+        if (note.story_type !== StoryType.SCENE) return false;
         return items.some(
           (l) => isLink(l) && l.source_id === zoomedChapterId && l.target_id === i.id,
         );
       })
-      .sort((a, b) => ((a as any).sequence_index || 0) - ((b as any).sequence_index || 0));
+      .sort(
+        (a, b) => ((a as StoryNote).sequence_index || 0) - ((b as StoryNote).sequence_index || 0),
+      ) as StoryNote[];
   }, [items, zoomedChapterId]);
 
   const handleUpdateChapterBlueprint = (chapterId: string, newBlocks: StudioBlock[]) => {
@@ -137,7 +144,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         item.id === chapterId
           ? { ...item, manifesto_data: newBlocks, last_modified: new Date().toISOString() }
           : item,
-      ) as any,
+      ),
     );
   };
 
@@ -145,9 +152,12 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
     const now = new Date().toISOString();
     const cleanItems = baseItems.filter(
       (i) =>
-        !((i as any)._type === NexusType.AGGREGATED_HIERARCHICAL_LINK && (i as any).is_reified),
+        !(
+          i._type === NexusType.AGGREGATED_HIERARCHICAL_LINK &&
+          (i as { is_reified?: boolean }).is_reified
+        ),
     );
-    const sequentialLinks: any[] = [];
+    const sequentialLinks: NexusObject[] = [];
     for (let i = 0; i < currentList.length - 1; i++) {
       const source = currentList[i];
       const target = currentList[i + 1];
@@ -167,12 +177,19 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         link_ids: [],
         internal_weight: 1.0,
         total_subtree_mass: 0,
-      });
+        aliases: [],
+        tags: [],
+        prose_content: '',
+        is_ghost: false,
+        containment_type: ContainmentType.PLOT_ARC,
+        is_collapsed: false,
+        default_layout: DefaultLayout.GRID,
+      } as NexusObject);
     }
     const reindexed = currentList.map((ch, idx) => ({ ...ch, sequence_index: idx + 1 }));
     const otherItems = cleanItems.filter((i) => !currentList.some((cc) => cc.id === i.id));
     const nextItems = [...otherItems, ...reindexed, ...sequentialLinks];
-    onUpdate(nextItems as any);
+    onUpdate(nextItems);
     return nextItems;
   };
 
@@ -190,8 +207,10 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   const handleUpdateBeat = (id: string, updates: Partial<NexusObject>) => {
     onUpdate(
       items.map((item) =>
-        item.id === id ? { ...item, ...updates, last_modified: new Date().toISOString() } : item,
-      ) as any,
+        item.id === id
+          ? ({ ...item, ...updates, last_modified: new Date().toISOString() } as NexusObject)
+          : item,
+      ),
     );
   };
 
@@ -214,10 +233,10 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         link_ids: [],
       }));
       const nextItems = [...items, ...generatedScenes, ...hierarchyLinks];
-      onUpdate(nextItems as any);
+      onUpdate(nextItems as NexusObject[]);
       onSetChapterBlueprintMode(false);
-    } catch (err) {
-      console.error('Scene Synthesis Failed', err);
+    } catch (_err) {
+      console.error('Scene Synthesis Failed', _err);
     } finally {
       setIsSynthesizing(false);
       setSynthStatus(null);
@@ -260,12 +279,12 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
           ? { ...item, children_ids: item.children_ids.filter((cid) => cid !== id) }
           : item,
       );
-    onUpdate(nextItems as any);
+    onUpdate(nextItems);
     if (editingId === id) setEditingId(null);
   };
 
   const handleAutoFillMetadata = async (id: string) => {
-    const target = items.find((i) => i.id === id) as any;
+    const target = items.find((i) => i.id === id) as StoryNote;
     if (!target) return;
     setIsAutoFilling(true);
     try {
@@ -290,7 +309,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   };
 
   const handleNeuralFill = async (id: string) => {
-    const target = items.find((i) => i.id === id) as any;
+    const target = items.find((i) => i.id === id) as StoryNote;
     if (!target) return;
     setIsFillingId(id);
     try {
@@ -313,7 +332,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   const handleAddManualBeat = () => {
     const now = new Date().toISOString();
     const chId = generateId();
-    const newChapter: any = {
+    const newChapter: StoryNote = {
       id: chId,
       _type: NexusType.STORY_NOTE,
       story_type: StoryType.CHAPTER,
@@ -329,6 +348,13 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
       children_ids: [],
       internal_weight: 1.0,
       total_subtree_mass: 0,
+      aliases: [],
+      tags: [],
+      prose_content: '',
+      is_ghost: false,
+      containment_type: ContainmentType.PLOT_ARC,
+      is_collapsed: false,
+      default_layout: DefaultLayout.GRID,
     };
     const nextItems = [...items, newChapter];
     if (bookNode) {
@@ -342,16 +368,16 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         created_at: now,
         last_modified: now,
         link_ids: [],
-      } as any);
+      } as NexusObject);
     }
-    onUpdate(nextItems as any);
+    onUpdate(nextItems);
     setEditingId(chId);
   };
 
   const handleAddScene = (chapterId: string) => {
     const now = new Date().toISOString();
     const sceneId = generateId();
-    const newScene: any = {
+    const newScene: StoryNote = {
       id: sceneId,
       _type: NexusType.STORY_NOTE,
       story_type: StoryType.SCENE,
@@ -367,6 +393,13 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
       children_ids: [],
       internal_weight: 1.0,
       total_subtree_mass: 0,
+      aliases: [],
+      tags: [],
+      prose_content: '',
+      is_ghost: false,
+      containment_type: ContainmentType.PLOT_ARC,
+      is_collapsed: false,
+      default_layout: DefaultLayout.GRID,
     };
     onUpdate([
       ...items,
@@ -381,7 +414,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
         created_at: now,
         last_modified: now,
         link_ids: [],
-      } as any,
+      } as NexusObject,
     ]);
     setEditingId(sceneId);
   };
@@ -410,12 +443,15 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                 try {
                   const generatedChapters = await StudioSpineAgent.synthesizeChapters(blocks);
                   const newBookId = generateId();
-                  const book: any = {
+                  const book: StoryNote = {
                     id: newBookId,
                     _type: NexusType.STORY_NOTE,
                     story_type: StoryType.BOOK,
                     title: 'Untitled Manuscript',
                     gist: 'Active Manuscript',
+                    sequence_index: 0,
+                    tension_level: 0,
+                    status: NarrativeStatus.OUTLINE,
                     category_id: NexusCategory.STORY,
                     created_at: new Date().toISOString(),
                     last_modified: new Date().toISOString(),
@@ -423,6 +459,13 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                     children_ids: generatedChapters.map((c) => c.id),
                     internal_weight: 1.0,
                     total_subtree_mass: 0,
+                    aliases: [],
+                    tags: [],
+                    prose_content: '',
+                    is_ghost: false,
+                    containment_type: ContainmentType.MANUSCRIPT,
+                    is_collapsed: false,
+                    default_layout: DefaultLayout.GRID,
                   };
                   const finalItems = handleRelinkSequence(generatedChapters, [
                     book,
@@ -499,7 +542,9 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
   }
 
   const currentList = zoomedChapterId ? scenesForZoomedChapter : chapters;
-  const zoomedNode = zoomedChapterId ? (items.find((i) => i.id === zoomedChapterId) as any) : null;
+  const zoomedNode = zoomedChapterId
+    ? (items.find((i) => i.id === zoomedChapterId) as StoryNote)
+    : null;
 
   return (
     <div className="h-full flex flex-col bg-nexus-950 overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
@@ -592,7 +637,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
               onClick={() => {
                 setShowAudit(true);
                 setIsAuditing(true);
-                StudioSpineAgent.analyzeStructure(blocks, chapters as any)
+                StudioSpineAgent.analyzeStructure(blocks, chapters)
                   .then(setAuditResult)
                   .finally(() => setIsAuditing(false));
               }}
@@ -687,7 +732,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
             </div>
           </div>
         ) : (
-          currentList.map((ch: any, idx: number) => (
+          currentList.map((ch, idx) => (
             <div
               key={ch.id}
               className="group relative flex gap-8 animate-in slide-in-from-left-4 duration-500"
@@ -848,7 +893,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                           {items
                             .filter(
                               (i) =>
-                                (i as any).story_type === StoryType.SCENE &&
+                                (i as StoryNote).story_type === StoryType.SCENE &&
                                 items.some(
                                   (l) => isLink(l) && l.source_id === ch.id && l.target_id === i.id,
                                 ),
@@ -862,7 +907,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                                 }}
                                 className="px-4 py-2 bg-nexus-950 border border-nexus-800 rounded-xl text-[10px] font-bold text-nexus-muted hover:border-nexus-arcane transition-all truncate max-w-[150px]"
                               >
-                                {(sc as any).title}
+                                {(sc as StoryNote).title}
                               </button>
                             ))}
                           <button
@@ -941,7 +986,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                       </p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {auditResult.alternatives.map((alt: any, i: number) => (
+                      {auditResult.alternatives.map((alt, i) => (
                         <div
                           key={i}
                           className="p-8 bg-nexus-950 border border-nexus-800 rounded-[32px] hover:border-nexus-ruby/50 transition-all group"

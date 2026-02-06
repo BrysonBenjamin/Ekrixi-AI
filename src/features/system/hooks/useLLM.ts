@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, Content, GenerationConfig, Part } from '@google/generative-ai';
 import { useSessionStore } from '../../../store/useSessionStore';
 import { getGeminiClient, GEMINI_MODELS } from '../../../core/llm';
 import { config } from '../../../config';
@@ -63,8 +63,8 @@ export const useLLM = () => {
   const generateContent = async (options: {
     model?: string;
     systemInstruction?: string;
-    contents: any[];
-    generationConfig?: any;
+    contents: Content[];
+    generationConfig?: GenerationConfig;
   }) => {
     if (config.useLocalLLM) {
       try {
@@ -74,9 +74,10 @@ export const useLLM = () => {
         }
 
         // Map Gemini contents to OpenAI messages
-        options.contents.forEach((c: any) => {
+        options.contents.forEach((c: Content) => {
           const role = c.role === 'model' ? 'assistant' : 'user';
-          const text = c.parts?.map((p: any) => p.text).join('\n') || '';
+          const text =
+            (c.parts as Part[])?.map((p: Part) => (p as { text: string }).text).join('\n') || '';
           messages.push({ role, content: text });
         });
 

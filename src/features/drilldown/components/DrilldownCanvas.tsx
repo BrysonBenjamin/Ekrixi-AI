@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { Share2, Link2, X, Activity } from 'lucide-react';
+import { Link2, X } from 'lucide-react';
 import { NexusObject, isLink, isReified, NexusType, isContainer } from '../../../types';
 import { DrillNode } from './DrillNode';
 import { VisibleNode } from '../DrilldownFeature';
 import { DrilldownContextMenu } from './DrilldownContextMenu';
-import { GraphIntegrityService, IntegrityReport } from '../../integrity/GraphIntegrityService';
+import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 
 interface SimulationNode extends d3.SimulationNodeDatum {
   id: string;

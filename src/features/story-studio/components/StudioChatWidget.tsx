@@ -3,17 +3,12 @@ import {
   X,
   Send,
   Bot,
-  User,
   Sparkles,
   RotateCw,
   Activity,
-  ArrowUpRight,
-  Box,
-  Library,
-  ChevronRight,
   BookOpen,
   ShieldCheck,
-  Search,
+  LucideIcon,
 } from 'lucide-react';
 import {
   NexusObject,
@@ -22,22 +17,48 @@ import {
   NexusCategory,
   NarrativeStatus,
   HierarchyType,
+  ContainmentType,
+  DefaultLayout,
+  StoryNote,
+  SimpleNote,
 } from '../../../types';
+import { StudioBlock } from '../types';
 import { generateId } from '../../../utils/ids';
 import { useLLM } from '../../system/hooks/useLLM';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
 import { GEMINI_MODELS } from '../../../core/llm';
+
+interface ChatAction {
+  reply: string;
+  proposedChapters?: Array<{ title: string; gist: string; insertAfterIndex: number }>;
+  proposedProtocols?: Array<{ title: string; gist: string; targetChapterIds: string[] }>;
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  context?: Array<{ title: string; id: string }>;
+  action?: ChatAction;
+}
 
 interface StudioChatWidgetProps {
   isOpen: boolean;
   onClose: () => void;
   items: NexusObject[];
   onUpdateItems: (items: NexusObject[]) => void;
-  blocks: any[];
+  blocks: StudioBlock[];
   inline?: boolean;
 }
 
-const ActionButton = ({ icon: Icon, label, onClick }: any) => (
+const ActionButton = ({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) => (
   <button
     onClick={onClick}
     className="w-full py-2 bg-nexus-essence/10 border border-nexus-essence/30 text-nexus-essence rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-nexus-essence hover:text-black transition-all flex items-center justify-center gap-2 shadow-lg"
@@ -56,9 +77,9 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
 }) => {
   const { generateContent } = useLLM();
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [contextNodes, setContextNodes] = useState<any[]>([]);
+  const [contextNodes, setContextNodes] = useState<Array<{ title: string; id: string }>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const memoizedRegistry = useMemo(
     () => items.reduce((acc, item) => ({ ...acc, [item.id]: item }), {}),
@@ -89,8 +110,11 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
 
     try {
       const chaptersSummary = items
-        .filter((i) => (i as any).story_type === StoryType.CHAPTER)
-        .map((ch: any) => `CH_${ch.sequence_index}: ${ch.title} - ${ch.gist}`)
+        .filter((i) => (i as StoryNote).story_type === StoryType.CHAPTER)
+        .map((ch) => {
+          const note = ch as StoryNote;
+          return `CH_${note.sequence_index}: ${note.title} - ${note.gist}`;
+        })
         .join('\n');
 
       const worldContext = contextNodes.map((n) => `- ${n.title}`).join('\n');
@@ -127,7 +151,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
         model: GEMINI_MODELS.FLASH,
         systemInstruction: systemInstruction,
         generationConfig: { responseMimeType: 'application/json' },
-        contents: [{ parts: [{ text: userMsg }] }],
+        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
       });
 
       const resultJson = await response.response;
@@ -149,9 +173,9 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
     let nextItems = [...items];
 
     if (type === 'CHAPTERS') {
-      data.forEach((ch: any) => {
+      (data as Array<{ title: string; gist: string; insertAfterIndex?: number }>).forEach((ch) => {
         const newId = generateId();
-        const node: any = {
+        const node: StoryNote = {
           id: newId,
           _type: NexusType.STORY_NOTE,
           story_type: StoryType.CHAPTER,
@@ -167,9 +191,16 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
           children_ids: [],
           internal_weight: 1.0,
           total_subtree_mass: 0,
+          aliases: [],
+          tags: [],
+          prose_content: '',
+          is_ghost: false,
+          containment_type: ContainmentType.MANUSCRIPT,
+          is_collapsed: false,
+          default_layout: DefaultLayout.GRID,
         };
         nextItems.push(node);
-        const book = items.find((i) => (i as any).story_type === StoryType.BOOK);
+        const book = items.find((i) => (i as StoryNote).story_type === StoryType.BOOK);
         if (book) {
           nextItems.push({
             id: generateId(),
@@ -185,38 +216,44 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
         }
       });
     } else if (type === 'PROTOCOLS') {
-      data.forEach((prot: any) => {
-        const pId = generateId();
-        nextItems.push({
-          id: pId,
-          _type: NexusType.SIMPLE_NOTE,
-          title: prot.title,
-          gist: prot.gist,
-          category_id: NexusCategory.META,
-          is_author_note: true,
-          created_at: now,
-          last_modified: now,
-          link_ids: [],
-          internal_weight: 1.0,
-          total_subtree_mass: 0,
-        } as any);
-        if (prot.targetChapterIds) {
-          prot.targetChapterIds.forEach((chId: string) => {
-            if (items.some((i) => i.id === chId)) {
-              nextItems.push({
-                id: generateId(),
-                _type: NexusType.SEMANTIC_LINK,
-                source_id: pId,
-                target_id: chId,
-                verb: 'governs',
-                created_at: now,
-                last_modified: now,
-                link_ids: [],
-              } as any);
-            }
-          });
-        }
-      });
+      (data as Array<{ title: string; gist: string; targetChapterIds?: string[] }>).forEach(
+        (prot) => {
+          const pId = generateId();
+          nextItems.push({
+            id: pId,
+            _type: NexusType.SIMPLE_NOTE,
+            title: prot.title,
+            gist: prot.gist,
+            category_id: NexusCategory.META,
+            is_author_note: true,
+            created_at: now,
+            last_modified: now,
+            link_ids: [],
+            internal_weight: 1.0,
+            total_subtree_mass: 0,
+            aliases: [],
+            tags: [],
+            prose_content: '',
+            is_ghost: false,
+          } as SimpleNote);
+          if (prot.targetChapterIds) {
+            prot.targetChapterIds.forEach((chId: string) => {
+              if (items.some((i) => i.id === chId)) {
+                nextItems.push({
+                  id: generateId(),
+                  _type: NexusType.SEMANTIC_LINK,
+                  source_id: pId,
+                  target_id: chId,
+                  verb: 'governs',
+                  created_at: now,
+                  last_modified: now,
+                  link_ids: [],
+                } as any);
+              }
+            });
+          }
+        },
+      );
     }
     onUpdateItems(nextItems);
     setMessages((prev) => [

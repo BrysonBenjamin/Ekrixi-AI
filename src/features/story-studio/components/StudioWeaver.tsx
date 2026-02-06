@@ -1,37 +1,26 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   PenTool,
   Compass,
-  ArrowLeft,
   Sparkles,
-  History,
   Layers,
   Database,
   Activity,
-  Eye,
-  Zap,
-  Link2,
-  CheckCircle,
   X,
-  RotateCw,
-  Maximize2,
-  Minimize2,
-  BookOpen,
   ScrollText,
   ShieldCheck,
   Quote,
   LayoutTemplate,
   Focus,
-  MousePointer2,
-  Wand2,
 } from 'lucide-react';
 import {
   NexusObject,
   isLink,
-  isContainer,
   NexusType,
-  NexusCategory,
   StoryType,
+  StoryNote,
+  SimpleNote,
+  SimpleLink,
 } from '../../../types';
 import { LocalizedWorldWiki } from './LocalizedWorldWiki';
 import { WeaverChatAssistant } from './WeaverChatAssistant';
@@ -64,18 +53,17 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   // Resolve context for switching
-  const focusedNode = studioItems.find((i) => i.id === activeId) as any;
+  const focusedNode = studioItems.find((i) => i.id === activeId) as StoryNote | SimpleNote;
   const parentChapterId = useMemo(() => {
     if (isChapterMode) return activeId;
-    // Fix: Use any cast to handle source_id/target_id access on NexusObject union in find callback
     const link = studioItems.find(
       (l) =>
         isLink(l) &&
-        (l as any).target_id === activeId &&
-        (studioItems.find((p) => p.id === (l as any).source_id) as any)?.story_type ===
+        (l as SimpleLink).target_id === activeId &&
+        (studioItems.find((p) => p.id === (l as SimpleLink).source_id) as StoryNote)?.story_type ===
           StoryType.CHAPTER,
-    );
-    return link ? (link as any).source_id : null;
+    ) as SimpleLink;
+    return link ? link.source_id : null;
   }, [studioItems, activeId, isChapterMode]);
 
   const scenesInChapter = useMemo(() => {
@@ -84,20 +72,30 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
     return studioItems
       .filter(
         (i) =>
-          (i as any).story_type === StoryType.SCENE &&
-          studioItems.some((l) => isLink(l) && l.source_id === chId && l.target_id === i.id),
+          (i as StoryNote).story_type === StoryType.SCENE &&
+          studioItems.some(
+            (l) =>
+              isLink(l) &&
+              (l as SimpleLink).source_id === chId &&
+              (l as SimpleLink).target_id === i.id,
+          ),
       )
-      .sort((a, b) => ((a as any).sequence_index || 0) - ((b as any).sequence_index || 0));
+      .sort(
+        (a, b) => ((a as StoryNote).sequence_index || 0) - ((b as StoryNote).sequence_index || 0),
+      ) as StoryNote[];
   }, [studioItems, parentChapterId]);
 
   const activeNotes = useMemo(() => {
     if (!parentChapterId) return [];
     return studioItems.filter((i) => {
-      if (!(i as any).is_author_note) return false;
+      if (!(i as SimpleNote).is_author_note) return false;
       return studioItems.some(
-        (l) => isLink(l) && l.source_id === i.id && l.target_id === parentChapterId,
+        (l) =>
+          isLink(l) &&
+          (l as SimpleLink).source_id === i.id &&
+          (l as SimpleLink).target_id === parentChapterId,
       );
-    });
+    }) as SimpleNote[];
   }, [studioItems, parentChapterId]);
 
   const handleTextChange = useCallback(
@@ -117,7 +115,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
       while ((match = wikiRegex.exec(val)) !== null) {
         const title = match[1].trim().toLowerCase();
         const worldNode = (Object.values(worldRegistry) as NexusObject[]).find(
-          (n) => !isLink(n) && (n as any).title?.toLowerCase() === title,
+          (n) => !isLink(n) && (n as SimpleNote).title?.toLowerCase() === title,
         );
         if (worldNode) mentions.add(worldNode.id);
       }
@@ -238,7 +236,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
           <div className="max-w-4xl mx-auto pb-40">
             {isChapterMode ? (
               <div className="space-y-0">
-                {scenesInChapter.map((scene: any, idx: number) => (
+                {scenesInChapter.map((scene, idx: number) => (
                   <div
                     key={scene.id}
                     className="group/weave relative pb-20 animate-in fade-in slide-in-from-bottom-4"
@@ -343,6 +341,18 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
   );
 };
 
+interface ContextTabsProps {
+  chapter: StoryNote | SimpleNote | null;
+  isChapterMode?: boolean;
+  registry: Record<string, NexusObject>;
+  mentions: Set<string>;
+  notes: SimpleNote[];
+  onUpdate: (items: NexusObject[]) => void;
+  studioItems: NexusObject[];
+  selectedText: string;
+  onClearSelection: () => void;
+}
+
 const ContextTabs = ({
   chapter,
   isChapterMode,
@@ -353,7 +363,7 @@ const ContextTabs = ({
   studioItems,
   selectedText,
   onClearSelection,
-}: any) => {
+}: ContextTabsProps) => {
   const [activeTab, setActiveTab] = useState<'WIKI' | 'CHAT' | 'NOTES'>('CHAT');
 
   return (
@@ -409,7 +419,7 @@ const ContextTabs = ({
                 </p>
               </div>
             ) : (
-              notes.map((note: any) => (
+              notes.map((note) => (
                 <div
                   key={note.id}
                   className="p-5 bg-nexus-950 border border-amber-500/20 rounded-2xl shadow-sm hover:border-amber-500 transition-all group"
@@ -430,7 +440,14 @@ const ContextTabs = ({
   );
 };
 
-const TabButton = ({ active, icon: Icon, label, onClick }: any) => (
+interface TabButtonProps {
+  active: boolean;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  onClick: () => void;
+}
+
+const TabButton = ({ active, icon: Icon, label, onClick }: TabButtonProps) => (
   <button
     onClick={onClick}
     className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[9px] font-display font-black uppercase tracking-widest transition-all ${active ? 'bg-nexus-accent text-white shadow-lg shadow-nexus-accent/20' : 'text-nexus-muted hover:text-nexus-text hover:bg-nexus-800/40'}`}
@@ -440,8 +457,8 @@ const TabButton = ({ active, icon: Icon, label, onClick }: any) => (
 );
 
 const localizedRegistry = (
-  studioItems: any[],
-  worldRegistry: any,
+  studioItems: NexusObject[],
+  worldRegistry: Record<string, NexusObject>,
   scannedMentions: Set<string>,
 ) => {
   const reg: Record<string, NexusObject> = {};
@@ -450,8 +467,9 @@ const localizedRegistry = (
     const node = worldRegistry[id];
     if (node) reg[id] = node;
   });
-  Object.values(worldRegistry).forEach((l: any) => {
-    if (isLink(l) && reg[l.source_id] && reg[l.target_id]) reg[l.id] = l;
+  Object.values(worldRegistry).forEach((l) => {
+    if (isLink(l) && reg[(l as SimpleLink).source_id] && reg[(l as SimpleLink).target_id])
+      reg[l.id] = l;
   });
   return reg;
 };

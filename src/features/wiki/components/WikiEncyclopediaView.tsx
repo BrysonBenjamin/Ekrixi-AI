@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sparkles, Save, RotateCw, Wand2 } from 'lucide-react';
 import { Logo } from '../../../components/shared/Logo';
-import { WikiArtifact, NexusObject } from '../../../types';
+import { WikiArtifact, NexusObject, SimpleNote } from '../../../types';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
 
 interface WikiEncyclopediaViewProps {
@@ -23,7 +23,7 @@ export const WikiEncyclopediaView: React.FC<WikiEncyclopediaViewProps> = ({
   registry,
   onSelect,
 }) => {
-  const themeColor = (currentObject as any).theme_color;
+  const themeColor = (currentObject as SimpleNote).theme_color;
 
   return (
     <div className="animate-in fade-in zoom-in-95 duration-1000">
