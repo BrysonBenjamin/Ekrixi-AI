@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PanelLeftClose, PanelLeft, Plus, ChevronDown, MoreHorizontal } from 'lucide-react';
 import gsap from 'gsap';
-import Flip from 'gsap/Flip';
+import { Flip } from 'gsap/all';
 import { useUniverseChat } from './hooks/useUniverseChat';
 import { Sidebar } from './components/Sidebar';
 import { MessageList } from './components/MessageList';
