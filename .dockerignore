@@ -41,8 +41,8 @@ Thumbs.db
 *.md
 !README.md
 
-# Backend (not needed for frontend build)
-backend
+# Backend (commented out to allow root-context builds)
+# backend
 
 # Other
 .prettierrc
