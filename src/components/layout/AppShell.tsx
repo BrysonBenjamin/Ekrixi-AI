@@ -102,7 +102,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
       >
         <div className="flex flex-col items-center w-full pt-6">
           <div className="mb-10 flex items-center justify-center">
-            <BrandLogo className="w-16 h-auto" />
+            <BrandLogo className="w-16 h-auto" data-flip-id="persistent-logo" />
           </div>
 
           <nav className="flex flex-col w-full gap-2">

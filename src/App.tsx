@@ -23,6 +23,13 @@ import { useRegistryStore } from './store/useRegistryStore';
 import { useUIStore } from './store/useUIStore';
 import { useRefineryStore } from './store/useRefineryStore';
 import { useSessionStore } from './store/useSessionStore';
+import { IntroOverlay } from './features/universe-generator/components/IntroOverlay';
+import { FirstRunOnboarding } from './features/universe-generator/components/FirstRunOnboarding';
+import { useLLM } from './features/system/hooks/useLLM';
+import gsap from 'gsap';
+import { Flip } from 'gsap/all';
+
+gsap.registerPlugin(Flip);
 
 export default function App() {
   const navigate = useNavigate();
@@ -52,7 +59,75 @@ export default function App() {
     updateBatchItems,
     removeBatch: deleteRefineryBatch,
   } = useRefineryStore();
+
   const { activeUniverseId, updateUniverseMeta } = useSessionStore();
+  const { requiresUserKey, hasKey } = useLLM();
+
+  // Global Overlay State
+  const [showIntro, setShowIntro] = React.useState(() => {
+    try {
+      // Should only show once per browser session
+      return !sessionStorage.getItem('ekrixi_intro_seen');
+    } catch {
+      return true;
+    }
+  });
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
+
+  const handleIntroComplete = () => {
+    // Mark intro as seen
+    try {
+      sessionStorage.setItem('ekrixi_intro_seen', 'true');
+    } catch (e) {
+      console.warn('Failed to save intro state', e);
+    }
+
+    // Animation: Fly Overlay Logo -> Persistent Top Left Logo
+    const overlayLogo = document.querySelector('#intro-logo');
+    // We target the logo in the AppShell. It's rendered in DOM because AppShell is below.
+    const targetLogo = document.querySelector('[data-flip-id="persistent-logo"]');
+
+    if (overlayLogo && targetLogo) {
+      const state = Flip.getState(targetLogo);
+
+      // Ensure target is invisible during flight to avoid double vision
+      gsap.set(targetLogo, { opacity: 0 });
+
+      // Animate the Overlay Logo
+      Flip.fit(overlayLogo, state, {
+        duration: 1.2,
+        ease: 'power4.inOut',
+        scale: true,
+        zIndex: 200, // Very high to fly over everything
+        onStart: () => {
+          // Fade out the overlay background
+          gsap.to('#intro-background', { opacity: 0, duration: 1.0, ease: 'power2.inOut' });
+        },
+        onComplete: () => {
+          // Reveal target, unmount overlay
+          gsap.set(targetLogo, { opacity: 1 });
+          setShowIntro(false);
+        },
+      });
+    } else {
+      // Fallback if target not found (e.g. mobile or different layout)
+      gsap.to('#intro-background', { opacity: 0, duration: 0.5 });
+      gsap.to(overlayLogo || [], {
+        opacity: 0,
+        duration: 0.5,
+        onComplete: () => setShowIntro(false),
+      });
+    }
+  };
+
+  // Trigger onboarding if intro is done (or skipped) and we still need a key
+  useEffect(() => {
+    if (!showIntro && requiresUserKey && !hasKey) {
+      // Small delay for smooth transition after intro flight
+      const timer = setTimeout(() => setShowOnboarding(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [showIntro, requiresUserKey, hasKey]);
 
   // Theme Effect
   useEffect(() => {
@@ -163,9 +238,11 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full">
+      {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
+      {showOnboarding && <FirstRunOnboarding onComplete={() => setShowOnboarding(false)} />}
       <AppShell theme={theme}>
         <Routes>
-          <Route path="/" element={<Navigate to="/playground" replace />} />
+          <Route path="/" element={<Navigate to="/nexus" replace />} />
 
           <Route
             path="/playground"
@@ -284,7 +361,7 @@ export default function App() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/playground" replace />} />
+          <Route path="*" element={<Navigate to="/nexus" replace />} />
         </Routes>
       </AppShell>
     </div>

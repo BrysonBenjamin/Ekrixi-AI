@@ -8,7 +8,12 @@ import { useSessionStore } from '../store/useSessionStore';
  */
 export const getGeminiClient = () => {
   const { apiKeys } = useSessionStore.getState();
-  const activeKey = apiKeys?.gemini || config.geminiApiKey;
+  let activeKey = apiKeys?.gemini || config.geminiApiKey;
+
+  // Handle explicit community key opt-in
+  if (activeKey === 'USE_COMMUNITY_KEY') {
+    activeKey = config.geminiApiKey;
+  }
 
   if (!activeKey) {
     return null;
