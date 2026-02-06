@@ -43,6 +43,21 @@
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --shadow-color: rgba(0, 0, 0, 0.5);
+
+  /* Driver.js Theme Overrides */
+  --driver-popover-bg: #09090b;
+  /* nexus-950 */
+  --driver-popover-text-color: #e2e8f0;
+  /* nexus-text */
+  --driver-popover-title-text-color: #fff;
+  --driver-popover-border-color: #1e293b;
+  /* nexus-800 */
+  --driver-element-highlight-color: rgba(124, 58, 237, 0.2);
+  /* nexus-accent transparent */
+  --driver-popover-navigation-btns-color: #7c3aed;
+  /* nexus-accent */
+  --driver-popover-close-btn-color: #94a3b8;
+  /* nexus-muted */
 }
 
 :root[data-theme='legacy'] {

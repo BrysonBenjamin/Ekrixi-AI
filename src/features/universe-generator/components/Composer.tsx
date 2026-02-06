@@ -205,6 +205,7 @@ export const Composer: React.FC<ComposerProps> = ({
                             ${isExpanded ? 'h-full text-xl' : 'min-h-[52px] text-[15px]'}
                         `}
             rows={1}
+            id="universe-prompt-input"
           />
         </div>
 
@@ -254,6 +255,7 @@ export const Composer: React.FC<ComposerProps> = ({
               <button
                 onClick={handleSend}
                 disabled={isLoading}
+                id="universe-send-button"
                 className={`
                                     flex items-center justify-center w-12 h-12 md:w-10 md:h-10 rounded-full transition-all
                                     ${

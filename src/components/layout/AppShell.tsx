@@ -14,11 +14,12 @@ import {
   User,
   LogOut,
   X,
+  BookOpen,
 } from 'lucide-react';
 import { useSessionStore } from '../../store/useSessionStore';
 import { useGoogleDrive } from '../../features/system/hooks/useGoogleDrive';
-import { Logo } from '../shared/Logo';
 import { BrandLogo } from '../shared/BrandLogo';
+import { TutorialMenu } from '../../features/system/tutorial/TutorialMenu';
 import { config } from '../../config';
 
 // ... (AppView type)
@@ -27,7 +28,7 @@ type ThemeMode = string; // Simplified for import issues, or import from store i
 
 interface AppShellProps {
   children: React.ReactNode;
-  theme: ThemeMode;
+  theme: ThemeMode; // Keep prop but mark unused if needed or remove from usage
 }
 
 interface NavItemProps {
@@ -215,6 +216,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
             isActive={isActiveView('/settings')}
             onClick={handleNavigate}
           />
+
+          <div className="relative group/help">
+            <button className="w-16 h-16 flex flex-col items-center justify-center text-nexus-muted hover:text-nexus-text transition-all duration-300 ease-out">
+              <div className="w-full h-full flex items-center justify-center">
+                <BookOpen size={24} strokeWidth={2} />
+              </div>
+            </button>
+            <div className="absolute left-full bottom-0 ml-4 mb-2 opacity-0 invisible group-hover/help:opacity-100 group-hover/help:visible transition-all duration-200 z-50">
+              <TutorialMenu />
+            </div>
+          </div>
         </div>
       </aside>
 

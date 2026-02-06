@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import { config } from './config';
-import { TutorialProvider } from './components/shared/tutorial/TutorialSystem';
+import { TutorialProvider } from './features/system/tutorial/TutorialContext';
 import './index.css';
 
 interface ErrorBoundaryProps {
