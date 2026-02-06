@@ -14,6 +14,7 @@ import {
   Play,
 } from 'lucide-react';
 import { useLLM } from '../../system/hooks/useLLM';
+import { config } from '../../../config';
 
 interface FirstRunOnboardingProps {
   onComplete: () => void;
@@ -275,15 +276,19 @@ export const FirstRunOnboarding: React.FC<FirstRunOnboardingProps> = ({ onComple
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Toggle Section */}
                 <div
-                  className="bg-nexus-950 border border-nexus-700 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:border-nexus-600 transition-colors group"
-                  onClick={() => setUseCommunityKey(!useCommunityKey)}
+                  className={`bg-nexus-950 border border-nexus-700 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:border-nexus-600 transition-colors group ${
+                    !config.useBackendProxy ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                  onClick={() => config.useBackendProxy && setUseCommunityKey(!useCommunityKey)}
                 >
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-nexus-text">
                       Use Community Key (Beta)
                     </span>
                     <span className="text-xs text-nexus-text/80">
-                      Free tier, subject to rate limits
+                      {config.useBackendProxy
+                        ? 'Free tier, subject to rate limits'
+                        : 'Unavailable (Backend Proxy Not Configured)'}
                     </span>
                   </div>
                   <div

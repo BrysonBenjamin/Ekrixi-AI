@@ -12,10 +12,12 @@ export const useLLM = () => {
   const activeKey = apiKeys?.gemini;
 
   useEffect(() => {
-    // Only initialize client if not using backend proxy
-    if (!config.useBackendProxy) {
+    // Initialize standard client if we have a real key (not community/proxy)
+    if (activeKey && activeKey !== 'USE_COMMUNITY_KEY') {
       const client = getGeminiClient();
       setModel(client);
+    } else {
+      setModel(null);
     }
   }, [activeKey]);
 
@@ -49,8 +51,14 @@ export const useLLM = () => {
     }
 
     // Mode 2: Backend Proxy
-    if (config.useBackendProxy) {
+    if (config.useBackendProxy && activeKey === 'USE_COMMUNITY_KEY') {
       try {
+        // Debug logging for backend proxy
+        console.log(`[Proxy] Sending request to: ${config.backendUrl}/api/generate-text`, {
+          prompt,
+          model: GEMINI_MODELS.FLASH,
+        });
+
         const response = await fetch(`${config.backendUrl}/api/generate-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -60,6 +68,8 @@ export const useLLM = () => {
             model: GEMINI_MODELS.FLASH,
           }),
         });
+
+        console.log(`[Proxy] Response status: ${response.status}`);
 
         if (!response.ok) {
           const error = await response.json();
@@ -145,8 +155,14 @@ export const useLLM = () => {
     }
 
     // Mode 2: Backend Proxy
-    if (config.useBackendProxy) {
+    if (config.useBackendProxy && activeKey === 'USE_COMMUNITY_KEY') {
       try {
+        // Debug logging for backend proxy
+        console.log(`[Proxy] Sending request to: ${config.backendUrl}/api/generate-content`, {
+          model: options.model || GEMINI_MODELS.PRO,
+          contentsCount: options.contents.length,
+        });
+
         const response = await fetch(`${config.backendUrl}/api/generate-content`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -157,6 +173,8 @@ export const useLLM = () => {
             generationConfig: options.generationConfig,
           }),
         });
+
+        console.log(`[Proxy] Response status: ${response.status}`);
 
         if (!response.ok) {
           const error = await response.json();
@@ -203,9 +221,12 @@ export const useLLM = () => {
   };
 
   return {
-    isReady: !!model || config.useLocalLLM || config.useBackendProxy,
-    hasKey: !!activeKey || config.useLocalLLM || config.useBackendProxy,
-    requiresUserKey: !config.useBackendProxy && !config.useLocalLLM,
+    isReady:
+      !!model ||
+      config.useLocalLLM ||
+      (config.useBackendProxy && activeKey === 'USE_COMMUNITY_KEY'),
+    hasKey: !!activeKey || config.useLocalLLM,
+    requiresUserKey: !config.useLocalLLM,
     setKey: (key: string) => setApiKey('gemini', key),
     generateText,
     generateContent,
