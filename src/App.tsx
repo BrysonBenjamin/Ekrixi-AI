@@ -239,7 +239,7 @@ export default function App() {
               <RefineryFeature
                 batches={refineryBatches}
                 onUpdateBatch={(id, items) => updateBatchItems(id, items)}
-                onDeleteBatch={(id) => deleteRefineryBatch(id)}
+                _onDeleteBatch={(id) => deleteRefineryBatch(id)}
                 onCommitBatch={handleCommitBatch}
               />
             }

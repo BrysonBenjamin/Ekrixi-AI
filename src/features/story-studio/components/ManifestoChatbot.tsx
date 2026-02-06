@@ -96,7 +96,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({
       const response = await generateContent({
         model: GEMINI_MODELS.FLASH,
         systemInstruction: systemInstruction,
-        contents: [{ parts: [{ text: userMsg }] }],
+        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
         generationConfig: { responseMimeType: 'application/json' },
       });
 

@@ -100,7 +100,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
       const response = await generateContent({
         model: GEMINI_MODELS.FLASH,
         systemInstruction: systemInstruction,
-        contents: [{ parts: [{ text: userMsg }] }],
+        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
         generationConfig: { responseMimeType: 'application/json' },
       });
 

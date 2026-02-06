@@ -25,6 +25,7 @@ import {
   NexusGraphUtils,
   SimpleNote,
   SimpleLink,
+  HierarchicalLink,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { HierarchyExplorer } from './components/HierarchyExplorer';
@@ -42,6 +43,12 @@ export interface RefineryBatch {
   source: 'SCANNER' | 'IMPORT' | 'GENERATOR';
 }
 
+interface Toast {
+  id: string;
+  message: string;
+  type: 'error' | 'success' | 'info';
+}
+
 interface RefineryFeatureProps {
   batches: RefineryBatch[];
   onUpdateBatch: (batchId: string, items: NexusObject[]) => void;
@@ -52,7 +59,6 @@ interface RefineryFeatureProps {
 export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
   batches,
   onUpdateBatch,
-  onDeleteBatch,
   onCommitBatch,
 }) => {
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
@@ -134,7 +140,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             default_layout: DefaultLayout.GRID,
           } as NexusObject);
 
-      const hierarchyLink = {
+      const hierarchyLink: HierarchicalLink = {
         id: generateId(),
         _type: NexusType.HIERARCHICAL_LINK,
         source_id: parentId,
