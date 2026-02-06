@@ -72,7 +72,7 @@ export const Logo: React.FC<LogoProps> = ({ className = 'w-10 h-10', size = 40 }
   return (
     <div className="relative flex items-center justify-center">
       <img
-        src="Ekrixi_logo_transparent.png"
+        src="/brand_logo_full.png"
         alt="Ekrixi AI"
         className={`${className} object-contain transition-opacity duration-300`}
         style={{ width: size, height: size }}
