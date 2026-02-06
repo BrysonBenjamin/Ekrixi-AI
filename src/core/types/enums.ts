@@ -1,0 +1,58 @@
+export enum NexusType {
+  SIMPLE_NOTE = 'SIMPLE_NOTE',
+  CONTAINER_NOTE = 'CONTAINER_NOTE',
+  STORY_NOTE = 'STORY_NOTE',
+  SIMPLE_LINK = 'SIMPLE_LINK',
+  SEMANTIC_LINK = 'SEMANTIC_LINK',
+  HIERARCHICAL_LINK = 'HIERARCHICAL_LINK',
+  AGGREGATED_SEMANTIC_LINK = 'AGGREGATED_SEMANTIC_LINK',
+  AGGREGATED_HIERARCHICAL_LINK = 'AGGREGATED_HIERARCHICAL_LINK',
+}
+
+export enum NexusCategory {
+  CHARACTER = 'CHARACTER',
+  LOCATION = 'LOCATION',
+  ITEM = 'ITEM',
+  EVENT = 'EVENT',
+  CONCEPT = 'CONCEPT',
+  META = 'META',
+  ORGANIZATION = 'ORGANIZATION',
+  STORY = 'STORY',
+}
+
+export enum StoryType {
+  BOOK = 'BOOK',
+  CHAPTER = 'CHAPTER',
+  SCENE = 'SCENE',
+  BEAT = 'BEAT',
+}
+
+export enum NarrativeStatus {
+  VOID = 'VOID',
+  OUTLINE = 'OUTLINE',
+  DRAFT = 'DRAFT',
+  POLISHED = 'POLISHED',
+}
+
+export enum ContainmentType {
+  FOLDER = 'FOLDER',
+  REGION = 'REGION',
+  FACTION = 'FACTION',
+  PLOT_ARC = 'PLOT_ARC',
+  MANUSCRIPT = 'MANUSCRIPT',
+}
+
+export enum DefaultLayout {
+  FORCE_DIRECTED = 'FORCE_DIRECTED',
+  MAP = 'MAP',
+  TREE = 'TREE',
+  GRID = 'GRID',
+  TIMELINE = 'TIMELINE',
+}
+
+export enum HierarchyType {
+  PARENT_OF = 'PARENT_OF',
+  PART_OF = 'PART_OF',
+}
+
+export type ConflictStatus = 'APPROVED' | 'IMPLIED' | 'REDUNDANT';

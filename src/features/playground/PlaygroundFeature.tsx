@@ -1,0 +1,211 @@
+import React from 'react';
+import {
+  FlaskConical,
+  Hammer,
+  Database,
+  Sparkles,
+  ChevronRight,
+  Package,
+  Terminal,
+  Box,
+  BookOpen,
+  PenTool,
+  Globe,
+} from 'lucide-react';
+import { getRefineryDemoBatch } from '../refinery/fixtures/refinery_batch_fixture';
+import { getNeonSyndicateBatch } from '../refinery/fixtures/neon_syndicate_fixture';
+import { getGaiaPrimeExpandedBatch } from './fixtures/gaia_prime_expanded_fixture';
+import { getCompletedManuscriptBatch } from './fixtures/completed_manuscript_fixture';
+import { getSeedStoryManifesto } from './fixtures/story_manifesto_fixture';
+import { NexusObject } from '../../types';
+
+interface PlaygroundFeatureProps {
+  onSeedRefinery: (items: NexusObject[], name: string) => void;
+  onSeedRegistry: (items: NexusObject[]) => void;
+  onSeedManifesto?: (blocks: any[]) => void;
+}
+
+export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
+  onSeedRefinery,
+  onSeedRegistry,
+  onSeedManifesto,
+}) => {
+  return (
+    <div className="h-full w-full bg-nexus-950 overflow-y-auto no-scrollbar p-8 md:p-12 font-sans">
+      <div className="max-w-5xl mx-auto space-y-16">
+        {/* Header */}
+        <header className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-nexus-accent/10 border border-nexus-accent/30 rounded-2xl text-nexus-accent">
+              <FlaskConical size={32} />
+            </div>
+            <div>
+              <h1 className="text-4xl font-display font-black text-white tracking-tighter uppercase">
+                Nexus <span className="text-nexus-accent">Playground</span>
+              </h1>
+              <p className="text-[10px] text-nexus-muted font-mono uppercase tracking-[0.4em]">
+                Development & Vibe-Coding Sandbox v1.2
+              </p>
+            </div>
+          </div>
+        </header>
+
+        {/* Fixture Section */}
+        <section className="space-y-8">
+          <div className="flex items-center gap-4 border-b border-nexus-800 pb-4">
+            <Package size={20} className="text-nexus-muted" />
+            <h2 className="text-sm font-display font-black text-nexus-muted uppercase tracking-[0.2em]">
+              Dramaturgical Injection System
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FixtureCard
+              title="Manifesto: Memory Thief"
+              desc="Protocol blocks for a high-fidelity 'Save the Cat' story. Seeds the writing forge with thesis, arc delta, and latent world units."
+              itemsCount={5}
+              category="Drafting Blocks"
+              icon={PenTool}
+              theme="ruby"
+              onSeed={() => onSeedManifesto?.(getSeedStoryManifesto())}
+              actionLabel="Seed Story Forge"
+            />
+
+            <FixtureCard
+              title="Manuscript: Resonance"
+              desc="Already completed manuscript hierarchy (Polished). Includes chapters, scenes, and embedded drafting history."
+              itemsCount={6}
+              category="Completed Work"
+              icon={BookOpen}
+              theme="ruby"
+              onSeed={() =>
+                onSeedRefinery(getCompletedManuscriptBatch(), 'GAIA_RESONANCE_POLISHED')
+              }
+            />
+
+            <FixtureCard
+              title="Kernel: Gaia Prime (v2)"
+              desc="Comprehensive expanded planetary lore. Multiple regions, nested organizations, and bio-tech character scry-nodes."
+              itemsCount={14}
+              category="World Building"
+              icon={Globe}
+              onSeed={() => onSeedRefinery(getGaiaPrimeExpandedBatch(), 'GAIA_CORE_EXPANDED')}
+            />
+
+            <FixtureCard
+              title="World: Oros Shattered"
+              desc="Classic Oros hierarchical map featuring floating islands and semantic hunt-logic."
+              itemsCount={15}
+              category="High Fantasy"
+              onSeed={() => onSeedRefinery(getRefineryDemoBatch(), 'OROS_WORLD_SEVENTH_ERA')}
+            />
+
+            <FixtureCard
+              title="Syndicate Intel"
+              desc="Cyberpunk associations focused on semantic links between hackers, illegal tech, and criminal organizations."
+              itemsCount={7}
+              category="Cyberpunk"
+              onSeed={() => onSeedRefinery(getNeonSyndicateBatch(), 'SYNDICATE_INTEL_SCRAPE')}
+            />
+
+            <FixtureCard
+              title="Inject: Deep Lore"
+              desc="Direct injection of Gaia fixture to the global registry (bypassing refinery)."
+              itemsCount={12}
+              category="Internal Dev"
+              icon={Database}
+              onSeed={() => onSeedRegistry(getGaiaPrimeExpandedBatch())}
+              actionLabel="Inject to Registry"
+              variant="registry"
+            />
+          </div>
+        </section>
+
+        {/* Dev Tools Section */}
+        <section className="space-y-8">
+          <div className="flex items-center gap-4 border-b border-nexus-800 pb-4">
+            <Terminal size={20} className="text-nexus-muted" />
+            <h2 className="text-sm font-display font-black text-nexus-muted uppercase tracking-[0.2em]">
+              Causal Prototyping
+            </h2>
+          </div>
+
+          <div className="p-8 bg-nexus-900/50 border border-nexus-800 rounded-[32px] flex flex-col items-center justify-center text-center space-y-6">
+            <div className="p-4 bg-nexus-800 rounded-full">
+              <Box size={40} className="text-nexus-muted opacity-40" />
+            </div>
+            <h3 className="text-xl font-display font-bold text-nexus-text uppercase">
+              Custom Scry Logic
+            </h3>
+            <p className="text-xs text-nexus-muted font-serif italic max-w-sm">
+              "Development space for future neural weights and reification testing."
+            </p>
+            <button
+              disabled
+              className="px-8 py-3 rounded-2xl border border-nexus-800 text-nexus-muted text-[10px] font-black uppercase tracking-widest opacity-50"
+            >
+              Locked: v5.2 Core Required
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+};
+
+const FixtureCard = ({
+  title,
+  desc,
+  itemsCount,
+  category,
+  onSeed,
+  actionLabel = 'Send to Refinery',
+  variant = 'refinery',
+  icon: Icon = Sparkles,
+  theme = 'cyan',
+}: any) => {
+  const accentClass = theme === 'ruby' ? 'text-nexus-ruby' : 'text-nexus-accent';
+  const borderAccent =
+    theme === 'ruby'
+      ? 'border-nexus-ruby/30 hover:border-nexus-ruby'
+      : 'border-nexus-accent/30 hover:border-nexus-accent';
+  const bgAccent = theme === 'ruby' ? 'bg-nexus-ruby/10' : 'bg-nexus-accent/10';
+
+  return (
+    <div
+      className={`group relative p-8 bg-nexus-900 border rounded-[40px] transition-all duration-500 hover:translate-y-[-4px] shadow-xl hover:shadow-2xl ${variant === 'registry' ? 'border-nexus-essence/30 hover:border-nexus-essence' : 'border-nexus-800 hover:border-nexus-accent'} ${theme === 'ruby' ? 'hover:border-nexus-ruby/50' : ''}`}
+    >
+      <div className="flex items-start justify-between mb-8">
+        <div className="space-y-1">
+          <span
+            className={`text-[8px] font-mono font-black px-2 py-0.5 rounded-full border uppercase tracking-widest ${variant === 'registry' ? 'bg-nexus-essence/10 border-nexus-essence/30 text-nexus-essence' : `${bgAccent} border-transparent ${accentClass}`}`}
+          >
+            {category}
+          </span>
+          <h3 className="text-2xl font-display font-bold text-nexus-text tracking-tight group-hover:text-white transition-colors">
+            {title}
+          </h3>
+        </div>
+        <div className="p-3 bg-nexus-950 rounded-2xl border border-nexus-800 text-nexus-muted group-hover:text-white transition-colors">
+          <Icon size={20} className={variant === 'registry' ? 'text-nexus-essence' : accentClass} />
+        </div>
+      </div>
+
+      <p className="text-sm text-nexus-muted leading-relaxed font-serif italic mb-10 opacity-70 group-hover:opacity-100 transition-opacity">
+        "{desc}"
+      </p>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest">
+          <Hammer size={14} /> {itemsCount} Units
+        </div>
+        <button
+          onClick={onSeed}
+          className={`px-6 py-2.5 rounded-full text-[10px] font-display font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95 ${variant === 'registry' ? 'bg-nexus-essence text-white shadow-nexus-essence/20' : theme === 'ruby' ? 'bg-nexus-ruby text-white shadow-nexus-ruby/20' : 'bg-nexus-accent text-white shadow-nexus-accent/20'}`}
+        >
+          {actionLabel} <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+};
