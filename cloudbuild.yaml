@@ -1,0 +1,13 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/ekrixi-ai-frontend',
+      '--build-arg', 'VITE_BACKEND_URL=${_VITE_BACKEND_URL}',
+      '.'
+    ]
+images:
+  - 'gcr.io/$PROJECT_ID/ekrixi-ai-frontend'
+substitutions:
+  _VITE_BACKEND_URL: '' # Default empty, expected to be passed via --substitutions
