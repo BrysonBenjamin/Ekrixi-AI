@@ -44,7 +44,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   onFinalize,
   onCancel,
 }) => {
-  const { generateContent } = useLLM();
+  const { generateContent, isReady } = useLLM();
   const [seeds, setSeeds] = useState<EntitySeed[]>([]);
   const [activeSeedId, setActiveSeedId] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Array<{ text: string; type: string }>>([]);
@@ -61,14 +61,17 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   // Initial detection pass
   useEffect(() => {
     const detectInitial = async () => {
+      if (!isReady || !text) return;
+
       try {
         const response = await generateContent({
           model: GEMINI_MODELS.FLASH,
-          systemInstruction: 'Identify unique entities in text. Return JSON list of strings only.',
+          systemInstruction:
+            'Identify ALL common nouns and proper nouns in the text. Return a JSON list of strings.',
           generationConfig: {
             responseMimeType: 'application/json',
           },
-          contents: [{ role: 'user', parts: [{ text: text.slice(0, 100000) }] }],
+          contents: [{ role: 'user', parts: [{ text: text.slice(0, 20000) }] }],
         });
         try {
           const result = await response.response;
@@ -89,7 +92,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
       }
     };
     detectInitial();
-  }, [text]);
+  }, [text, isReady]);
 
   const activeSeed = useMemo(() => seeds.find((s) => s.id === activeSeedId), [seeds, activeSeedId]);
 

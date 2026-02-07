@@ -203,8 +203,10 @@ export const useLLM = () => {
     try {
       // Map legacy model names or use defaults
       let targetModel = options.model || GEMINI_MODELS.PRO;
-      if (targetModel.includes('gemini-1.5-flash')) targetModel = GEMINI_MODELS.FLASH;
-      if (targetModel.includes('gemini-1.5-pro')) targetModel = GEMINI_MODELS.PRO;
+      if (targetModel.includes('gemini') && targetModel.includes('flash'))
+        targetModel = GEMINI_MODELS.FLASH;
+      if (targetModel.includes('gemini') && targetModel.includes('pro'))
+        targetModel = GEMINI_MODELS.PRO;
 
       const geminiModel = model.getGenerativeModel({
         model: targetModel,

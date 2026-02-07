@@ -26,6 +26,6 @@ export const getGeminiClient = () => {
  * Unified model configuration
  */
 export const GEMINI_MODELS = {
-  FLASH: 'gemini-flash-latest',
-  PRO: 'gemini-pro-latest',
+  FLASH: 'gemini-2.5-flash',
+  PRO: 'gemini-2.5-flash',
 };
