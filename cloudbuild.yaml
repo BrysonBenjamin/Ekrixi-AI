@@ -10,4 +10,6 @@ steps:
 images:
   - 'gcr.io/$PROJECT_ID/ekrixi-ai-frontend'
 substitutions:
-  _VITE_BACKEND_URL: '' # Default empty, expected to be passed via --substitutions
+  _VITE_BACKEND_URL: '' 
+options:
+  logging: CLOUD_LOGGING_ONLY
