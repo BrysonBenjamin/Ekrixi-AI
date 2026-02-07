@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { FirestoreService } from '../core/services/FirestoreService';
+import { DataService } from '../core/services/DataService';
 
 export interface UniverseMetadata {
   id: string;
@@ -58,7 +58,7 @@ export const useSessionStore = create<SessionState>()(
 
       initializeUniversesListener: () => {
         set({ isLoadingUniverses: true });
-        const unsubscribe = FirestoreService.listenToUniverses((universesData) => {
+        const unsubscribe = DataService.listenToUniverses((universesData) => {
           // Map Firestore data to UniverseMetadata
           const universes = universesData.map((u) => ({
             id: u.id,
@@ -91,7 +91,7 @@ export const useSessionStore = create<SessionState>()(
 
       createUniverse: async (name, description) => {
         const user = get().currentUser;
-        const id = await FirestoreService.createUniverse(name, description || '', user?.id || '');
+        const id = await DataService.createUniverse(name, description || '', user?.id || '');
         // Listener will update state
         set({ activeUniverseId: id });
         return id;
@@ -106,7 +106,7 @@ export const useSessionStore = create<SessionState>()(
         }),
 
       deleteUniverse: async (id) => {
-        await FirestoreService.deleteUniverse(id);
+        await DataService.deleteUniverse(id);
         // Listener handles state update
       },
 
@@ -131,12 +131,7 @@ export const useSessionStore = create<SessionState>()(
         // If importing a universe, we should probably save it to Firestore?
         // For now, just add to local state to allow viewing?
         // Or strictly push to DB. Let's push to DB to be consistent.
-        FirestoreService.importUniverse(
-          meta.id,
-          meta.name,
-          meta.description || '',
-          meta.ownerId || '',
-        );
+        DataService.importUniverse(meta.id, meta.name, meta.description || '', meta.ownerId || '');
       },
     }),
     {

@@ -1,0 +1,69 @@
+import { NexusObject, SimpleLink, SimpleNote } from '../types';
+import { ChatSession, MessageNode } from '../../features/universe-generator/types';
+
+export interface IDataService {
+  // NexusObject CRUD
+  createOrUpdateNexusObject(universeId: string, nexusObject: NexusObject): Promise<void>;
+  getNexusObject(universeId: string, nexusObjectId: string): Promise<NexusObject | null>;
+  updateNexusObjectFields(
+    universeId: string,
+    nexusObjectId: string,
+    updates: Partial<NexusObject>,
+  ): Promise<void>;
+  deleteNexusObject(universeId: string, nexusObjectId: string): Promise<void>;
+  getAllNexusObjects(universeId: string): Promise<NexusObject[]>;
+
+  // Batch Operations
+  batchCreateOrUpdate(universeId: string, objects: NexusObject[]): Promise<void>;
+
+  // Real-time Listeners
+  listenToAllNexusObjects(
+    universeId: string,
+    callback: (nexusObjects: NexusObject[]) => void,
+  ): () => void;
+
+  // Transactions
+  reifyLinkToNote(
+    universeId: string,
+    linkToReify: SimpleLink,
+    newNoteData: Omit<SimpleNote, '_type' | 'id'>,
+  ): Promise<SimpleNote | null>;
+
+  // Universe Management
+  createUniverse(name: string, description: string, ownerId: string): Promise<string>;
+  importUniverse(id: string, name: string, description: string, ownerId: string): Promise<void>;
+  deleteUniverse(universeId: string): Promise<void>;
+  updateUniverseMeta(universeId: string, updates: any): Promise<void>;
+  listenToUniverses(callback: (universes: any[]) => void): () => void;
+
+  // Chat Management
+  createChatSession(universeId: string, session: ChatSession): Promise<void>;
+  deleteChatSession(universeId: string, sessionId: string): Promise<void>;
+  updateChatSessionTitle(universeId: string, sessionId: string, title: string): Promise<void>;
+  updateChatSession(
+    universeId: string,
+    sessionId: string,
+    updates: Partial<ChatSession>,
+  ): Promise<void>;
+  listenToChatSessions(universeId: string, callback: (sessions: ChatSession[]) => void): () => void;
+
+  // Message Management
+  listenToChatMessages(
+    universeId: string,
+    chatId: string,
+    callback: (messages: MessageNode[]) => void,
+  ): () => void;
+  addMessageToChat(
+    universeId: string,
+    chatId: string,
+    message: MessageNode,
+    parentId: string | null,
+    rootUpdate?: { newRootId: string; isSelectionChange: boolean },
+  ): Promise<void>;
+  updateMessage(
+    universeId: string,
+    chatId: string,
+    messageId: string,
+    updates: Partial<MessageNode>,
+  ): Promise<void>;
+}

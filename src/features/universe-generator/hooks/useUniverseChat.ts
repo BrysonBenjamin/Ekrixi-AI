@@ -3,7 +3,7 @@ import { ChatSession, MessageNode } from '../types';
 import { generateId } from '../../../utils/ids';
 import { NexusObject, isLink, SimpleNote } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
-import { FirestoreService } from '../../../core/services/FirestoreService';
+import { DataService } from '../../../core/services/DataService';
 
 export const useUniverseChat = (
   registry: Record<string, NexusObject>,
@@ -31,7 +31,7 @@ export const useUniverseChat = (
       return;
     }
 
-    const unsubscribe = FirestoreService.listenToChatSessions(activeUniverseId, (newSessions) => {
+    const unsubscribe = DataService.listenToChatSessions(activeUniverseId, (newSessions) => {
       setSessions(newSessions);
 
       // Auto-select first if none selected and sessions exist
@@ -64,7 +64,7 @@ export const useUniverseChat = (
       return;
     }
 
-    const unsubscribe = FirestoreService.listenToChatMessages(
+    const unsubscribe = DataService.listenToChatMessages(
       activeUniverseId,
       currentSessionId,
       (messages) => {
@@ -123,7 +123,7 @@ export const useUniverseChat = (
       };
 
       // Firestore Update
-      await FirestoreService.addMessageToChat(activeUniverseId, sessionId, botNode, leafId);
+      await DataService.addMessageToChat(activeUniverseId, sessionId, botNode, leafId);
 
       try {
         const knownUnits = (Object.values(registry) as NexusObject[])
@@ -183,7 +183,7 @@ export const useUniverseChat = (
             setIsLoading(false);
 
             // FINAL SAVE to Firestore
-            await FirestoreService.updateMessage(activeUniverseId, sessionId, botId, {
+            await DataService.updateMessage(activeUniverseId, sessionId, botId, {
               text: currentText,
               isStreaming: false,
             });
@@ -191,7 +191,7 @@ export const useUniverseChat = (
         }, revealInterval);
       } catch (error) {
         console.error('Generation failed:', error);
-        await FirestoreService.updateMessage(activeUniverseId, sessionId, botId, {
+        await DataService.updateMessage(activeUniverseId, sessionId, botId, {
           text: 'The connection was interrupted. Please check your credentials and try again.',
           isStreaming: false,
           isError: true,
@@ -237,10 +237,10 @@ export const useUniverseChat = (
         session.rootNodeIds.length === 0 && isNewRoot ? text.slice(0, 30) : undefined;
 
       if (newTitle) {
-        FirestoreService.updateChatSessionTitle(activeUniverseId, currentSessionId, newTitle);
+        DataService.updateChatSessionTitle(activeUniverseId, currentSessionId, newTitle);
       }
 
-      await FirestoreService.addMessageToChat(
+      await DataService.addMessageToChat(
         activeUniverseId,
         currentSessionId,
         newNode,
@@ -307,7 +307,7 @@ export const useUniverseChat = (
         };
       }
 
-      await FirestoreService.addMessageToChat(
+      await DataService.addMessageToChat(
         activeUniverseId,
         currentSessionId,
         newNode,
@@ -418,14 +418,14 @@ export const useUniverseChat = (
         // 1. If parent exists, update its `selectedChildId`
         if (node.parentId) {
           updates.push(
-            FirestoreService.updateMessage(activeUniverseId, session.id, node.parentId, {
+            DataService.updateMessage(activeUniverseId, session.id, node.parentId, {
               selectedChildId: targetId,
             }),
           );
         } else {
           // Update session `selectedRootId`
           updates.push(
-            FirestoreService.updateChatSession(activeUniverseId, session.id, {
+            DataService.updateChatSession(activeUniverseId, session.id, {
               selectedRootId: targetId,
             }),
           );
@@ -433,7 +433,7 @@ export const useUniverseChat = (
 
         // 2. Update session `currentLeafId`
         updates.push(
-          FirestoreService.updateChatSession(activeUniverseId, session.id, {
+          DataService.updateChatSession(activeUniverseId, session.id, {
             currentLeafId: newLeafId,
           }),
         );
@@ -473,12 +473,12 @@ export const useUniverseChat = (
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      await FirestoreService.createChatSession(activeUniverseId, initial);
+      await DataService.createChatSession(activeUniverseId, initial);
       setCurrentSessionId(newId);
     },
     deleteSession: async (id: string) => {
       if (!activeUniverseId) return;
-      await FirestoreService.deleteChatSession(activeUniverseId, id);
+      await DataService.deleteChatSession(activeUniverseId, id);
       if (currentSessionId === id) setCurrentSessionId(null);
     },
     selectSession: setCurrentSessionId,

@@ -26,7 +26,7 @@ import { useUIStore } from './store/useUIStore';
 import { useRefineryStore } from './store/useRefineryStore';
 import { useSessionStore } from './store/useSessionStore';
 import { IntroOverlay } from './features/universe-generator/components/IntroOverlay';
-import { FirstRunOnboarding } from './features/universe-generator/components/FirstRunOnboarding';
+// Removed FirstRunOnboarding import as it is now integrated into LoginFeature
 import { useLLM } from './features/system/hooks/useLLM';
 import gsap from 'gsap';
 import { Flip } from 'gsap/all';
@@ -80,7 +80,7 @@ export default function App(): React.ReactNode {
       return true;
     }
   });
-  const [showOnboarding, setShowOnboarding] = React.useState(false);
+  // Onboarding is now handled in the /login route for unauthenticated or keyless users.
 
   const handleIntroComplete = () => {
     // Mark intro as seen
@@ -127,15 +127,6 @@ export default function App(): React.ReactNode {
       });
     }
   };
-
-  // Trigger onboarding if intro is done (or skipped) and we still need a key
-  useEffect(() => {
-    if (!showIntro && requiresUserKey && !hasKey) {
-      // Small delay for smooth transition after intro flight
-      const timer = setTimeout(() => setShowOnboarding(true), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [showIntro, requiresUserKey, hasKey]);
 
   // Theme Effect
   useEffect(() => {
@@ -247,10 +238,11 @@ export default function App(): React.ReactNode {
   // Protected Route Component
   const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     const { user, loading } = useAuth();
+    const { requiresUserKey, hasKey } = useLLM();
 
-    if (loading) return null; // Or a loading spinner
+    if (loading) return null;
 
-    if (!user) {
+    if (!user || (requiresUserKey && !hasKey)) {
       return <Navigate to="/login" replace />;
     }
 
@@ -261,7 +253,6 @@ export default function App(): React.ReactNode {
     <AuthProvider>
       <div className="relative h-full w-full">
         {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
-        {showOnboarding && <FirstRunOnboarding onComplete={() => setShowOnboarding(false)} />}
         <AppShell theme={theme}>
           <Routes>
             <Route path="/login" element={<LoginFeature />} />

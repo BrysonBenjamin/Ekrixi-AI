@@ -26,21 +26,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { setUser: setSessionUser } = useSessionStore();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
 
       if (firebaseUser) {
-        // Sync with Session Store
+        const isAnonymous = firebaseUser.isAnonymous;
+        const currentSession = useSessionStore.getState();
+
+        // Preserve existing token if the user ID matches, otherwise clear it (security)
+        // For anonymous users, we always want the token to be null.
+        let tokenToSet = isAnonymous ? null : currentSession.authToken;
+        if (!isAnonymous && currentSession.currentUser?.id !== firebaseUser.uid) {
+          tokenToSet = null; // New user logged in or session mismatch
+        }
+
         setSessionUser(
           {
             id: firebaseUser.uid,
-            name: firebaseUser.displayName || 'Guest User',
+            name: firebaseUser.displayName || (isAnonymous ? 'Nexus Guest' : 'User'),
             email: firebaseUser.email || '',
             picture: firebaseUser.photoURL || undefined,
           },
-          // We can get the token if needed, but for now we just use the object presence
-          // await firebaseUser.getIdToken()
-          'firebase-token-placeholder',
+          tokenToSet,
         );
       } else {
         setSessionUser(null, null);
@@ -54,8 +61,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    provider.addScope('email');
+    provider.addScope('profile');
+    provider.addScope('openid');
+
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential?.accessToken || null;
+
+      if (result.user) {
+        setSessionUser(
+          {
+            id: result.user.uid,
+            name: result.user.displayName || 'Nexus User',
+            email: result.user.email || '',
+            picture: result.user.photoURL || undefined,
+          },
+          accessToken,
+        );
+      }
     } catch (error) {
       console.error('Error signing in with Google', error);
       throw error;
@@ -65,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInGuest = async () => {
     try {
       await signInAnonymously(auth);
+      // Profile sync handled by onAuthStateChanged with null token
     } catch (error) {
       console.error('Error signing in anonymously', error);
       throw error;

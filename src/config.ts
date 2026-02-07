@@ -21,6 +21,11 @@ export const config = {
   localLLMUrl: import.meta.env.VITE_LOCAL_LLM_URL || 'http://localhost:8080/v1/chat/completions',
   localLLMModel: import.meta.env.VITE_LOCAL_LLM_MODEL || 'mlx-model',
 
+  // Database Configuration
+  useLocalDatabase:
+    import.meta.env.VITE_USE_LOCAL_DB === 'true' ||
+    (!import.meta.env.PROD && !import.meta.env.VITE_FIREBASE_API_KEY),
+
   // Firebase Configuration
   firebase: {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

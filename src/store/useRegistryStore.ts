@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { NexusObject } from '../types';
-import { FirestoreService } from '../core/services/FirestoreService';
+import { DataService } from '../core/services/DataService';
 
 interface RegistryState {
   registry: Record<string, NexusObject>;
@@ -38,7 +38,7 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
     set({ isLoading: true, error: null, activeUniverseId: universeId });
 
     // Set up new listener
-    const unsubscribe = FirestoreService.listenToAllNexusObjects(universeId, (objects) => {
+    const unsubscribe = DataService.listenToAllNexusObjects(universeId, (objects) => {
       const newRegistry: Record<string, NexusObject> = {};
       objects.forEach((obj) => {
         newRegistry[obj.id] = obj;
@@ -73,7 +73,7 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
     // Firestore listener calls back very fast, usually we can wait.
     // If we want instant feedback, we can set state here too.
 
-    await FirestoreService.createOrUpdateNexusObject(universeId, objectToSave);
+    await DataService.createOrUpdateNexusObject(universeId, objectToSave);
   },
 
   addBatch: async (objects) => {
@@ -82,7 +82,7 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
       console.warn('Cannot add batch: No active universe selected.');
       return;
     }
-    await FirestoreService.batchCreateOrUpdate(universeId, objects);
+    await DataService.batchCreateOrUpdate(universeId, objects);
   },
 
   removeObject: async (id) => {
@@ -91,7 +91,7 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
       console.warn('Cannot remove object: No active universe selected.');
       return;
     }
-    await FirestoreService.deleteNexusObject(universeId, id);
+    await DataService.deleteNexusObject(universeId, id);
   },
 
   clearRegistry: () => set({ registry: {} }),
