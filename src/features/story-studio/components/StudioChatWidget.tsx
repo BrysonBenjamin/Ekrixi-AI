@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   X,
   Send,
-  Bot,
   Sparkles,
   RotateCw,
   Activity,
@@ -42,7 +41,7 @@ interface ChatMessage {
 }
 
 interface StudioChatWidgetProps {
-  isOpen: boolean;
+  _isOpen: boolean;
   onClose: () => void;
   items: NexusObject[];
   onUpdateItems: (items: NexusObject[]) => void;
@@ -68,7 +67,7 @@ const ActionButton = ({
 );
 
 export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
-  isOpen,
+  _isOpen,
   onClose,
   items,
   onUpdateItems,
@@ -158,7 +157,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
       const result = JSON.parse(resultJson.text() || '{}');
       setMessages((prev) => [...prev, { role: 'assistant', text: result.reply, action: result }]);
       setContextNodes([]);
-    } catch (err) {
+    } catch (_err) {
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: 'Neural Chat connection interrupted. Please re-synchronize.' },

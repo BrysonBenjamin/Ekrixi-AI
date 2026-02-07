@@ -1,118 +1,104 @@
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
 import { NexusObject } from '../types';
+import { FirestoreService } from '../core/services/FirestoreService';
 
 interface RegistryState {
   registry: Record<string, NexusObject>;
+  isLoading: boolean;
+  error: string | null;
   activeUniverseId: string | null;
+  unsubscribeListener: (() => void) | null;
 
   // Actions
   loadUniverse: (universeId: string) => void;
-
-  setRegistry: (registry: Record<string, NexusObject>) => void;
-  upsertObject: (id: string, updates: Partial<NexusObject>) => void;
-  addBatch: (objects: NexusObject[]) => void;
-  removeObject: (id: string) => void;
+  setRegistry: (registry: Record<string, NexusObject>) => void; // Kept for legacy/import compatibility
+  upsertObject: (id: string, updates: Partial<NexusObject>) => Promise<void>;
+  addBatch: (objects: NexusObject[]) => Promise<void>;
+  removeObject: (id: string) => Promise<void>;
   clearRegistry: () => void;
+
+  // Cleanup
+  cleanup: () => void;
 }
 
-// Helper to save to disk
-const saveToDisk = (universeId: string, registry: Record<string, NexusObject>) => {
-  try {
-    localStorage.setItem(`nexus-registry-${universeId}`, JSON.stringify({ state: { registry } }));
-  } catch (e) {
-    console.error('Failed to save registry', e);
-  }
-};
+export const useRegistryStore = create<RegistryState>((set, get) => ({
+  registry: {},
+  isLoading: false,
+  error: null,
+  activeUniverseId: null,
+  unsubscribeListener: null,
 
-export const useRegistryStore = create<RegistryState>()(
-  subscribeWithSelector((set, get) => ({
-    registry: {},
-    activeUniverseId: null,
-
-    loadUniverse: (universeId) => {
-      const currentId = get().activeUniverseId;
-      if (currentId === universeId) return; // Already loaded
-
-      // 1. Save current if exists (safety check, though subscription handles this)
-      // if (currentId) saveToDisk(currentId, get().registry);
-
-      // 2. Load new
-      const key = `nexus-registry-${universeId}`;
-      const raw = localStorage.getItem(key);
-      let loadedRegistry = {};
-
-      // Try explicit modern format first
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          // Zustand persist format is { state: { registry: ... }, version: ... }
-          loadedRegistry = parsed.state?.registry || parsed.registry || {};
-        } catch (e) {
-          console.error(e);
-        }
-      } else if (universeId === 'default' && localStorage.getItem('nexus-registry-storage')) {
-        // Migration: Check for legacy 'nexus-registry-storage' if default
-        try {
-          const legacy = localStorage.getItem('nexus-registry-storage');
-          if (legacy) {
-            const parsed = JSON.parse(legacy);
-            loadedRegistry = parsed.state?.registry || {};
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      set({ registry: loadedRegistry, activeUniverseId: universeId });
-    },
-
-    setRegistry: (registry) => set({ registry }),
-
-    upsertObject: (id, updates) =>
-      set((state) => {
-        const existing = state.registry[id];
-        if (!existing && !updates.id) return state;
-
-        const newState = {
-          ...state.registry,
-          [id]: {
-            ...(existing || {}),
-            ...updates, // updates spread later to override
-            id: id,
-            last_modified: new Date().toISOString(),
-          } as NexusObject,
-        };
-        return { registry: newState };
-      }),
-
-    addBatch: (objects) =>
-      set((state) => {
-        const newRegistry = { ...state.registry };
-        objects.forEach((obj) => {
-          newRegistry[obj.id] = obj;
-        });
-        return { registry: newRegistry };
-      }),
-
-    removeObject: (id) =>
-      set((state) => {
-        const newRegistry = { ...state.registry };
-        delete newRegistry[id];
-        return { registry: newRegistry };
-      }),
-
-    clearRegistry: () => set({ registry: {} }),
-  })),
-);
-
-// Auto-persistence subscription
-useRegistryStore.subscribe(
-  (state) => state.registry,
-  (registry) => {
-    const id = useRegistryStore.getState().activeUniverseId;
-    if (id) {
-      saveToDisk(id, registry);
+  loadUniverse: (universeId) => {
+    // Cleanup previous listener
+    const currentUnsubscribe = get().unsubscribeListener;
+    if (currentUnsubscribe) {
+      currentUnsubscribe();
     }
+
+    set({ isLoading: true, error: null, activeUniverseId: universeId });
+
+    // Set up new listener
+    const unsubscribe = FirestoreService.listenToAllNexusObjects(universeId, (objects) => {
+      const newRegistry: Record<string, NexusObject> = {};
+      objects.forEach((obj) => {
+        newRegistry[obj.id] = obj;
+      });
+      set({ registry: newRegistry, isLoading: false });
+    });
+
+    set({ unsubscribeListener: unsubscribe });
   },
-);
+
+  setRegistry: (registry) => set({ registry }),
+
+  upsertObject: async (id, updates) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot upsert object: No active universe selected.');
+      return;
+    }
+
+    const currentRegistry = get().registry;
+    const existingObject = currentRegistry[id];
+
+    // We construct the full object if it doesn't exist, or merge updates
+    // Note: Firestore merge will handle partials, but if we need a full object for creation
+    // we rely on the caller to provide enough data in `updates` if it's new.
+
+    const objectToSave = existingObject
+      ? ({ ...existingObject, ...updates } as NexusObject)
+      : (updates as NexusObject);
+
+    // Optimistic update locally?
+    // Firestore listener calls back very fast, usually we can wait.
+    // If we want instant feedback, we can set state here too.
+
+    await FirestoreService.createOrUpdateNexusObject(universeId, objectToSave);
+  },
+
+  addBatch: async (objects) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot add batch: No active universe selected.');
+      return;
+    }
+    await FirestoreService.batchCreateOrUpdate(universeId, objects);
+  },
+
+  removeObject: async (id) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot remove object: No active universe selected.');
+      return;
+    }
+    await FirestoreService.deleteNexusObject(universeId, id);
+  },
+
+  clearRegistry: () => set({ registry: {} }),
+
+  cleanup: () => {
+    const unsubscribe = get().unsubscribeListener;
+    if (unsubscribe) unsubscribe();
+    set({ unsubscribeListener: null, registry: {}, activeUniverseId: null });
+  },
+}));

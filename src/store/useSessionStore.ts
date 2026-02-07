@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { generateId } from '../utils/ids';
+import { FirestoreService } from '../core/services/FirestoreService';
 
 export interface UniverseMetadata {
   id: string;
@@ -9,6 +9,7 @@ export interface UniverseMetadata {
   nodeCount: number;
   lastActive: string;
   createdAt: string;
+  ownerId?: string;
 }
 
 export interface UserProfile {
@@ -21,6 +22,7 @@ export interface UserProfile {
 interface SessionState {
   universes: UniverseMetadata[];
   activeUniverseId: string | null;
+  isLoadingUniverses: boolean;
 
   // Auth State
   currentUser: UserProfile | null;
@@ -30,10 +32,11 @@ interface SessionState {
   };
 
   // Actions
-  createUniverse: (name: string, description?: string) => string;
+  initializeUniversesListener: () => () => void;
+  createUniverse: (name: string, description?: string) => Promise<string>;
   setActiveUniverse: (id: string) => void;
-  deleteUniverse: (id: string) => void;
-  updateUniverseMeta: (id: string, updates: Partial<UniverseMetadata>) => void;
+  deleteUniverse: (id: string) => Promise<void>;
+  updateUniverseMeta: (id: string, updates: Partial<UniverseMetadata>) => void; // Local opt-update or DB update?
 
   // Auth Actions
   setUser: (user: UserProfile | null, token: string | null) => void;
@@ -43,66 +46,78 @@ interface SessionState {
   registerUniverse: (meta: UniverseMetadata) => void;
 }
 
-const DEFAULT_UNIVERSE_ID = 'default';
-
 export const useSessionStore = create<SessionState>()(
   persist(
-    (set, _get) => ({
-      universes: [
-        {
-          id: DEFAULT_UNIVERSE_ID,
-          name: 'Default Universe',
-          description: 'Main registry',
-          nodeCount: 0,
-          lastActive: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      activeUniverseId: DEFAULT_UNIVERSE_ID,
+    (set, get) => ({
+      universes: [],
+      activeUniverseId: null, // Start null, let UI or listener decide
+      isLoadingUniverses: false,
       currentUser: null,
       authToken: null,
       apiKeys: {},
 
-      createUniverse: (name, description) => {
-        const id = generateId();
-        const newUniverse: UniverseMetadata = {
-          id,
-          name,
-          description,
-          nodeCount: 0,
-          lastActive: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        };
-        set((state) => ({
-          universes: [...state.universes, newUniverse],
-          activeUniverseId: id,
-        }));
+      initializeUniversesListener: () => {
+        set({ isLoadingUniverses: true });
+        const unsubscribe = FirestoreService.listenToUniverses((universesData) => {
+          // Map Firestore data to UniverseMetadata
+          const universes = universesData.map((u) => ({
+            id: u.id,
+            name: u.name,
+            description: u.description,
+            nodeCount: u.nodeCount || 0,
+            lastActive: u.lastActive,
+            createdAt: u.createdAt,
+            ownerId: u.ownerId,
+          })) as UniverseMetadata[];
+
+          set((state) => {
+            // If we have no active universe and universes exist, select first?
+            // Or keep null and let UI force selection/creation.
+            // For now, if activeUniverseId is set but not in list (deleted?), unset it.
+            let newActive = state.activeUniverseId;
+            if (newActive && !universes.find((u) => u.id === newActive)) {
+              newActive = universes.length > 0 ? universes[0].id : null;
+            }
+            // If no active and we have universes, select one?
+            if (!newActive && universes.length > 0) {
+              newActive = universes[0].id;
+            }
+
+            return { universes, isLoadingUniverses: false, activeUniverseId: newActive };
+          });
+        });
+        return unsubscribe;
+      },
+
+      createUniverse: async (name, description) => {
+        const user = get().currentUser;
+        const id = await FirestoreService.createUniverse(name, description || '', user?.id || '');
+        // Listener will update state
+        set({ activeUniverseId: id });
         return id;
       },
 
       setActiveUniverse: (id) =>
         set((state) => {
           if (!state.universes.find((u) => u.id === id)) return state;
-          const updatedUniverses = state.universes.map((u) =>
-            u.id === id ? { ...u, lastActive: new Date().toISOString() } : u,
-          );
-          return { activeUniverseId: id, universes: updatedUniverses };
+          // TODO: Update 'lastActive' in Firestore?
+          // For now just local state switch.
+          return { activeUniverseId: id };
         }),
 
-      deleteUniverse: (id) =>
-        set((state) => {
-          if (state.universes.length <= 1) return state; // Prevent deleting last universe
-          const newUniverses = state.universes.filter((u) => u.id !== id);
-          // If we deleted the active one, switch to the first available
-          const newActive =
-            state.activeUniverseId === id ? newUniverses[0].id : state.activeUniverseId;
-          return { universes: newUniverses, activeUniverseId: newActive };
-        }),
+      deleteUniverse: async (id) => {
+        await FirestoreService.deleteUniverse(id);
+        // Listener handles state update
+      },
 
-      updateUniverseMeta: (id, updates) =>
+      updateUniverseMeta: (id, updates) => {
+        // This was used for nodeCount updates.
+        // We probably want to push this to Firestore if it's critical,
+        // OR just keep it local/optimistic for node counts until a proper counter is implemented.
         set((state) => ({
           universes: state.universes.map((u) => (u.id === id ? { ...u, ...updates } : u)),
-        })),
+        }));
+      },
 
       setUser: (user, token) => set({ currentUser: user, authToken: token }),
 
@@ -111,26 +126,29 @@ export const useSessionStore = create<SessionState>()(
           apiKeys: { ...state.apiKeys, [service]: key },
         })),
 
-      registerUniverse: (meta) =>
-        set((state) => {
-          const exists = state.universes.find((u) => u.id === meta.id);
-          if (exists) return state;
-          return { universes: [...state.universes, meta] };
-        }),
+      registerUniverse: (meta) => {
+        // Legacy/Import support.
+        // If importing a universe, we should probably save it to Firestore?
+        // For now, just add to local state to allow viewing?
+        // Or strictly push to DB. Let's push to DB to be consistent.
+        FirestoreService.importUniverse(
+          meta.id,
+          meta.name,
+          meta.description || '',
+          meta.ownerId || '',
+        );
+      },
     }),
     {
       name: 'nexus-session-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        // We DO persist universes to show them while loading
         universes: state.universes,
         activeUniverseId: state.activeUniverseId,
-        currentUser: state.currentUser, // Persist user
-        // We typically DO persist tokens in local-first apps if we want "Remember Me",
-        // but security-wise it's a tradeoff. For this MVP, we persist it (Implicit Flow token).
-        // Note: Google Access Tokens expire in 1hr. Logic to handle expiry is needed,
-        // or we just accept user has to re-login if token is invalid.
+        currentUser: state.currentUser,
         authToken: state.authToken,
-        apiKeys: state.apiKeys, // Persist API keys
+        apiKeys: state.apiKeys,
       }),
     },
   ),

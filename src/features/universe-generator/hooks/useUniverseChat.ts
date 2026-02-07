@@ -3,77 +3,90 @@ import { ChatSession, MessageNode } from '../types';
 import { generateId } from '../../../utils/ids';
 import { NexusObject, isLink, SimpleNote } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
-
-const STORAGE_KEY = 'ekrixi_nexus_chats';
+import { FirestoreService } from '../../../core/services/FirestoreService';
 
 export const useUniverseChat = (
   registry: Record<string, NexusObject>,
   activeUniverseId?: string,
 ) => {
   const { generateText } = useLLM();
-  // Persistent initial state
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    try {
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error('Failed to parse saved sessions', e);
-      return [];
-    }
-  });
+
+  // Local State for sessions (synced from listening)
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // We need to store messages for the ACTIVE session separately,
+  // because `sessions` only contains metadata now (empty messageMap).
+  // We'll merge them for the return value.
+  const [activeSessionMessages, setActiveSessionMessages] = useState<Record<string, MessageNode>>(
+    {},
+  );
+
   const [isLoading, setIsLoading] = useState(false);
 
-  // Derived: Sessions visible in the current universe
-  const universeSessions = useMemo(() => {
-    return sessions.filter(
-      (s) => !s.universeId || (activeUniverseId && s.universeId === activeUniverseId),
-    );
-  }, [sessions, activeUniverseId]);
-
-  // Persistence Effect
+  // 1. Listen to Sessions
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-  }, [sessions]);
+    if (!activeUniverseId) {
+      queueMicrotask(() => setSessions([]));
+      return;
+    }
 
-  // Handle Universe Switching / Initialization
-  useEffect(() => {
-    // If we have sessions for this universe, ensure a valid one is selected
-    if (universeSessions.length > 0) {
-      const currentIsValid =
-        !!currentSessionId && universeSessions.some((s) => s.id === currentSessionId);
-      if (!currentIsValid) {
-        const nextId = universeSessions[0].id;
-        queueMicrotask(() => {
-          setCurrentSessionId(nextId);
+    const unsubscribe = FirestoreService.listenToChatSessions(activeUniverseId, (newSessions) => {
+      setSessions(newSessions);
+
+      // Auto-select first if none selected and sessions exist
+      if (newSessions.length > 0) {
+        setCurrentSessionId((prev) => {
+          if (!prev || !newSessions.find((s) => s.id === prev)) {
+            return newSessions[0].id;
+          }
+          return prev;
         });
+      } else {
+        // If no sessions, create default?
+        // Logic moved to createSession call or explicit user action usually.
+        // But valid to ensure at least one exists.
+        // Let's create one if completely empty to match old behavior?
+        // Actually, let's leave it empty and let UI prompt or create one.
+        // BUT old behavior created on mount. Let's replicate that securely.
+        // We can't easily check "if empty create" inside listener without infinite loops if create fails/lags.
+        // Safer to let UI handle "No Chats" state.
+        setCurrentSessionId(null);
       }
-    }
-    // If no sessions exist for this universe, create one automatically
-    else if (!isLoading) {
-      queueMicrotask(() => {
-        const newId = generateId();
-        const initial: ChatSession = {
-          id: newId,
-          universeId: activeUniverseId,
-          title: 'New Project',
-          messageMap: {},
-          rootNodeIds: [],
-          selectedRootId: null,
-          currentLeafId: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        setSessions((prev) => [initial, ...prev]);
-        setCurrentSessionId(newId);
-      });
-    }
-  }, [universeSessions, currentSessionId, activeUniverseId, isLoading]);
+    });
+    return () => unsubscribe();
+  }, [activeUniverseId]);
 
-  const currentSession = useMemo(
-    () => universeSessions.find((s) => s.id === currentSessionId),
-    [universeSessions, currentSessionId],
-  );
+  // 2. Listen to Messages for Current Session
+  useEffect(() => {
+    if (!activeUniverseId || !currentSessionId) {
+      queueMicrotask(() => setActiveSessionMessages({}));
+      return;
+    }
+
+    const unsubscribe = FirestoreService.listenToChatMessages(
+      activeUniverseId,
+      currentSessionId,
+      (messages) => {
+        const map: Record<string, MessageNode> = {};
+        messages.forEach((m) => (map[m.id] = m));
+        setActiveSessionMessages(map);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [activeUniverseId, currentSessionId]);
+
+  // Construct current session object with messages
+  const currentSession = useMemo(() => {
+    const session = sessions.find((s) => s.id === currentSessionId);
+    if (!session) return undefined;
+
+    return {
+      ...session,
+      messageMap: activeSessionMessages,
+    };
+  }, [sessions, currentSessionId, activeSessionMessages]);
 
   const getThread = useCallback((session: ChatSession): MessageNode[] => {
     if (!session.currentLeafId || !session.messageMap[session.currentLeafId]) return [];
@@ -92,34 +105,25 @@ export const useUniverseChat = (
 
   const triggerGeneration = useCallback(
     async (sessionId: string, leafId: string, historyNodes: MessageNode[]) => {
+      if (!activeUniverseId) return;
       setIsLoading(true);
       const botId = generateId();
       const timestamp = new Date().toISOString();
 
-      setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id !== sessionId) return s;
-          const leafNode = s.messageMap[leafId];
-          if (!leafNode) return s;
-          const botNode: MessageNode = {
-            id: botId,
-            role: 'model',
-            text: '',
-            parentId: leafId,
-            childrenIds: [],
-            selectedChildId: null,
-            createdAt: timestamp,
-            isStreaming: true,
-          };
-          const updatedLeaf = {
-            ...leafNode,
-            childrenIds: [...leafNode.childrenIds, botId],
-            selectedChildId: botId,
-          };
-          const newMap = { ...s.messageMap, [leafId]: updatedLeaf, [botId]: botNode };
-          return { ...s, messageMap: newMap, currentLeafId: botId, updatedAt: timestamp };
-        }),
-      );
+      // Create placeholder empty bot message
+      const botNode: MessageNode = {
+        id: botId,
+        role: 'model',
+        text: '',
+        parentId: leafId,
+        childrenIds: [],
+        selectedChildId: null,
+        createdAt: timestamp,
+        isStreaming: true,
+      };
+
+      // Firestore Update
+      await FirestoreService.addMessageToChat(activeUniverseId, sessionId, botNode, leafId);
 
       try {
         const knownUnits = (Object.values(registry) as NexusObject[])
@@ -150,137 +154,133 @@ export const useUniverseChat = (
           systemInstruction,
         );
 
+        // Streaming simulation locally vs Firestore
+        // Firestore is "slow" for per-character streaming.
+        // We will stream LOCALLY to `activeSessionMessages` state for UI smoothness,
+        // then update Firestore at the end (or in chunks).
+        // BUT `activeSessionMessages` is driven by the listener.
+        // Overriding it locally might cause flickering when listener updates?
+        // Let's rely on Firestore speed? No, too many writes.
+        // Best approach: Local state override for streaming node, then final save.
+
         let currentText = '';
         const chars = fullText.split('');
-        const revealInterval = 1;
-        const chunkAmount = 30;
+        const chunkAmount = 30; // Larger chunks for speed
+        const revealInterval = 50;
 
-        const interval = setInterval(() => {
+        const interval = setInterval(async () => {
           if (chars.length > 0) {
             const chunk = chars.splice(0, chunkAmount).join('');
             currentText += chunk;
-            setSessions((prev) =>
-              prev.map((s) => {
-                if (s.id !== sessionId) return s;
-                const node = s.messageMap[botId];
-                if (!node) return s;
-                return {
-                  ...s,
-                  messageMap: { ...s.messageMap, [botId]: { ...node, text: currentText } },
-                };
-              }),
-            );
+
+            // LOCAL OPTIMISTIC UPDATE for streaming
+            setActiveSessionMessages((prev) => ({
+              ...prev,
+              [botId]: { ...prev[botId], text: currentText },
+            }));
           } else {
             clearInterval(interval);
-            setSessions((prev) =>
-              prev.map((s) => {
-                if (s.id !== sessionId) return s;
-                const node = s.messageMap[botId];
-                if (!node) return s;
-                return {
-                  ...s,
-                  messageMap: { ...s.messageMap, [botId]: { ...node, isStreaming: false } },
-                };
-              }),
-            );
             setIsLoading(false);
+
+            // FINAL SAVE to Firestore
+            await FirestoreService.updateMessage(activeUniverseId, sessionId, botId, {
+              text: currentText,
+              isStreaming: false,
+            });
           }
         }, revealInterval);
       } catch (error) {
         console.error('Generation failed:', error);
-        setSessions((prev) =>
-          prev.map((s) => {
-            if (s.id !== sessionId) return s;
-            const node = s.messageMap[botId];
-            if (!node) return s;
-            return {
-              ...s,
-              messageMap: {
-                ...s.messageMap,
-                [botId]: {
-                  ...node,
-                  text: 'The connection was interrupted. Please check your credentials and try again.',
-                  isStreaming: false,
-                  isError: true,
-                },
-              },
-            };
-          }),
-        );
+        await FirestoreService.updateMessage(activeUniverseId, sessionId, botId, {
+          text: 'The connection was interrupted. Please check your credentials and try again.',
+          isStreaming: false,
+          isError: true,
+        });
         setIsLoading(false);
       }
     },
-    [registry, generateText],
+    [registry, generateText, activeUniverseId],
   );
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!currentSessionId || isLoading) return;
+      if (!currentSessionId || isLoading || !activeUniverseId) return;
       const userMsgId = generateId();
       const timestamp = new Date().toISOString();
+      const session = currentSession; // captured from closure/render
 
-      let updatedHistory: MessageNode[] = [];
-      setSessions((prev) => {
-        const sessionsCopy = [...prev];
-        const sessionIdx = sessionsCopy.findIndex((s) => s.id === currentSessionId);
-        if (sessionIdx === -1) return prev;
+      // Safety check: verify we have the session loaded
+      if (!session) return;
 
-        const s = sessionsCopy[sessionIdx];
-        const newNode: MessageNode = {
-          id: userMsgId,
-          role: 'user',
-          text,
-          parentId: s.currentLeafId,
-          childrenIds: [],
-          selectedChildId: null,
-          createdAt: timestamp,
+      const newNode: MessageNode = {
+        id: userMsgId,
+        role: 'user',
+        text,
+        parentId: session.currentLeafId,
+        childrenIds: [],
+        selectedChildId: null,
+        createdAt: timestamp,
+      };
+
+      // Determine Root Updates
+      let rootUpdate = undefined;
+      const isNewRoot = !session.currentLeafId;
+
+      if (isNewRoot) {
+        rootUpdate = {
+          newRootId: userMsgId,
+          isSelectionChange: true,
         };
-
-        const newMap = { ...s.messageMap, [userMsgId]: newNode };
-        const rootNodeIds = [...(s.rootNodeIds || [])];
-        let selectedRootId = s.selectedRootId;
-
-        if (s.currentLeafId && newMap[s.currentLeafId]) {
-          const parent = newMap[s.currentLeafId];
-          newMap[s.currentLeafId] = {
-            ...parent,
-            childrenIds: [...parent.childrenIds, userMsgId],
-            selectedChildId: userMsgId,
-          };
-        } else {
-          rootNodeIds.push(userMsgId);
-          selectedRootId = userMsgId;
-        }
-
-        const updatedSession: ChatSession = {
-          ...s,
-          title:
-            rootNodeIds.length > 1 || (s.rootNodeIds && s.rootNodeIds.length > 0)
-              ? s.title
-              : text.slice(0, 30),
-          messageMap: newMap,
-          rootNodeIds,
-          selectedRootId,
-          currentLeafId: userMsgId,
-          updatedAt: timestamp,
-        };
-        sessionsCopy[sessionIdx] = updatedSession;
-        updatedHistory = getThread(updatedSession);
-        return sessionsCopy;
-      });
-
-      if (updatedHistory.length > 0) {
-        triggerGeneration(currentSessionId, userMsgId, updatedHistory);
       }
+
+      const newTitle =
+        session.rootNodeIds.length === 0 && isNewRoot ? text.slice(0, 30) : undefined;
+
+      if (newTitle) {
+        FirestoreService.updateChatSessionTitle(activeUniverseId, currentSessionId, newTitle);
+      }
+
+      await FirestoreService.addMessageToChat(
+        activeUniverseId,
+        currentSessionId,
+        newNode,
+        session.currentLeafId,
+        rootUpdate,
+      );
+
+      // Calculate history for generation
+      // We need to wait for local state to update via listener?
+      // OR we predict the structure.
+      // `triggerGeneration` takes `historyNodes`.
+      // We can construct history including the new node.
+
+      const tempSession = {
+        ...session,
+        messageMap: {
+          ...session.messageMap,
+          [userMsgId]: newNode,
+          ...(session.currentLeafId
+            ? {
+                [session.currentLeafId]: {
+                  ...session.messageMap[session.currentLeafId],
+                  selectedChildId: userMsgId,
+                },
+              }
+            : {}),
+        },
+        currentLeafId: userMsgId,
+      };
+
+      const history = getThread(tempSession);
+      triggerGeneration(currentSessionId, userMsgId, history);
     },
-    [currentSessionId, isLoading, getThread, triggerGeneration],
+    [currentSessionId, isLoading, activeUniverseId, currentSession, getThread, triggerGeneration],
   );
 
   const editMessage = useCallback(
     async (nodeId: string, newText: string) => {
-      if (!currentSessionId || isLoading) return;
-
-      const session = sessions.find((s) => s.id === currentSessionId);
+      if (!currentSessionId || isLoading || !activeUniverseId) return;
+      const session = currentSession;
       if (!session) return;
       const originalNode = session.messageMap[nodeId];
       if (!originalNode) return;
@@ -298,129 +298,171 @@ export const useUniverseChat = (
         createdAt: timestamp,
       };
 
-      const newMap = { ...session.messageMap, [newBranchId]: newNode };
-      let rootNodeIds = [...(session.rootNodeIds || [])];
-      let selectedRootId = session.selectedRootId;
-
-      if (originalNode.parentId && newMap[originalNode.parentId]) {
-        const parent = newMap[originalNode.parentId];
-        newMap[originalNode.parentId] = {
-          ...parent,
-          childrenIds: [...parent.childrenIds, newBranchId],
-          selectedChildId: newBranchId,
+      // Determine Root Updates
+      let rootUpdate = undefined;
+      if (!originalNode.parentId) {
+        rootUpdate = {
+          newRootId: newBranchId,
+          isSelectionChange: true,
         };
-      } else {
-        rootNodeIds.push(newBranchId);
-        selectedRootId = newBranchId;
       }
 
-      const updatedSession = {
-        ...session,
-        messageMap: newMap,
-        rootNodeIds,
-        selectedRootId,
-        currentLeafId: newBranchId,
-        updatedAt: timestamp,
-      };
-      const updatedHistory = getThread(updatedSession);
+      await FirestoreService.addMessageToChat(
+        activeUniverseId,
+        currentSessionId,
+        newNode,
+        originalNode.parentId,
+        rootUpdate,
+      );
 
-      setSessions((prev) => prev.map((s) => (s.id === currentSessionId ? updatedSession : s)));
-
+      // Trigger generation if user message
       if (originalNode.role === 'user') {
-        triggerGeneration(currentSessionId, newBranchId, updatedHistory);
+        // similar history construction...
+        const tempSession = {
+          ...session,
+          messageMap: {
+            ...session.messageMap,
+            [newBranchId]: newNode,
+            ...(originalNode.parentId
+              ? {
+                  [originalNode.parentId]: {
+                    ...session.messageMap[originalNode.parentId],
+                    selectedChildId: newBranchId,
+                  },
+                }
+              : {}),
+          },
+          currentLeafId: newBranchId,
+        };
+        const history = getThread(tempSession);
+        triggerGeneration(currentSessionId, newBranchId, history);
       }
     },
-    [currentSessionId, isLoading, sessions, getThread, triggerGeneration],
+    [currentSessionId, isLoading, activeUniverseId, currentSession, triggerGeneration, getThread],
   );
 
   const regenerate = useCallback(
     async (nodeId: string) => {
-      if (!currentSessionId || isLoading) return;
-      const session = sessions.find((s) => s.id === currentSessionId);
-      if (!session) return;
-      const node = session.messageMap[nodeId];
+      // ... (reuse logic or keep simple)
+      if (!currentSessionId || isLoading || !currentSession || !activeUniverseId) return;
+      const node = currentSession.messageMap[nodeId];
       if (!node) return;
 
       if (node.role === 'user') {
         editMessage(nodeId, node.text);
       } else if (node.role === 'model' && node.parentId) {
-        const history = getThread({ ...session, currentLeafId: node.parentId });
+        const history = getThread({ ...currentSession, currentLeafId: node.parentId });
         triggerGeneration(currentSessionId, node.parentId, history);
       }
     },
-    [currentSessionId, isLoading, sessions, editMessage, getThread, triggerGeneration],
-  );
-
-  const findLatestLeaf = useCallback(
-    (startNodeId: string, map: Record<string, MessageNode>): string => {
-      let currentId = startNodeId;
-      while (true) {
-        const node = map[currentId];
-        if (!node || node.childrenIds.length === 0) return currentId;
-        currentId = node.selectedChildId || node.childrenIds[node.childrenIds.length - 1];
-      }
-    },
-    [],
+    [
+      currentSessionId,
+      isLoading,
+      currentSession,
+      activeUniverseId,
+      editMessage,
+      getThread,
+      triggerGeneration,
+    ],
   );
 
   const navigateBranch = useCallback(
     (nodeId: string, direction: 'prev' | 'next') => {
-      setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id !== currentSessionId) return s;
-          const node = s.messageMap[nodeId];
-          if (!node) return s;
+      // Navigation is tricky with Firestore immutable model.
+      // We need to update `selectedChildId` on the parent,
+      // AND `currentLeafId` on the session.
+      // This is a UI state change that persists.
 
-          let newActiveId = '';
-          const newMap = { ...s.messageMap };
+      if (!currentSession || !activeUniverseId) return;
+      const session = currentSession;
+      const node = session.messageMap[nodeId];
+      if (!node) return;
 
-          let newSelectedRoot = s.selectedRootId;
+      // Identify target
+      let targetId: string | null = null;
 
-          if (node.parentId && s.messageMap[node.parentId]) {
-            const parent = s.messageMap[node.parentId];
-            const currentIndex = parent.childrenIds.indexOf(nodeId);
-            const nextIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
-            if (nextIndex >= 0 && nextIndex < parent.childrenIds.length) {
-              const targetId = parent.childrenIds[nextIndex];
-              newMap[parent.id] = { ...parent, selectedChildId: targetId };
-              newActiveId = findLatestLeaf(targetId, newMap);
-            }
-          } else {
-            const currentIndex = s.rootNodeIds.indexOf(nodeId);
-            const nextIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
-            if (nextIndex >= 0 && nextIndex < s.rootNodeIds.length) {
-              const targetId = s.rootNodeIds[nextIndex];
-              newSelectedRoot = targetId;
-              newActiveId = findLatestLeaf(targetId, newMap);
-            }
+      if (node.parentId && session.messageMap[node.parentId]) {
+        const parent = session.messageMap[node.parentId];
+        const idx = parent.childrenIds.indexOf(nodeId);
+        const nextIdx = direction === 'prev' ? idx - 1 : idx + 1;
+        if (nextIdx >= 0 && nextIdx < parent.childrenIds.length) {
+          targetId = parent.childrenIds[nextIdx];
+        }
+      } else {
+        const idx = session.rootNodeIds.indexOf(nodeId);
+        const nextIdx = direction === 'prev' ? idx - 1 : idx + 1;
+        if (nextIdx >= 0 && nextIdx < session.rootNodeIds.length) {
+          targetId = session.rootNodeIds[nextIdx];
+        }
+      }
+
+      if (targetId) {
+        // We need to traverse down to leaf to set `currentLeafId`?
+        // Or just selecting this branch implies we follow `selectedChildId` down?
+        // The `findLatestLeaf` helper did exactly that.
+
+        const findLatestLeaf = (startId: string, map: Record<string, MessageNode>): string => {
+          let cur = startId;
+          while (true) {
+            const n = map[cur];
+            if (!n || n.childrenIds.length === 0) return cur;
+            cur = n.selectedChildId || n.childrenIds[n.childrenIds.length - 1];
           }
+        };
 
-          if (!newActiveId) return s;
-          return {
-            ...s,
-            messageMap: newMap,
-            selectedRootId: newSelectedRoot,
-            currentLeafId: newActiveId,
-          };
-        }),
-      );
+        const newLeafId = findLatestLeaf(targetId, session.messageMap);
+
+        // Perform Updates in Firestore
+        const updates: Promise<void>[] = [];
+
+        // 1. If parent exists, update its `selectedChildId`
+        if (node.parentId) {
+          updates.push(
+            FirestoreService.updateMessage(activeUniverseId, session.id, node.parentId, {
+              selectedChildId: targetId,
+            }),
+          );
+        } else {
+          // Update session `selectedRootId`
+          updates.push(
+            FirestoreService.updateChatSession(activeUniverseId, session.id, {
+              selectedRootId: targetId,
+            }),
+          );
+        }
+
+        // 2. Update session `currentLeafId`
+        updates.push(
+          FirestoreService.updateChatSession(activeUniverseId, session.id, {
+            currentLeafId: newLeafId,
+          }),
+        );
+
+        Promise.all(updates).catch((err) => console.error('Navigation failed', err));
+      }
     },
-    [currentSessionId, findLatestLeaf],
+    [currentSession, activeUniverseId],
   );
+
+  // Helper for navigateBranch to actually persist
+  // We'll skip implementing `navigateBranch` fully for now
+  // and focus on basic messaging first, as `navigateBranch` requires complex updates.
+  // Actually, I can just not persist it? No, UI depends on it.
 
   const thread = useMemo(() => {
     return currentSession ? getThread(currentSession) : [];
   }, [currentSession, getThread]);
 
   return {
-    sessions: universeSessions, // Return filtered sessions
+    sessions,
     currentSessionId,
     currentSession,
     thread,
     isLoading,
-    createSession: () => {
+    createSession: async () => {
+      if (!activeUniverseId) return;
       const newId = generateId();
-      const session: ChatSession = {
+      const initial: ChatSession = {
         id: newId,
         universeId: activeUniverseId,
         title: 'New Project',
@@ -431,11 +473,12 @@ export const useUniverseChat = (
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      setSessions((prev) => [session, ...prev]);
+      await FirestoreService.createChatSession(activeUniverseId, initial);
       setCurrentSessionId(newId);
     },
-    deleteSession: (id: string) => {
-      setSessions((prev) => prev.filter((s) => s.id !== id));
+    deleteSession: async (id: string) => {
+      if (!activeUniverseId) return;
+      await FirestoreService.deleteChatSession(activeUniverseId, id);
       if (currentSessionId === id) setCurrentSessionId(null);
     },
     selectSession: setCurrentSessionId,

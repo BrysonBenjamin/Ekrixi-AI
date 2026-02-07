@@ -10,6 +10,8 @@ import { WikiFeature } from './features/wiki/WikiFeature';
 import { DrilldownFeature } from './features/drilldown/DrilldownFeature';
 import { StoryStudioFeature } from './features/story-studio/StoryStudioFeature';
 import { PlaygroundFeature } from './features/playground/PlaygroundFeature';
+import { AuthProvider, useAuth } from './core/auth/AuthContext';
+import { LoginFeature } from './features/auth/LoginFeature';
 import {
   NexusObject,
   isLink,
@@ -31,7 +33,7 @@ import { Flip } from 'gsap/all';
 
 gsap.registerPlugin(Flip);
 
-export default function App() {
+export default function App(): React.ReactNode {
   const navigate = useNavigate();
 
   // Store Hooks
@@ -60,8 +62,14 @@ export default function App() {
     removeBatch: deleteRefineryBatch,
   } = useRefineryStore();
 
-  const { activeUniverseId, updateUniverseMeta } = useSessionStore();
+  const { activeUniverseId, updateUniverseMeta, initializeUniversesListener } = useSessionStore();
   const { requiresUserKey, hasKey } = useLLM();
+
+  // Initialize Universes Listener
+  useEffect(() => {
+    const unsubscribe = initializeUniversesListener();
+    return () => unsubscribe();
+  }, [initializeUniversesListener]);
 
   // Global Overlay State
   const [showIntro, setShowIntro] = React.useState(() => {
@@ -236,134 +244,170 @@ export default function App() {
     setIntegrityFocus(null);
   };
 
+  // Protected Route Component
+  const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
+    const { user, loading } = useAuth();
+
+    if (loading) return null; // Or a loading spinner
+
+    if (!user) {
+      return <Navigate to="/login" replace />;
+    }
+
+    return children;
+  };
+
   return (
-    <div className="relative h-full w-full">
-      {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
-      {showOnboarding && <FirstRunOnboarding onComplete={() => setShowOnboarding(false)} />}
-      <AppShell theme={theme}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/nexus" replace />} />
+    <AuthProvider>
+      <div className="relative h-full w-full">
+        {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
+        {showOnboarding && <FirstRunOnboarding onComplete={() => setShowOnboarding(false)} />}
+        <AppShell theme={theme}>
+          <Routes>
+            <Route path="/login" element={<LoginFeature />} />
+            <Route path="/" element={<Navigate to="/nexus" replace />} />
 
-          <Route
-            path="/playground"
-            element={
-              <PlaygroundFeature
-                onSeedRefinery={(items, name) => handleBatchToRefinery(items, 'IMPORT', name)}
-                onSeedRegistry={(items) => addToRegistry(items)}
-                onSeedManifesto={(blocks) => {
-                  window.dispatchEvent(new CustomEvent('nexus-seed-manifesto', { detail: blocks }));
-                  navigate('/studio');
-                }}
-              />
-            }
-          />
+            <Route
+              path="/playground"
+              element={
+                <ProtectedRoute>
+                  <PlaygroundFeature
+                    onSeedRefinery={(items, name) => handleBatchToRefinery(items, 'IMPORT', name)}
+                    onSeedRegistry={(items) => addToRegistry(items)}
+                    onSeedManifesto={(blocks) => {
+                      window.dispatchEvent(
+                        new CustomEvent('nexus-seed-manifesto', { detail: blocks }),
+                      );
+                      navigate('/studio');
+                    }}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/explore"
-            element={
-              <DrilldownFeature
-                registry={registry}
-                onRegistryUpdate={setRegistry}
-                integrityFocus={integrityFocus}
-                onSetIntegrityFocus={setIntegrityFocus}
-                onResolveAnomaly={handleResolveAnomaly}
-                onSelectNote={(id) => {
-                  setSelectedNoteId(id);
-                  navigate('/library');
-                }}
-              />
-            }
-          />
+            <Route
+              path="/explore"
+              element={
+                <ProtectedRoute>
+                  <DrilldownFeature
+                    registry={registry}
+                    onRegistryUpdate={setRegistry}
+                    integrityFocus={integrityFocus}
+                    onSetIntegrityFocus={setIntegrityFocus}
+                    onResolveAnomaly={handleResolveAnomaly}
+                    onSelectNote={(id) => {
+                      setSelectedNoteId(id);
+                      navigate('/library');
+                    }}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/studio"
-            element={
-              <StoryStudioFeature
-                onCommitBatch={(items) => {
-                  addToRegistry(items);
-                }}
-                registry={registry}
-              />
-            }
-          />
+            <Route
+              path="/studio"
+              element={
+                <ProtectedRoute>
+                  <StoryStudioFeature
+                    onCommitBatch={(items) => {
+                      addToRegistry(items);
+                    }}
+                    registry={registry}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/nexus"
-            element={
-              <UniverseGeneratorFeature
-                onScan={handleScanLore}
-                registry={registry}
-                activeUniverseId={activeUniverseId}
-              />
-            }
-          />
+            <Route
+              path="/nexus"
+              element={
+                <ProtectedRoute>
+                  <UniverseGeneratorFeature
+                    onScan={handleScanLore}
+                    registry={registry}
+                    activeUniverseId={activeUniverseId}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/scanner"
-            element={
-              <ScannerFeature
-                onCommitBatch={(items) => handleBatchToRefinery(items, 'SCANNER')}
-                registry={registry}
-                initialText={pendingScanText}
-                onClearPendingText={() => setPendingScanText('')}
-              />
-            }
-          />
+            <Route
+              path="/scanner"
+              element={
+                <ProtectedRoute>
+                  <ScannerFeature
+                    onCommitBatch={(items) => handleBatchToRefinery(items, 'SCANNER')}
+                    registry={registry}
+                    initialText={pendingScanText}
+                    onClearPendingText={() => setPendingScanText('')}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/refinery"
-            element={
-              <RefineryFeature
-                batches={refineryBatches}
-                onUpdateBatch={(id, items) => updateBatchItems(id, items)}
-                _onDeleteBatch={(id) => deleteRefineryBatch(id)}
-                onCommitBatch={handleCommitBatch}
-              />
-            }
-          />
+            <Route
+              path="/refinery"
+              element={
+                <ProtectedRoute>
+                  <RefineryFeature
+                    batches={refineryBatches}
+                    onUpdateBatch={(id, items) => updateBatchItems(id, items)}
+                    _onDeleteBatch={(id) => deleteRefineryBatch(id)}
+                    onCommitBatch={handleCommitBatch}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/registry"
-            element={
-              <StructureFeature
-                registry={registry}
-                onRegistryUpdate={setRegistry}
-                onNavigateToWiki={(id) => {
-                  setSelectedNoteId(id);
-                  navigate('/library');
-                }}
-              />
-            }
-          />
+            <Route
+              path="/registry"
+              element={
+                <ProtectedRoute>
+                  <StructureFeature
+                    registry={registry}
+                    onRegistryUpdate={setRegistry}
+                    onNavigateToWiki={(id) => {
+                      setSelectedNoteId(id);
+                      navigate('/library');
+                    }}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/library"
-            element={
-              <WikiFeature
-                registry={registry}
-                selectedId={selectedNoteId}
-                onSelect={setSelectedNoteId}
-                onUpdateObject={handleUpdateRegistryObject}
-              />
-            }
-          />
+            <Route
+              path="/library"
+              element={
+                <ProtectedRoute>
+                  <WikiFeature
+                    registry={registry}
+                    selectedId={selectedNoteId}
+                    onSelect={setSelectedNoteId}
+                    onUpdateObject={handleUpdateRegistryObject}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/settings"
-            element={
-              <SystemFeature
-                registry={registry}
-                onImport={(data) => setRegistry(data)}
-                onClear={() => setRegistry({})}
-                theme={theme}
-                onThemeChange={setTheme}
-              />
-            }
-          />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SystemFeature
+                    registry={registry}
+                    onImport={(data) => setRegistry(data)}
+                    onClear={() => setRegistry({})}
+                    theme={theme}
+                    onThemeChange={setTheme}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/nexus" replace />} />
-        </Routes>
-      </AppShell>
-    </div>
+            <Route path="*" element={<Navigate to="/nexus" replace />} />
+          </Routes>
+        </AppShell>
+      </div>
+    </AuthProvider>
   );
 }

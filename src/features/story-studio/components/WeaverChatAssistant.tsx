@@ -12,7 +12,6 @@ import {
   Layers,
 } from 'lucide-react';
 import { NexusObject, StoryType, SimpleNote, StoryNote } from '../../../types';
-import { generateId } from '../../../utils/ids';
 import { useLLM } from '../../system/hooks/useLLM';
 import { GEMINI_MODELS } from '../../../core/llm';
 
@@ -41,7 +40,6 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
   isChapterMode,
   notes,
   studioItems,
-  onUpdate,
   worldRegistry,
   selection,
   onClearSelection,
