@@ -26,6 +26,7 @@ import { generateId } from '../../utils/ids';
 import { Logo } from '../../components/shared/Logo';
 import { useLLM } from '../system/hooks/useLLM';
 import { GEMINI_MODELS } from '../../core/llm';
+import { SchemaType } from '@google/generative-ai';
 
 interface ManuscriptAnalyzerFeatureProps {
   onCommitBatch: (items: NexusObject[]) => void;
@@ -110,22 +111,28 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema: {
-            type: 'object',
+            type: SchemaType.OBJECT,
             properties: {
               units: {
-                type: 'array',
+                type: SchemaType.ARRAY,
                 items: {
-                  type: 'object',
+                  type: SchemaType.OBJECT,
                   properties: {
-                    title: { type: 'string' },
-                    type: { type: 'string', description: 'ARC, CHAPTER, SCENE, or THEME' },
-                    gist: { type: 'string' },
+                    title: { type: SchemaType.STRING },
+                    type: {
+                      type: SchemaType.STRING,
+                      description: 'ARC, CHAPTER, SCENE, or THEME',
+                    },
+                    gist: { type: SchemaType.STRING },
                     theory_beat: {
-                      type: 'string',
+                      type: SchemaType.STRING,
                       description:
                         "Which part of the theory this unit represents (e.g., 'Incite Incident').",
                     },
-                    parent_title: { type: 'string', description: 'Title of the parent unit.' },
+                    parent_title: {
+                      type: SchemaType.STRING,
+                      description: 'Title of the parent unit.',
+                    },
                   },
                   required: ['title', 'type', 'gist', 'theory_beat'],
                 },
@@ -134,7 +141,7 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
             required: ['units'],
           },
         },
-        contents: [{ parts: [{ text: `IDEA SEED: ${ideaSeed}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `IDEA SEED: ${ideaSeed}` }] }],
       });
 
       const result = await theoryResponse.response;

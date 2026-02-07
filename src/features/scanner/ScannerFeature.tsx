@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Database, BrainCircuit } from 'lucide-react';
+import { safeParseJson } from '../../utils/json';
 import {
   NexusObject,
   NexusType,
@@ -54,18 +55,6 @@ export type ExtractedItem = NexusObject & {
     suggestion?: string;
     existingPath?: string[];
   };
-};
-
-const safeParseJson = (text: string, fallback: any = {}) => {
-  try {
-    const cleaned = text
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    return fallback;
-  }
 };
 
 export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
@@ -267,8 +256,13 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
       setExtractedItems(finalBatch);
       setStage('REVIEW');
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Extraction Pipeline Interrupted.');
+      console.error('Scanner Processing Error:', err);
+      // Construct a more helpful error message checks
+      let msg = err.message || 'Extraction Pipeline Interrupted.';
+      if (msg.includes('404')) msg += ' (Model not found? Check GEMINI_MODELS)';
+      if (msg.includes('400')) msg += ' (Bad Request? Check prompt/context size)';
+
+      setError(msg);
       setStage('INPUT');
     }
   };
