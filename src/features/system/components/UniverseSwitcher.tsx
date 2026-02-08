@@ -86,7 +86,7 @@ export const UniverseSwitcher = () => {
       try {
         await deleteUniverse(id);
         setDeleteConfirmId(null);
-      } catch (err) {
+      } catch {
         // UI already logs via store, but we reset confirmed state
         setDeleteConfirmId(null);
       } finally {
