@@ -18,6 +18,7 @@ export enum NexusCategory {
   META = 'META',
   ORGANIZATION = 'ORGANIZATION',
   STORY = 'STORY',
+  WORLD = 'WORLD',
 }
 
 export enum StoryType {

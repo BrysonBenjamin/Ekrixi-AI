@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { BookOpen, History, Library, Plus, PlusCircle, Activity } from 'lucide-react';
-import { NexusObject, NexusType, StoryType, StoryNote, SimpleNote } from '../../../types';
+import { NexusObject, NexusType, StoryType, StoryNote } from '../../../types';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../types';
 

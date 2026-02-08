@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Activity,
   Compass,
@@ -20,7 +20,6 @@ interface StudioMacroAnalyzerProps {
   blocks: StudioBlock[];
   onUpdateBlocks: (blocks: StudioBlock[]) => void;
   onClose: () => void;
-  registry: Record<string, NexusObject>;
 }
 
 interface AnalysisAlternative {
@@ -40,7 +39,6 @@ export const StudioMacroAnalyzer: React.FC<StudioMacroAnalyzerProps> = ({
   blocks,
   onUpdateBlocks,
   onClose,
-  registry,
 }) => {
   const { generateContent } = useLLM();
   const [isAnalyzing, setIsAnalyzing] = useState(false);

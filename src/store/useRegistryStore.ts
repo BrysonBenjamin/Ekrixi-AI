@@ -1,118 +1,130 @@
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
 import { NexusObject } from '../types';
+import { DataService } from '../core/services/DataService';
 
 interface RegistryState {
   registry: Record<string, NexusObject>;
+  isLoading: boolean;
+  error: string | null;
   activeUniverseId: string | null;
+  unsubscribeListener: (() => void) | null;
 
   // Actions
   loadUniverse: (universeId: string) => void;
+  setRegistry: (
+    registryOrUpdater:
+      | Record<string, NexusObject>
+      | ((prev: Record<string, NexusObject>) => Record<string, NexusObject>),
+  ) => Promise<void>;
+  upsertObject: (id: string, updates: Partial<NexusObject>) => Promise<void>;
+  addBatch: (objects: NexusObject[]) => Promise<void>;
+  removeObject: (id: string) => Promise<void>;
+  resetUniverse: () => Promise<void>;
 
-  setRegistry: (registry: Record<string, NexusObject>) => void;
-  upsertObject: (id: string, updates: Partial<NexusObject>) => void;
-  addBatch: (objects: NexusObject[]) => void;
-  removeObject: (id: string) => void;
-  clearRegistry: () => void;
+  // Cleanup
+  cleanup: () => void;
 }
 
-// Helper to save to disk
-const saveToDisk = (universeId: string, registry: Record<string, NexusObject>) => {
-  try {
-    localStorage.setItem(`nexus-registry-${universeId}`, JSON.stringify({ state: { registry } }));
-  } catch (e) {
-    console.error('Failed to save registry', e);
-  }
-};
+export const useRegistryStore = create<RegistryState>((set, get) => ({
+  registry: {},
+  isLoading: false,
+  error: null,
+  activeUniverseId: null,
+  unsubscribeListener: null,
 
-export const useRegistryStore = create<RegistryState>()(
-  subscribeWithSelector((set, get) => ({
-    registry: {},
-    activeUniverseId: null,
+  loadUniverse: (universeId) => {
+    // Cleanup previous listener
+    const currentUnsubscribe = get().unsubscribeListener;
+    if (currentUnsubscribe) {
+      currentUnsubscribe();
+    }
 
-    loadUniverse: (universeId) => {
-      const currentId = get().activeUniverseId;
-      if (currentId === universeId) return; // Already loaded
+    set({ isLoading: true, error: null, activeUniverseId: universeId });
 
-      // 1. Save current if exists (safety check, though subscription handles this)
-      // if (currentId) saveToDisk(currentId, get().registry);
+    // Set up new listener
+    const unsubscribe = DataService.listenToAllNexusObjects(universeId, (objects) => {
+      const newRegistry: Record<string, NexusObject> = {};
+      objects.forEach((obj) => {
+        newRegistry[obj.id] = obj;
+      });
+      set({ registry: newRegistry, isLoading: false });
+    });
 
-      // 2. Load new
-      const key = `nexus-registry-${universeId}`;
-      const raw = localStorage.getItem(key);
-      let loadedRegistry = {};
+    set({ unsubscribeListener: unsubscribe });
+  },
 
-      // Try explicit modern format first
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          // Zustand persist format is { state: { registry: ... }, version: ... }
-          loadedRegistry = parsed.state?.registry || parsed.registry || {};
-        } catch (e) {
-          console.error(e);
-        }
-      } else if (universeId === 'default' && localStorage.getItem('nexus-registry-storage')) {
-        // Migration: Check for legacy 'nexus-registry-storage' if default
-        try {
-          const legacy = localStorage.getItem('nexus-registry-storage');
-          if (legacy) {
-            const parsed = JSON.parse(legacy);
-            loadedRegistry = parsed.state?.registry || {};
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+  setRegistry: async (registryOrUpdater) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) return;
 
-      set({ registry: loadedRegistry, activeUniverseId: universeId });
-    },
+    const currentRegistry = get().registry;
+    const newRegistry =
+      typeof registryOrUpdater === 'function'
+        ? registryOrUpdater(currentRegistry)
+        : registryOrUpdater;
 
-    setRegistry: (registry) => set({ registry }),
+    // Optimistic local update
+    set({ registry: newRegistry });
 
-    upsertObject: (id, updates) =>
-      set((state) => {
-        const existing = state.registry[id];
-        if (!existing && !updates.id) return state;
-
-        const newState = {
-          ...state.registry,
-          [id]: {
-            ...(existing || {}),
-            ...updates, // updates spread later to override
-            id: id,
-            last_modified: new Date().toISOString(),
-          } as NexusObject,
-        };
-        return { registry: newState };
-      }),
-
-    addBatch: (objects) =>
-      set((state) => {
-        const newRegistry = { ...state.registry };
-        objects.forEach((obj) => {
-          newRegistry[obj.id] = obj;
-        });
-        return { registry: newRegistry };
-      }),
-
-    removeObject: (id) =>
-      set((state) => {
-        const newRegistry = { ...state.registry };
-        delete newRegistry[id];
-        return { registry: newRegistry };
-      }),
-
-    clearRegistry: () => set({ registry: {} }),
-  })),
-);
-
-// Auto-persistence subscription
-useRegistryStore.subscribe(
-  (state) => state.registry,
-  (registry) => {
-    const id = useRegistryStore.getState().activeUniverseId;
-    if (id) {
-      saveToDisk(id, registry);
+    // Persist to database
+    // Note: For large registries, we might want to diff.
+    // For now, we'll batch create/update everything in the new registry.
+    const objects = Object.values(newRegistry) as NexusObject[];
+    if (objects.length > 0) {
+      await DataService.batchCreateOrUpdate(universeId, objects);
     }
   },
-);
+
+  upsertObject: async (id, updates) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot upsert object: No active universe selected.');
+      return;
+    }
+
+    const currentRegistry = get().registry;
+    const existingObject = currentRegistry[id];
+
+    const objectToSave = existingObject
+      ? ({ ...existingObject, ...updates } as NexusObject)
+      : (updates as NexusObject);
+
+    await DataService.createOrUpdateNexusObject(universeId, objectToSave);
+  },
+
+  addBatch: async (objects) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot add batch: No active universe selected.');
+      return;
+    }
+    await DataService.batchCreateOrUpdate(universeId, objects);
+  },
+
+  removeObject: async (id) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot remove object: No active universe selected.');
+      return;
+    }
+    await DataService.deleteNexusObject(universeId, id);
+  },
+
+  resetUniverse: async () => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) return;
+
+    const objects = Object.values(get().registry);
+    // Delete one by one for now
+    for (const obj of objects) {
+      await DataService.deleteNexusObject(universeId, obj.id);
+    }
+    set({ registry: {} });
+  },
+
+  cleanup: () => {
+    const unsubscribe = get().unsubscribeListener;
+    if (unsubscribe) unsubscribe();
+    set({ unsubscribeListener: null, registry: {}, activeUniverseId: null });
+  },
+}));

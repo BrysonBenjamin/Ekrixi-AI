@@ -9,6 +9,7 @@ export interface MessageNode {
   selectedChildId: string | null; // Remembers which branch was last active
 
   createdAt: string;
+  senderId: string; // Required for security rules
   isStreaming?: boolean;
   isError?: boolean;
 }

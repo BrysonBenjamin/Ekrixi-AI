@@ -20,4 +20,21 @@ export const config = {
   useLocalLLM: import.meta.env.VITE_USE_LOCAL_LLM === 'true',
   localLLMUrl: import.meta.env.VITE_LOCAL_LLM_URL || 'http://localhost:8080/v1/chat/completions',
   localLLMModel: import.meta.env.VITE_LOCAL_LLM_MODEL || 'mlx-model',
+
+  // Database Configuration
+  useLocalDatabase:
+    import.meta.env.VITE_USE_LOCAL_DB === 'true' ||
+    (!import.meta.env.VITE_FIREBASE_API_KEY && !import.meta.env.PROD),
+
+  // Firebase Configuration
+  firebase: {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+    databaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)',
+  },
 };

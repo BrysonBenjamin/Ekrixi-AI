@@ -8,18 +8,20 @@ export const UniverseSwitcher = () => {
     useSessionStore();
   const { loadUniverse } = useRegistryStore();
   const [isCreating, setIsCreating] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [newUniverseName, setNewUniverseName] = useState('');
+  const [newUniverseDesc, setNewUniverseDesc] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
-    const id = createUniverse(newName, 'New Exploration');
+  /*
+   * Handlers
+   */
+  const handleCreate = async () => {
+    if (!newUniverseName.trim()) return;
+    const id = await createUniverse(newUniverseName, newUniverseDesc);
     setActiveUniverse(id); // Set session active
     loadUniverse(id); // Hydrate registry
-
-    setNewName('');
+    setNewUniverseName('');
+    setNewUniverseDesc('');
     setIsCreating(false);
   };
 
@@ -63,13 +65,19 @@ export const UniverseSwitcher = () => {
       </h2>
 
       {isCreating && (
-        <form onSubmit={handleCreate} className="mb-6 animate-in slide-in-from-top-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreate();
+          }}
+          className="mb-6 animate-in slide-in-from-top-2"
+        >
           <div className="flex gap-2">
             <input
               autoFocus
               type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              value={newUniverseName}
+              onChange={(e) => setNewUniverseName(e.target.value)}
               placeholder="Designation..."
               className="flex-1 bg-nexus-950 border border-nexus-800 rounded-xl px-4 py-2 text-sm text-nexus-text focus:outline-none focus:border-nexus-accent"
             />
