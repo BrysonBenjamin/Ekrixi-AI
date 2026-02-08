@@ -3,6 +3,15 @@ import * as d3 from 'd3';
 import { isLink, isReified, isContainer, NexusObject } from '../../../../types';
 import { createNodeHTML, createLinkPillHTML } from './NodeTemplates';
 
+interface TreeData {
+  id: string;
+  name: string;
+  category?: string;
+  reified: boolean;
+  gist: string;
+  children: TreeData[];
+}
+
 interface ResponsiveTreeProps {
   registry: Record<string, NexusObject>;
   selectedId: string | null;
@@ -66,26 +75,26 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       const inContainer = allObjects.some(
         (p: NexusObject) => isContainer(p) && p.children_ids.includes(o.id),
       );
-      const isManualRoot = (o as any).tags?.includes('__is_root__');
+      const isManualRoot = 'tags' in o && (o as any).tags?.includes('__is_root__');
       return !inContainer || isManualRoot;
     });
 
-    const buildTree = (node: NexusObject, visited: Set<string> = new Set()): any => {
+    const buildTree = (node: NexusObject, visited: Set<string> = new Set()): TreeData | null => {
       if (!node || visited.has(node.id)) return null;
       visited.add(node.id);
 
       return {
         id: node.id,
-        name: (node as any).title || 'Untitled',
-        category: (node as any).category_id,
+        name: 'title' in node ? (node as any).title || 'Untitled' : 'Untitled',
+        category: 'category_id' in node ? (node as any).category_id : undefined,
         reified: isReified(node),
-        gist: (node as any).gist || 'No summary available.',
+        gist: 'gist' in node ? (node as any).gist || '' : 'No summary available.',
         children: isContainer(node)
           ? node.children_ids
               .map((cid) => registry[cid])
               .filter((n): n is NexusObject => !!n)
               .map((c) => buildTree(c, new Set(visited)))
-              .filter(Boolean)
+              .filter((n): n is TreeData => !!n)
           : [],
       };
     };
@@ -108,26 +117,29 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       .attr('class', 'main-container')
       .attr('transform', currentTransformRef.current.toString());
 
-    const root = d3.hierarchy(hierarchyData);
+    const root = d3.hierarchy<TreeData>(hierarchyData);
 
-    const treeLayout = d3.tree().nodeSize(isVertical ? [320, 480] : [140, 560]);
+    const treeLayout = d3.tree<TreeData>().nodeSize(isVertical ? [320, 480] : [140, 560]);
     treeLayout(root);
 
-    const getX = (d: any) => (isVertical ? d.x : d.y);
-    const getY = (d: any) => (isVertical ? d.y : d.x);
+    const getX = (d: d3.HierarchyPointNode<TreeData>) => (isVertical ? d.x : d.y);
+    const getY = (d: d3.HierarchyPointNode<TreeData>) => (isVertical ? d.y : d.x);
 
     const links = root.links().filter((l) => l.source.data.id !== 'VIRTUAL_ROOT');
 
     const lineLayer = mainG.append('g').attr('class', 'line-layer');
     const linkGroups = lineLayer
       .selectAll('g.link-group')
-      .data(links, (d: any) => `${d.source.data.id}-${d.target.data.id}`)
+      .data(links, (d) => {
+        const link = d as d3.HierarchyPointLink<TreeData>;
+        return `${link.source.data.id}-${link.target.data.id}`;
+      })
       .join('g')
       .attr('class', 'link-group');
 
     linkGroups
       .append('path')
-      .attr('d', (d: any) => {
+      .attr('d', (d) => {
         const s = d.source;
         const t = d.target;
         if (isVertical) {
@@ -141,7 +153,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       .attr('stroke-width', isVertical ? 3 : 2)
       .attr('stroke-dasharray', isVertical ? 'none' : '4,2');
 
-    linkGroups.each(function (d: any) {
+    linkGroups.each(function (d) {
       const s = d.source;
       const t = d.target;
       const pillW = 160;
@@ -154,7 +166,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         (o: NexusObject) => isLink(o) && o.source_id === s.data.id && o.target_id === t.data.id,
       );
 
-      const verb = linkObj ? (linkObj as any).verb : 'contains';
+      const verb = linkObj && 'verb' in linkObj ? linkObj.verb : 'contains';
       const isLinkReified = linkObj ? isReified(linkObj) : false;
       const linkId = linkObj ? linkObj.id : null;
 
@@ -197,20 +209,20 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       .selectAll('g.node-group')
       .data(
         root.descendants().filter((d) => d.data.id !== 'VIRTUAL_ROOT'),
-        (d: any) => d.data.id,
+        (d) => (d as d3.HierarchyPointNode<TreeData>).data.id,
       )
       .join('g')
       .attr('class', 'node-group')
       .attr('transform', (d) => `translate(${getX(d) - 130},${getY(d) - 27})`);
 
-    nodeGroups.each(function (d: any) {
+    nodeGroups.each(function (d) {
       const isExpanded = expandedIds.has(d.data.id);
       const foHeight = isExpanded ? 200 : 54;
       const isDraggingOver = dragOverNodeId === d.data.id;
 
       const fo = d3
         .select(this)
-        .selectAll('foreignObject')
+        .selectAll<SVGForeignObjectElement, d3.HierarchyPointNode<TreeData>>('foreignObject')
         .data([d])
         .join('foreignObject')
         .attr('width', 260)
@@ -218,7 +230,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         .style('overflow', 'visible')
         .html(() =>
           createNodeHTML(
-            d,
+            d as any,
             selectedId === d.data.id,
             hoveredId === d.data.id || isDraggingOver,
             isExpanded,
@@ -278,7 +290,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         }
       } else if (pill) {
         e.stopPropagation();
-        const nodeData = d3.select(pill.closest('.node-group') as any).datum() as any;
+        const nodeGroup = pill.closest('.node-group');
+        const nodeData = nodeGroup
+          ? (d3.select(nodeGroup).datum() as d3.HierarchyPointNode<TreeData>)
+          : null;
         if (nodeData) onSelect(nodeData.data.id);
       }
     };
@@ -288,7 +303,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       const pill = target.closest('.node-pill');
       if (pill) {
         e.stopPropagation();
-        const nodeData = d3.select(pill.closest('.node-group') as any).datum() as any;
+        const nodeGroup = pill.closest('.node-group');
+        const nodeData = nodeGroup
+          ? (d3.select(nodeGroup).datum() as d3.HierarchyPointNode<TreeData>)
+          : null;
         if (nodeData) {
           if (onDoubleClick) {
             onDoubleClick(nodeData.data.id);
@@ -304,7 +322,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       const target = e.target as HTMLElement;
       const pill = target.closest('.node-pill');
       if (pill) {
-        const nodeData = d3.select(pill.closest('.node-group') as any).datum() as any;
+        const nodeGroup = pill.closest('.node-group');
+        const nodeData = nodeGroup
+          ? (d3.select(nodeGroup).datum() as d3.HierarchyPointNode<TreeData>)
+          : null;
         if (nodeData) onHover(nodeData.data.id);
       }
     };

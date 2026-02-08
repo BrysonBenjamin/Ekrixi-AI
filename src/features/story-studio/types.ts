@@ -12,7 +12,7 @@ export type BlockType =
 export interface StudioBlock {
   id: string;
   type: BlockType;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export type RightWidgetMode = 'CHAT' | 'LIBRARY' | 'NOTES' | null;

@@ -36,7 +36,7 @@ import {
 interface AtomicEditorProps {
   object: NexusObject;
   registry: Record<string, NexusObject>;
-  onUpdate: (updates: any) => void;
+  onUpdate: (updates: Partial<NexusObject>) => void;
   onDeleteLink?: (linkId: string) => void;
   onCreateLink: (sourceId: string, targetId: string, verb: string) => void;
 }
@@ -59,14 +59,14 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
   const isHierarchical = isStrictHierarchy(object);
 
   const handleTextChange = (text: string) => {
-    onUpdate({ prose_content: text });
+    onUpdate({ prose_content: text } as Partial<NexusObject>);
     const linkRegex = /\[\[(.*?)\]\]/g;
     let match;
     while ((match = linkRegex.exec(text)) !== null) {
       const linkedTitle = match[1].trim();
-      const target = (Object.values(registry) as NexusObject[]).find(
-        (node) => (node as any).title === linkedTitle,
-      );
+      const target = (Object.values(registry) as NexusObject[]).find((node) => {
+        return 'title' in node && (node as any).title === linkedTitle;
+      });
       if (target && target.id !== object.id) {
         onCreateLink(object.id, target.id, 'mentions');
       }
@@ -86,12 +86,12 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
   };
 
   const insertNodeLink = (nodeTitle: string) => {
-    const text = (object as any).prose_content || '';
+    const text = 'prose_content' in object ? (object as any).prose_content : '';
     const beforeCursor = text.slice(0, cursorPos);
     const afterCursor = text.slice(cursorPos);
     const lastAtIndex = beforeCursor.lastIndexOf('@');
     const newText = beforeCursor.slice(0, lastAtIndex) + `[[${nodeTitle}]]` + afterCursor;
-    onUpdate({ prose_content: newText });
+    onUpdate({ prose_content: newText } as Partial<NexusObject>);
     setAtMenu(null);
   };
 
@@ -120,9 +120,10 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
     };
 
     const filtered = allItems
-      .filter(
-        (n) => !isLink(n) && n.id !== object.id && (n as any).title?.toLowerCase().includes(q),
-      )
+      .filter((n) => {
+        if (isLink(n) || n.id === object.id) return false;
+        return 'title' in n && (n as any).title?.toLowerCase().includes(q);
+      })
       .map((n) => ({ node: n, depth: getDepth(n.id) }));
 
     return filtered
@@ -132,7 +133,7 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
   }, [atMenu, registry, object.id]);
 
   const handleProtocolSwitch = (newType: NexusType) => {
-    const updates: any = { _type: newType };
+    const updates: Partial<NexusObject> = { _type: newType } as any;
 
     // Ensure hierarchical traits are added if switching to hierarchy
     if (
@@ -140,7 +141,7 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
         newType === NexusType.AGGREGATED_HIERARCHICAL_LINK) &&
       !('hierarchy_type' in object)
     ) {
-      updates.hierarchy_type = HierarchyType.PARENT_OF;
+      (updates as any).hierarchy_type = HierarchyType.PARENT_OF;
     }
 
     // Ensure container traits are added if switching to reified
@@ -149,13 +150,16 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
         newType === NexusType.AGGREGATED_HIERARCHICAL_LINK) &&
       !reified
     ) {
-      updates.is_reified = true;
-      updates.title =
-        updates.title ||
-        (isL ? `${(registry[object.source_id] as any).title} Logic` : 'Reified Unit');
-      updates.containment_type = ContainmentType.FOLDER;
-      updates.default_layout = DefaultLayout.GRID;
-      updates.children_ids = [];
+      (updates as any).is_reified = true;
+      if (!('title' in object) || !(object as any).title) {
+        const sourceNode = isLink(object) ? registry[object.source_id] : null;
+        const sourceTitle =
+          sourceNode && 'title' in sourceNode ? (sourceNode as any).title : 'Unit';
+        (updates as any).title = isLink(object) ? `${sourceTitle} Logic` : 'Reified Unit';
+      }
+      (updates as any).containment_type = ContainmentType.FOLDER;
+      (updates as any).default_layout = DefaultLayout.GRID;
+      (updates as any).children_ids = [];
     }
 
     onUpdate(updates);
@@ -208,7 +212,9 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                 Origin
               </div>
               <div className="text-xs font-display font-bold text-nexus-text truncate px-6 py-4 bg-nexus-900/80 border border-nexus-800 rounded-2xl shadow-sm">
-                {(registry[object.source_id] as any)?.title || 'Undefined'}
+                {isLink(object) && 'title' in (registry[object.source_id] || {})
+                  ? (registry[object.source_id] as any).title
+                  : 'Undefined'}
               </div>
             </div>
 
@@ -226,7 +232,9 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                 Terminal
               </div>
               <div className="text-xs font-display font-bold text-nexus-text truncate px-6 py-4 bg-nexus-900/80 border border-nexus-800 rounded-2xl shadow-sm">
-                {(registry[object.target_id] as any)?.title || 'Undefined'}
+                {isLink(object) && 'title' in (registry[object.target_id] || {})
+                  ? (registry[object.target_id] as any).title
+                  : 'Undefined'}
               </div>
             </div>
           </div>
@@ -254,8 +262,11 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                   <GitBranch size={12} className="text-nexus-essence" /> Hierarchy Mode
                 </label>
                 <select
-                  value={(object as any).hierarchy_type || HierarchyType.PARENT_OF}
-                  onChange={(e) => onUpdate({ hierarchy_type: e.target.value })}
+                  value={
+                    ('hierarchy_type' in object ? object.hierarchy_type : null) ||
+                    HierarchyType.PARENT_OF
+                  }
+                  onChange={(e) => onUpdate({ hierarchy_type: e.target.value } as any)}
                   className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-essence outline-none focus:border-nexus-essence transition-all shadow-inner cursor-pointer"
                 >
                   <option value={HierarchyType.PARENT_OF}>
@@ -272,8 +283,8 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
               </label>
               <input
                 type="text"
-                value={(object as any).verb || ''}
-                onChange={(e) => onUpdate({ verb: e.target.value })}
+                value={'verb' in object ? object.verb : ''}
+                onChange={(e) => onUpdate({ verb: e.target.value } as any)}
                 className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner"
                 placeholder="Relationship..."
               />
@@ -285,8 +296,8 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
               </label>
               <input
                 type="text"
-                value={(object as any).verb_inverse || ''}
-                onChange={(e) => onUpdate({ verb_inverse: e.target.value })}
+                value={'verb_inverse' in object ? object.verb_inverse : ''}
+                onChange={(e) => onUpdate({ verb_inverse: e.target.value } as any)}
                 className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner"
                 placeholder="Inverse..."
               />
@@ -303,8 +314,8 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
             </label>
             <input
               type="text"
-              value={(object as any).title || ''}
-              onChange={(e) => onUpdate({ title: e.target.value })}
+              value={'title' in object ? object.title : ''}
+              onChange={(e) => onUpdate({ title: e.target.value } as any)}
               className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner"
               placeholder="Designation..."
             />
@@ -314,8 +325,8 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
               <Hash size={12} className="text-nexus-accent" /> Unit Category
             </label>
             <select
-              value={(object as any).category_id}
-              onChange={(e) => onUpdate({ category_id: e.target.value })}
+              value={'category_id' in object ? object.category_id : ''}
+              onChange={(e) => onUpdate({ category_id: e.target.value } as any)}
               className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-4 text-sm font-display font-bold text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner cursor-pointer"
             >
               {Object.values(NexusCategory).map((cat) => (
@@ -334,8 +345,8 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
             Manifest Abstract (Gist)
           </label>
           <textarea
-            value={(object as any).gist || ''}
-            onChange={(e) => onUpdate({ gist: e.target.value })}
+            value={'gist' in object ? object.gist : ''}
+            onChange={(e) => onUpdate({ gist: e.target.value } as any)}
             className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-6 py-4 text-base font-serif italic text-nexus-text outline-none focus:border-nexus-accent transition-all shadow-inner h-24 resize-none no-scrollbar"
             placeholder="Establish the core essence of this logical unit..."
           />
@@ -347,7 +358,7 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
               <AtSign size={12} /> Designations (AKA)
             </label>
             <div className="min-h-[60px] w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-4 py-3 flex flex-wrap gap-2 focus-within:border-nexus-accent transition-all shadow-inner">
-              {((object as any).aliases || []).map((alias: string) => (
+              {('aliases' in object ? object.aliases || [] : []).map((alias: string) => (
                 <span
                   key={alias}
                   className="flex items-center gap-2 px-3 py-1.5 bg-nexus-900 border border-nexus-800 rounded-xl text-[10px] font-bold text-nexus-text"
@@ -356,8 +367,10 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                   <button
                     onClick={() =>
                       onUpdate({
-                        aliases: ((object as any).aliases || []).filter((a: string) => a !== alias),
-                      })
+                        aliases: (
+                          ('aliases' in object ? object.aliases || [] : []) as string[]
+                        ).filter((a: string) => a !== alias),
+                      } as any)
                     }
                     className="text-nexus-muted hover:text-red-500 transition-colors"
                   >
@@ -374,7 +387,13 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     const val = aliasInput.trim();
-                    if (val) onUpdate({ aliases: [...((object as any).aliases || []), val] });
+                    if (val)
+                      onUpdate({
+                        aliases: [
+                          ...(('aliases' in object ? object.aliases || [] : []) as string[]),
+                          val,
+                        ],
+                      } as any);
                     setAliasInput('');
                   }
                 }}
@@ -387,7 +406,7 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
               <Tag size={12} /> Semantic Markers
             </label>
             <div className="min-h-[60px] w-full bg-nexus-950 border border-nexus-800 rounded-2xl px-4 py-3 flex flex-wrap gap-2 focus-within:border-nexus-accent transition-all shadow-inner">
-              {((object as any).tags || []).map((tag: string) => (
+              {('tags' in object ? object.tags || [] : []).map((tag: string) => (
                 <span
                   key={tag}
                   className="flex items-center gap-2 px-3 py-1.5 bg-nexus-accent/10 border border-nexus-accent/20 rounded-xl text-[10px] font-display font-bold text-nexus-accent"
@@ -396,8 +415,10 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                   <button
                     onClick={() =>
                       onUpdate({
-                        tags: ((object as any).tags || []).filter((t: string) => t !== tag),
-                      })
+                        tags: (('tags' in object ? object.tags || [] : []) as string[]).filter(
+                          (t: string) => t !== tag,
+                        ),
+                      } as any)
                     }
                     className="text-nexus-accent/40 hover:text-red-500 transition-colors"
                   >
@@ -414,7 +435,10 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     const val = tagInput.trim();
-                    if (val) onUpdate({ tags: [...((object as any).tags || []), val] });
+                    if (val)
+                      onUpdate({
+                        tags: [...(('tags' in object ? object.tags || [] : []) as string[]), val],
+                      } as any);
                     setTagInput('');
                   }
                 }}
@@ -435,8 +459,8 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
             <div className="absolute -inset-1 bg-gradient-to-br from-nexus-accent/10 to-transparent rounded-[32px] blur-lg opacity-0 group-focus-within/records:opacity-100 transition-all pointer-events-none" />
             <textarea
               ref={textareaRef}
-              value={(object as any).prose_content || ''}
-              onSelect={(e) => setCursorPos((e.target as any).selectionStart)}
+              value={'prose_content' in object ? object.prose_content || '' : ''}
+              onSelect={(e) => setCursorPos((e.target as HTMLTextAreaElement).selectionStart || 0)}
               onChange={(e) => handleTextChange(e.target.value)}
               className="w-full h-96 bg-nexus-950 border border-nexus-800 rounded-[32px] px-8 py-8 text-nexus-text outline-none focus:border-nexus-accent transition-all resize-none no-scrollbar font-sans text-base leading-relaxed shadow-inner relative z-10"
               placeholder="# Detailed Records... (Use @ to link units)"
@@ -456,21 +480,22 @@ export const AtomicEditor: React.FC<AtomicEditorProps> = ({
                   </button>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto no-scrollbar p-2 space-y-1">
-                  {suggestions.map((node: any) => (
+                  {suggestions.map((node) => (
                     <button
                       key={node.id}
-                      onClick={() => insertNodeLink(node.title)}
+                      onClick={() => insertNodeLink('title' in node ? (node as any).title : '')}
                       className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-left hover:bg-nexus-accent hover:text-white transition-all group"
                     >
                       <div className="w-8 h-8 rounded-xl bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[10px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all">
-                        {node.category_id?.charAt(0) || 'U'}
+                        {('category_id' in node ? (node as any).category_id?.charAt(0) : 'U') ||
+                          'U'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-display font-bold text-nexus-text group-hover:text-white truncate">
-                          {node.title}
+                          {'title' in node ? (node as any).title : 'Unknown'}
                         </div>
                         <div className="text-[9px] text-nexus-muted font-black uppercase tracking-tighter group-hover:text-white/60">
-                          {node.category_id}
+                          {'category_id' in node ? (node as any).category_id : 'Unknown'}
                         </div>
                       </div>
                     </button>

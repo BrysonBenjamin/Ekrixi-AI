@@ -54,6 +54,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
         hierarchy_type?: HierarchyType;
         gist?: string;
         prose_content?: string;
+        encyclopedia_content?: string;
+        weaving_protocol?: string;
       };
       setEditData({
         _type: obj._type as NexusType,
@@ -62,6 +64,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
         hierarchy_type: link.hierarchy_type || HierarchyType.PARENT_OF,
         gist: link.gist || '',
         prose_content: link.prose_content || '',
+        encyclopedia_content: link.encyclopedia_content || '',
+        weaving_protocol: link.weaving_protocol || '',
       });
     } else {
       const note = obj as SimpleNote;
@@ -69,6 +73,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
         title: note.title || (note as unknown as SimpleLink).verb,
         gist: note.gist || '',
         prose_content: note.prose_content || '',
+        encyclopedia_content: note.encyclopedia_content || '',
+        weaving_protocol: note.weaving_protocol || '',
         aliases: [...(note.aliases || [])],
         tags: [...(note.tags || [])],
         category_id: note.category_id || NexusCategory.CONCEPT,
@@ -163,6 +169,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
         generated_at: new Date().toISOString(),
         context_depth: 2,
         graph_version: `v1`,
+        weaving_protocol: systemInstruction,
       };
       setArtifacts((prev) => ({ ...prev, [selectedId]: artifact }));
     } catch (error) {
@@ -175,12 +182,14 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
   const handleCommitToRegistry = () => {
     if (currentArtifact && currentObject) {
       onUpdateObject(currentObject.id, {
-        prose_content: currentArtifact.content,
+        encyclopedia_content: currentArtifact.content,
+        weaving_protocol: currentArtifact.weaving_protocol || '',
         last_modified: new Date().toISOString(),
       });
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
-      setViewMode('NOTE');
+      // We stay in ENCYCLOPEDIA view to see the result, or toggle back?
+      // User said "separate from the note", so staying in encyclopedia makes sense.
     }
   };
 

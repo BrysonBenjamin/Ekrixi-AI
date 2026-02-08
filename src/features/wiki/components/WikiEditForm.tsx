@@ -43,20 +43,30 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
 }) => {
   const [aliasInput, setAliasInput] = useState('');
   const [tagInput, setTagInput] = useState('');
-  const [atMenu, setAtMenu] = useState<{ query: string; pos: number } | null>(null);
+  const [atMenu, setAtMenu] = useState<{
+    query: string;
+    pos: number;
+    field: 'prose' | 'encyclopedia';
+  } | null>(null);
   const sectionProseRef = useRef<HTMLTextAreaElement>(null);
+  const sectionEncyclopediaRef = useRef<HTMLTextAreaElement>(null);
 
   const isStoryNode = node._type === NexusType.STORY_NOTE;
   const reified = isReified(node);
   const isLinkNode = isLink(node) && !reified;
 
   // Scry Detection
-  const handleProseChange = (val: string, pos: number) => {
-    setEditData({ ...editData, prose_content: val });
+  const handleProseChange = (val: string, pos: number, field: 'prose' | 'encyclopedia') => {
+    if (field === 'prose') {
+      setEditData({ ...editData, prose_content: val });
+    } else {
+      setEditData({ ...editData, encyclopedia_content: val });
+    }
+
     const beforeCursor = val.slice(0, pos);
     const lastAt = beforeCursor.lastIndexOf('@');
     if (lastAt !== -1 && !beforeCursor.slice(lastAt).includes(' ')) {
-      setAtMenu({ query: beforeCursor.slice(lastAt + 1), pos });
+      setAtMenu({ query: beforeCursor.slice(lastAt + 1), pos, field });
     } else {
       setAtMenu(null);
     }
@@ -78,14 +88,22 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
 
   const insertMention = (title: string) => {
     if (!atMenu) return;
-    const text = editData.prose_content || '';
+    const isProse = atMenu.field === 'prose';
+    const text = isProse ? editData.prose_content || '' : editData.encyclopedia_content || '';
     const before = text.slice(0, atMenu.pos);
     const after = text.slice(atMenu.pos);
     const lastAt = before.lastIndexOf('@');
     const newText = before.slice(0, lastAt) + `[[${title}]]` + after;
-    setEditData({ ...editData, prose_content: newText });
+
+    if (isProse) {
+      setEditData({ ...editData, prose_content: newText });
+    } else {
+      setEditData({ ...editData, encyclopedia_content: newText });
+    }
+
     setAtMenu(null);
-    if (sectionProseRef.current) sectionProseRef.current.focus();
+    const ref = isProse ? sectionProseRef : sectionEncyclopediaRef;
+    if (ref.current) ref.current.focus();
   };
 
   if (isLinkNode) {
@@ -173,13 +191,13 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
               textareaRef={sectionProseRef}
               content={editData.prose_content || ''}
               onUpdate={(val) =>
-                handleProseChange(val, sectionProseRef.current?.selectionStart || 0)
+                handleProseChange(val, sectionProseRef.current?.selectionStart || 0, 'prose')
               }
             />
             <textarea
               ref={sectionProseRef}
               value={editData.prose_content || ''}
-              onChange={(e) => handleProseChange(e.target.value, e.target.selectionStart)}
+              onChange={(e) => handleProseChange(e.target.value, e.target.selectionStart, 'prose')}
               spellCheck={false}
               className="w-full bg-nexus-900 border border-nexus-800 rounded-[32px] p-8 text-nexus-text text-sm font-mono outline-none focus:border-nexus-accent shadow-inner h-[400px] no-scrollbar leading-[1.8] tracking-tight selection:bg-nexus-accent/30"
               placeholder="# Document the nuances of this causality..."
@@ -427,16 +445,45 @@ export const WikiEditForm: React.FC<WikiEditFormProps> = ({
               textareaRef={sectionProseRef}
               content={editData.prose_content || ''}
               onUpdate={(val) =>
-                handleProseChange(val, sectionProseRef.current?.selectionStart || 0)
+                handleProseChange(val, sectionProseRef.current?.selectionStart || 0, 'prose')
               }
             />
             <textarea
               ref={sectionProseRef}
               value={editData.prose_content || ''}
-              onChange={(e) => handleProseChange(e.target.value, e.target.selectionStart)}
+              onChange={(e) => handleProseChange(e.target.value, e.target.selectionStart, 'prose')}
               spellCheck={false}
               className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-6 text-[13px] font-mono text-nexus-text focus:border-nexus-accent outline-none resize-none h-64 shadow-inner no-scrollbar leading-[1.8] tracking-tight selection:bg-nexus-accent/30"
               placeholder="# The history of this unit..."
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4 pt-4">
+          <label className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest ml-4 opacity-40">
+            Encyclopedia Records (Neural Synthesis)
+          </label>
+          <div className="space-y-3 relative">
+            <MarkdownToolbar
+              textareaRef={sectionEncyclopediaRef}
+              content={editData.encyclopedia_content || ''}
+              onUpdate={(val) =>
+                handleProseChange(
+                  val,
+                  sectionEncyclopediaRef.current?.selectionStart || 0,
+                  'encyclopedia',
+                )
+              }
+            />
+            <textarea
+              ref={sectionEncyclopediaRef}
+              value={editData.encyclopedia_content || ''}
+              onChange={(e) =>
+                handleProseChange(e.target.value, e.target.selectionStart, 'encyclopedia')
+              }
+              spellCheck={false}
+              className="w-full bg-nexus-950 border border-nexus-800 rounded-2xl p-6 text-[13px] font-mono text-nexus-text focus:border-nexus-accent outline-none resize-none h-64 shadow-inner no-scrollbar leading-[1.8] tracking-tight selection:bg-nexus-accent/30"
+              placeholder="# Generated or manual encyclopedia content..."
             />
             {/* Mention UI */}
             {atMenu && scrySuggestions.length > 0 && (

@@ -65,7 +65,6 @@ export default function App(): React.ReactNode {
 
   const { activeUniverseId, updateUniverseMeta, initializeUniversesListener, currentUser } =
     useSessionStore();
-  const { requiresUserKey, hasKey } = useLLM();
 
   // Initialize Universes Listener
   useEffect(() => {
@@ -222,9 +221,9 @@ export default function App(): React.ReactNode {
             ? NexusType.AGGREGATED_HIERARCHICAL_LINK
             : NexusType.AGGREGATED_SEMANTIC_LINK,
         is_reified: true,
-        title: `${(source as any).title || 'Origin'} → ${(target as any).title || 'Terminal'}`,
+        title: `${('title' in source ? (source as any).title : 'Origin') || 'Origin'} → ${('title' in target ? (target as any).title : 'Terminal') || 'Terminal'}`,
         gist: `Logic: ${link.verb}`,
-        prose_content: `Relationship between ${(source as any).title} and ${(target as any).title}.`,
+        prose_content: `Relationship between ${'title' in source ? (source as any).title : 'Origin'} and ${'title' in target ? (target as any).title : 'Terminal'}.`,
         category_id: NexusCategory.META,
         children_ids: [],
         containment_type: ContainmentType.FOLDER,
@@ -233,7 +232,7 @@ export default function App(): React.ReactNode {
         is_ghost: false,
         aliases: [],
         tags: ['reified'],
-      } as any;
+      } as NexusObject;
 
       upsertObject(linkId, reifiedUnit);
     }

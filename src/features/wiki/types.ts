@@ -9,6 +9,8 @@ export interface WikiEditData {
   hierarchy_type?: HierarchyType;
   gist?: string;
   prose_content?: string;
+  encyclopedia_content?: string;
+  weaving_protocol?: string;
   title?: string;
   aliases?: string[];
   tags?: string[];

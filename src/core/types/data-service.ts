@@ -1,6 +1,16 @@
 import { NexusObject, SimpleLink, SimpleNote } from '../types';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
 
+export interface Universe {
+  id: string;
+  name: string;
+  description: string;
+  ownerId: string;
+  createdAt: string;
+}
+
+export type UniverseUpdates = Partial<Omit<Universe, 'id' | 'createdAt'>>;
+
 export interface IDataService {
   // NexusObject CRUD
   createOrUpdateNexusObject(universeId: string, nexusObject: NexusObject): Promise<void>;
@@ -33,8 +43,8 @@ export interface IDataService {
   createUniverse(name: string, description: string, ownerId: string): Promise<string>;
   importUniverse(id: string, name: string, description: string, ownerId: string): Promise<void>;
   deleteUniverse(universeId: string): Promise<void>;
-  updateUniverseMeta(universeId: string, updates: any): Promise<void>;
-  listenToUniverses(userId: string | null, callback: (universes: any[]) => void): () => void;
+  updateUniverseMeta(universeId: string, updates: UniverseUpdates): Promise<void>;
+  listenToUniverses(userId: string | null, callback: (universes: Universe[]) => void): () => void;
 
   // Chat Management
   createChatSession(universeId: string, session: ChatSession): Promise<void>;

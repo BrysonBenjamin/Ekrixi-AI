@@ -1,15 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Search,
-  Database,
-  ChevronRight,
-  Globe,
-  ArrowUpRight,
-  Box,
-  Share2,
-  MapPin,
-  Users,
-} from 'lucide-react';
+import { Search, Database, ChevronRight, Globe, Box, Share2, MapPin, Users } from 'lucide-react';
 import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../types';
 import ReactMarkdown from 'react-markdown';
 
@@ -25,13 +15,18 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
   const nodes = useMemo(() => {
     const all = Object.values(registry) as NexusObject[];
     return all
-      .filter(
-        (o) =>
-          (!isLink(o) || isReified(o)) &&
-          o._type !== NexusType.STORY_NOTE &&
-          ((o as any).title?.toLowerCase().includes(search.toLowerCase()) ||
-            (o as any).gist?.toLowerCase().includes(search.toLowerCase())),
-      )
+      .filter((o) => {
+        if (isLink(o) && !isReified(o)) return false;
+        if (o._type === NexusType.STORY_NOTE) return false;
+
+        const title = 'title' in o ? (o as any).title : '';
+        const gist = 'gist' in o ? (o as any).gist : '';
+
+        return (
+          title?.toLowerCase().includes(search.toLowerCase()) ||
+          gist?.toLowerCase().includes(search.toLowerCase())
+        );
+      })
       .sort((a, b) => {
         const aInMentions = mentions.has(a.id);
         const bInMentions = mentions.has(b.id);
@@ -41,7 +36,7 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
       });
   }, [registry, search, mentions]);
 
-  const focusedNode = focusNodeId ? (registry[focusNodeId] as any) : null;
+  const focusedNode = focusNodeId ? (registry[focusNodeId] as NexusObject) : null;
 
   if (focusedNode) {
     return (
@@ -54,22 +49,24 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
             <Globe size={14} /> Back to Library
           </button>
           <div className="px-3 py-1 bg-nexus-accent/10 border border-nexus-accent/30 rounded-full text-[9px] font-black text-nexus-accent uppercase">
-            {focusedNode.category_id}
+            {'category_id' in focusedNode ? (focusedNode as any).category_id : 'CONCEPT'}
           </div>
         </header>
         <div className="flex-1 overflow-y-auto no-scrollbar p-8 space-y-8">
           <div className="space-y-4">
             <h2 className="text-3xl font-display font-black text-nexus-text uppercase tracking-tight leading-none">
-              {focusedNode.title}
+              {'title' in focusedNode ? (focusedNode as any).title : 'Unit'}
             </h2>
             <div className="pl-6 border-l-2 border-nexus-accent/30 py-1">
               <p className="text-base font-serif italic text-nexus-muted leading-relaxed">
-                "{focusedNode.gist}"
+                "{'gist' in focusedNode ? (focusedNode as any).gist : ''}"
               </p>
             </div>
           </div>
           <div className="prose prose-sm prose-invert max-w-none wiki-content border-t border-nexus-800 pt-8">
-            <ReactMarkdown>{focusedNode.prose_content}</ReactMarkdown>
+            <ReactMarkdown>
+              {'prose_content' in focusedNode ? (focusedNode as any).prose_content || '' : ''}
+            </ReactMarkdown>
           </div>
         </div>
       </div>
@@ -97,8 +94,12 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
             <p className="text-xs font-black uppercase tracking-widest">Registry Vault Empty</p>
           </div>
         ) : (
-          nodes.map((node: any) => {
+          nodes.map((node) => {
             const isMentioned = mentions.has(node.id);
+            const title = 'title' in node ? (node as any).title : 'Unit';
+            const gist = 'gist' in node ? (node as any).gist : '';
+            const categoryId =
+              'category_id' in node ? (node as any).category_id : NexusCategory.CONCEPT;
             return (
               <button
                 key={node.id}
@@ -107,11 +108,11 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <CategoryIcon cat={node.category_id} reified={isReified(node)} />
+                    <CategoryIcon cat={categoryId} reified={isReified(node)} />
                     <span
                       className={`text-[8px] font-mono font-black uppercase tracking-widest ${isMentioned ? 'text-nexus-accent' : 'text-nexus-muted'}`}
                     >
-                      {isMentioned ? 'Sync: Active' : node.category_id}
+                      {isMentioned ? 'Sync: Active' : categoryId}
                     </span>
                   </div>
                   <ChevronRight
@@ -120,10 +121,10 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
                   />
                 </div>
                 <div className="text-sm font-display font-bold text-nexus-text uppercase truncate mb-1">
-                  {node.title}
+                  {title}
                 </div>
                 <p className="text-[10px] text-nexus-muted italic line-clamp-1 font-serif">
-                  "{node.gist}"
+                  "{gist}"
                 </p>
               </button>
             );

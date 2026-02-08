@@ -21,6 +21,7 @@ import {
   HierarchyType,
   isContainer,
   isLink,
+  DefaultLayout,
 } from '../../types';
 import { generateId } from '../../utils/ids';
 import { Logo } from '../../components/shared/Logo';
@@ -40,7 +41,19 @@ interface TemplateInfo {
   id: TheoryTemplate;
   title: string;
   desc: string;
-  icon: any;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+}
+
+interface TheoryUnit {
+  title: string;
+  type: string;
+  gist: string;
+  theory_beat: string;
+  parent_title?: string;
+}
+
+interface TheoryResponse {
+  units: TheoryUnit[];
 }
 
 const TEMPLATES: TemplateInfo[] = [
@@ -70,7 +83,7 @@ const TEMPLATES: TemplateInfo[] = [
   },
 ];
 
-const safeParseJson = (text: string, fallback: any = {}) => {
+const safeParseJson = <T,>(text: string, fallback: T): T => {
   try {
     const cleaned = text
       .replace(/```json/g, '')
@@ -145,19 +158,21 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
       });
 
       const result = await theoryResponse.response;
-      const theoryData = safeParseJson(result.text() || '{"units": []}', { units: [] });
+      const theoryData = safeParseJson<TheoryResponse>(result.text() || '{"units": []}', {
+        units: [],
+      });
 
       setStatus('Forging the structural blueprint...');
       const finalItems: NexusObject[] = [];
       const titleToId: Record<string, string> = {};
       const now = new Date().toISOString();
 
-      theoryData.units.forEach((u: any) => {
+      theoryData.units.forEach((u) => {
         const id = generateId();
         titleToId[u.title] = id;
         const isC = u.type === 'ARC' || u.type === 'CHAPTER';
 
-        const node: any = {
+        const node: NexusObject = {
           id,
           _type: isC ? 'CONTAINER_NOTE' : 'SIMPLE_NOTE',
           title: u.title,
@@ -175,25 +190,29 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
           internal_weight: 1.0,
           total_subtree_mass: 0,
           aliases: [],
-        };
+          prose_content: '',
+          is_ghost: false,
+        } as NexusObject;
 
-        if (isC) {
+        if (isC && node._type === 'CONTAINER_NOTE') {
           node.children_ids = [];
           node.containment_type =
             u.type === 'ARC' ? ContainmentType.PLOT_ARC : ContainmentType.FOLDER;
           node.is_collapsed = false;
-          node.default_layout = u.type === 'ARC' ? 'TIMELINE' : 'GRID';
+          node.default_layout = u.type === 'ARC' ? DefaultLayout.TIMELINE : DefaultLayout.GRID;
         }
 
         finalItems.push(node);
       });
 
-      theoryData.units.forEach((u: any) => {
+      theoryData.units.forEach((u) => {
         const currentId = titleToId[u.title];
         if (u.parent_title && titleToId[u.parent_title] && currentId) {
           const pId = titleToId[u.parent_title];
-          const parent = finalItems.find((i) => i.id === pId) as any;
-          if (parent && parent.children_ids) parent.children_ids.push(currentId);
+          const parent = finalItems.find((i) => i.id === pId);
+          if (parent && 'children_ids' in parent && parent.children_ids) {
+            parent.children_ids.push(currentId);
+          }
 
           finalItems.push({
             id: generateId(),
@@ -208,11 +227,13 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
             link_ids: [],
             internal_weight: 1.0,
             total_subtree_mass: 0,
-          } as any);
+          } as NexusObject);
         }
 
         if (u.type === 'THEME') {
-          const scenes = finalItems.filter((i) => (i as any).tags?.includes('SCENE')).slice(0, 3);
+          const scenes = finalItems
+            .filter((i) => 'tags' in i && i.tags?.includes('SCENE'))
+            .slice(0, 3);
           scenes.forEach((scene) => {
             finalItems.push({
               id: generateId(),
@@ -226,16 +247,18 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
               link_ids: [],
               internal_weight: 1.0,
               total_subtree_mass: 0,
-            } as any);
+            } as NexusObject);
           });
         }
       });
 
       setBlueprint(finalItems);
       setStage('RESULT');
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setError(err.message || 'Ekrixi AI encountered a creative block.');
+      const errorMessage =
+        err instanceof Error ? err.message : 'Ekrixi AI encountered a creative block.';
+      setError(errorMessage);
       setStage('IDLE');
     }
   };
@@ -537,7 +560,7 @@ export const ManuscriptAnalyzerFeature: React.FC<ManuscriptAnalyzerFeatureProps>
   );
 };
 
-const StatBox = ({ label, val }: any) => (
+const StatBox = ({ label, val }: { label: string; val: number }) => (
   <div className="bg-nexus-900 border border-nexus-800 rounded-[32px] p-6 hover:border-nexus-accent/30 transition-all group shadow-sm">
     <div className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1 group-hover:text-nexus-accent transition-colors">
       {label}

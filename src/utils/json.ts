@@ -1,4 +1,4 @@
-export const safeParseJson = (text: string, fallback: any = {}) => {
+export const safeParseJson = <T>(text: string, fallback: T): T => {
   try {
     // 1. Try stripping markdown code blocks
     const cleaned = text
