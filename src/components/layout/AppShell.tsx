@@ -97,16 +97,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
     <div className="flex flex-col md:flex-row h-full absolute inset-0 text-nexus-text overflow-hidden font-sans">
       <aside
         className="
-                hidden md:flex flex-col items-center justify-between
+                hidden md:flex flex-col items-center
                 w-20 h-full bg-nexus-900 border-r border-nexus-800 z-50 shadow-[4px_0_20px_rgba(0,0,0,0.1)]
             "
       >
-        <div className="flex flex-col items-center w-full pt-6">
-          <div className="mb-10 flex items-center justify-center">
+        <div className="flex flex-col items-center w-full pt-6 flex-1 overflow-y-auto no-scrollbar">
+          <div className="mb-10 flex items-center justify-center shrink-0 px-2">
             <BrandLogo className="w-16 h-auto" data-flip-id="persistent-logo" />
           </div>
 
-          <nav className="flex flex-col w-full gap-2">
+          <nav className="flex flex-col w-full gap-2 pb-6">
             <NavItem
               path="/nexus"
               icon={Flame}
@@ -166,7 +166,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
           </nav>
         </div>
 
-        <div className="flex flex-col items-center w-full pb-6 gap-4">
+        <div className="flex flex-col items-center w-full pb-6 pt-4 gap-4 bg-nexus-950/50 backdrop-blur-md border-t border-nexus-800 shrink-0">
           {/* User Profile / Login */}
           {config.features.enableSSO && (
             <div className="group relative">
@@ -348,9 +348,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
 
       {/* ... (Mobile Header & Main - unchanged) */}
 
-      <header className="md:hidden h-14 bg-nexus-900 border-b border-nexus-800 flex items-center justify-between px-4 z-50 shrink-0">
+      <header className="md:hidden h-14 bg-nexus-900/80 backdrop-blur-lg border-b border-nexus-800 flex items-center justify-between px-4 z-50 shrink-0">
         <div className="flex items-center gap-2">
-          <BrandLogo className="h-6 w-24 bg-white" />
+          <BrandLogo className="h-7 w-auto" />
         </div>
         <div className="flex items-center gap-4">
           <button

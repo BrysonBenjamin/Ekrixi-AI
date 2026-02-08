@@ -1,14 +1,31 @@
 steps:
-  - name: gcr.io/cloud-builders/docker
+  - name: 'gcr.io/cloud-builders/docker'
     args:
       - build
-      - '--no-cache'
       - '-t'
       - >-
         $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - '--build-arg' # FIRST --build-arg
+      - 'VITE_BACKEND_URL=${_VITE_BACKEND_URL}' # Its value
+      - '--build-arg' # SECOND --build-arg
+      - 'VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}' # Its value
+      # You will need to add more '--build-arg' and their values here for all your _VITE_FIREBASE_ and _VITE_GOOGLE_ substitutions
       - '--build-arg'
-      - VITE_BACKEND_URL=${_VITE_BACKEND_URL}
-      - VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}
+      - 'VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_MEASUREMENT_ID=${_VITE_FIREBASE_MEASUREMENT_ID}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_MESSAGING_SENDER_ID=${_VITE_FIREBASE_MESSAGING_SENDER_ID}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_PROJECT_ID=${_VITE_FIREBASE_PROJECT_ID}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_STORAGE_BUCKET=${_VITE_FIREBASE_STORAGE_BUCKET}'
+      - '--build-arg'
+      - 'VITE_FIREBASE_DATABASE_ID=${_VITE_FIREBASE_DATABASE_ID}'
+      - '--build-arg'
+      - 'VITE_GOOGLE_CLIENT_ID=${_VITE_GOOGLE_CLIENT_ID}'
       - .
       - '-f'
       - Dockerfile
@@ -44,8 +61,16 @@ substitutions:
   _DEPLOY_REGION: us-central1
   _AR_HOSTNAME: us-central1-docker.pkg.dev
   _AR_REPOSITORY: cloud-run-source-deploy
-  _VITE_FIREBASE_API_KEY: AIzaSyC_udGk2iMiic9MITjx1Ulyt-igZ5haP-U
   _AR_PROJECT_ID: ekrixi-ai
+  _SERVICE_NAME: ekrixi-ai
   _TRIGGER_ID: 88003d3a-212c-4074-be2a-1edca337c0f4
   _VITE_BACKEND_URL: https://backendproxy-412518375747.us-central1.run.app
-  _SERVICE_NAME: ekrixi-ai
+  _VITE_GOOGLE_CLIENT_ID: 412518375747-6hib28eca6dm7t6pu0qff69illhpgv3p.apps.googleusercontent.com
+  _VITE_FIREBASE_API_KEY: AIzaSyC_udGk2iMiic9MITjx1Ulyt-igZ5haP-U
+  _VITE_FIREBASE_AUTH_DOMAIN: ekrixi-ai.firebaseapp.com
+  _VITE_FIREBASE_PROJECT_ID: ekrixi-ai
+  _VITE_FIREBASE_DATABASE_ID: ekrixi-nexus
+  _VITE_FIREBASE_STORAGE_BUCKET: ekrixi-ai.firebasestorage.app
+  _VITE_FIREBASE_MESSAGING_SENDER_ID: '412518375747'
+  _VITE_FIREBASE_APP_ID: '1:412518375747:web:43c25d95e12e82f4f7cff6'
+  _VITE_FIREBASE_MEASUREMENT_ID: G-K0S43H3NSD
