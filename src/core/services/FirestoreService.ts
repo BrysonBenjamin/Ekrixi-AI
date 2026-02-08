@@ -430,41 +430,48 @@ export const FirestoreService = {
       const chatDocRef = getChatDocRef(universeId, chatId);
       const messageDocRef = getMessageDocRef(universeId, chatId, message.id);
 
-      // 1. Create Message
-      transaction.set(messageDocRef, message);
-
-      // 2. Update Parent if exists
+      // 1. ALL READS FIRST
+      let parentSnap;
       if (parentId) {
         const parentDocRef = getMessageDocRef(universeId, chatId, parentId);
-        const parentSnap = await transaction.get(parentDocRef);
-        if (parentSnap.exists()) {
-          const parentData = parentSnap.data() as MessageNode;
-          const updatedChildren = [...(parentData.childrenIds || []), message.id];
-          transaction.update(parentDocRef, {
-            childrenIds: updatedChildren,
-            selectedChildId: message.id,
-          });
-        }
+        parentSnap = await transaction.get(parentDocRef);
       }
 
-      // 3. Update Session
+      let chatSnap;
+      if (rootUpdate) {
+        chatSnap = await transaction.get(chatDocRef);
+      }
+
+      // 2. ALL WRITES AFTER READS
+      // A. Create Message
+      transaction.set(messageDocRef, message);
+
+      // B. Update Parent if exists
+      if (parentId && parentSnap?.exists()) {
+        const parentDocRef = getMessageDocRef(universeId, chatId, parentId);
+        const parentData = parentSnap.data() as MessageNode;
+        const updatedChildren = [...(parentData.childrenIds || []), message.id];
+        transaction.update(parentDocRef, {
+          childrenIds: updatedChildren,
+          selectedChildId: message.id,
+        });
+      }
+
+      // C. Update Session
       const sessionUpdates: any = {
         currentLeafId: message.id,
         updatedAt: new Date().toISOString(),
       };
 
-      if (rootUpdate) {
-        const chatSnap = await transaction.get(chatDocRef);
-        if (chatSnap.exists()) {
-          const chatData = chatSnap.data();
-          const currentRoots = chatData?.rootNodeIds || [];
-          // Avoid duplicates just in case
-          if (!currentRoots.includes(rootUpdate.newRootId)) {
-            sessionUpdates.rootNodeIds = [...currentRoots, rootUpdate.newRootId];
-          }
-          if (rootUpdate.isSelectionChange) {
-            sessionUpdates.selectedRootId = rootUpdate.newRootId;
-          }
+      if (rootUpdate && chatSnap?.exists()) {
+        const chatData = chatSnap.data();
+        const currentRoots = chatData?.rootNodeIds || [];
+        // Avoid duplicates just in case
+        if (!currentRoots.includes(rootUpdate.newRootId)) {
+          sessionUpdates.rootNodeIds = [...currentRoots, rootUpdate.newRootId];
+        }
+        if (rootUpdate.isSelectionChange) {
+          sessionUpdates.selectedRootId = rootUpdate.newRootId;
         }
       }
 

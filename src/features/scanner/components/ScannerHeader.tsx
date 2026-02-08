@@ -27,13 +27,13 @@ export const ScannerHeader: React.FC<ScannerHeaderProps> = ({ stage, onReset }) 
             Ekrixi <span className="text-nexus-accent hidden sm:inline">AI Scanner</span>
             <span className="text-nexus-accent sm:hidden">Scanner</span>
           </h1>
-          <p className="text-[9px] md:text-[10px] text-nexus-muted font-mono uppercase tracking-[0.2em] flex items-center gap-2">
+          <div className="text-[9px] md:text-[10px] text-nexus-muted font-mono uppercase tracking-[0.2em] flex items-center gap-2">
             <span className="hidden sm:inline">Intel-to-Unit Pipeline</span>
             <span className="lg:hidden text-nexus-accent flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-nexus-accent animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-nexus-accent animate-pulse" />
               {steps.find((s) => s.id === stage)?.label}
             </span>
-          </p>
+          </div>
         </div>
       </div>
 

@@ -24,6 +24,7 @@ export interface WikiArtifact {
   generated_at: string;
   context_depth: number;
   graph_version: string;
+  weaving_protocol?: string;
 }
 
 export interface TraitContainer {
@@ -51,6 +52,8 @@ export interface SimpleNote extends NexusElement {
   tags: string[];
   gist: string;
   prose_content: string;
+  encyclopedia_content?: string;
+  weaving_protocol?: string;
   category_id: NexusCategory;
   is_ghost: boolean;
   is_author_note?: boolean;
