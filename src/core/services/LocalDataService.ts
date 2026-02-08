@@ -126,6 +126,9 @@ export const LocalDataService: IDataService = {
       description,
       ownerId,
       createdAt: new Date().toISOString(),
+      lastActive: new Date().toISOString(),
+      nodeCount: 0,
+      chatCount: 0,
     };
 
     universes.push(newUniverse);
@@ -149,6 +152,9 @@ export const LocalDataService: IDataService = {
         description,
         ownerId,
         createdAt: new Date().toISOString(),
+        lastActive: new Date().toISOString(),
+        nodeCount: 0,
+        chatCount: 0,
       });
       _saveData(key, universes);
     }

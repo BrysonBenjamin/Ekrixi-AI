@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { GoogleGenerativeAI, Content, GenerationConfig } from '@google/generative-ai';
+import { db, auth } from './firebase-admin';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -25,6 +26,24 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);
+
+// Authentication Middleware for Firebase
+const authenticate = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+  }
+
+  const token = authHeader.split('Bearer ')[1];
+  try {
+    const decodedToken = await auth.verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Auth Error:', error);
+    res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  }
+};
 
 // Initialize Gemini AI
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -105,6 +124,47 @@ app.post('/api/generate-content', async (req: ExpressRequest, res: ExpressRespon
     console.error('Generate content error:', error);
     res.status(500).json({
       error: 'Failed to generate content',
+      message: error?.message || 'Unknown error',
+    });
+  }
+});
+
+// Recursive Delete Universe endpoint
+app.post('/api/delete-universe', authenticate, async (req: any, res: ExpressResponse) => {
+  try {
+    const { universeId } = req.body;
+    const userId = req.user.uid;
+
+    if (!universeId) {
+      return res.status(400).json({ error: 'universeId is required' });
+    }
+
+    // 1. Authorization Check: Verify if the user is the owner of the universe
+    const universeRef = db.collection('universes').doc(universeId);
+    const universeDoc = await universeRef.get();
+
+    if (!universeDoc.exists) {
+      return res.status(404).json({ error: 'Universe not found' });
+    }
+
+    if (universeDoc.data()?.ownerId !== userId) {
+      return res.status(403).json({ error: 'Forbidden: Only the owner can delete this universe' });
+    }
+
+    console.log(`[Backend] User ${userId} requested recursive delete of universe: ${universeId}`);
+
+    // 2. Perform Recursive Delete using Admin SDK
+    // This deletes the doc AND all subcollections recursively.
+    await db.recursiveDelete(universeRef);
+
+    res.json({
+      status: 'success',
+      message: `Universe ${universeId} and all sub-resources deleted.`,
+    });
+  } catch (error: any) {
+    console.error('Delete universe error:', error);
+    res.status(500).json({
+      error: 'Failed to delete universe',
       message: error?.message || 'Unknown error',
     });
   }

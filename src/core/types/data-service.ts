@@ -7,6 +7,9 @@ export interface Universe {
   description: string;
   ownerId: string;
   createdAt: string;
+  lastActive: string;
+  nodeCount: number;
+  chatCount?: number;
 }
 
 export type UniverseUpdates = Partial<Omit<Universe, 'id' | 'createdAt'>>;

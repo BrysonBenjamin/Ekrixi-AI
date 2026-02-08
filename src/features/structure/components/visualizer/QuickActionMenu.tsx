@@ -50,6 +50,8 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   const isC = isContainer(object);
   const reified = isReified(object);
 
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
   const title = (object as SimpleNote).title || (object as SimpleLink).verb || 'Untitled';
   const type = object._type.replace(/_/g, ' ');
 
@@ -114,90 +116,128 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
         </div>
 
         <div className="p-4 grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto no-scrollbar">
-          <ActionButton
-            icon={Search}
-            label="Inspect Unit"
-            desc="Detailed manifest & records"
-            onClick={() => {
-              onInspect(object.id);
-              onClose();
-            }}
-          />
-
-          {isL && (
-            <ActionButton
-              icon={Repeat}
-              label="Invert Logic"
-              desc="Swap source and terminal direction"
-              onClick={() => {
-                if (onInvert) onInvert(object.id);
-                onClose();
-              }}
-            />
-          )}
-
-          {(isC || (isL && reified)) && onAddChild && (
-            <ActionButton
-              icon={Plus}
-              label="Establish Sub-Unit"
-              desc="Append nested logical unit"
-              color="text-nexus-essence"
-              onClick={() => {
-                onAddChild(object.id);
-                onClose();
-              }}
-            />
-          )}
-
-          {isL && !reified && onReify && (
-            <ActionButton
-              icon={Share2}
-              label="Reify Connection"
-              desc="Promote logic to First-Class Unit"
-              color="text-nexus-accent"
-              onClick={() => {
-                onReify(object.id);
-                onClose();
-              }}
-            />
-          )}
-
-          {isL && onSelectNode && (
+          {confirmDelete ? (
+            <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-[32px] text-center space-y-6 animate-in slide-in-from-top-4">
+              <div className="space-y-2">
+                <h4 className="text-sm font-display font-black text-red-500 uppercase tracking-widest">
+                  Terminate Permanently?
+                </h4>
+                <p className="text-[10px] text-nexus-muted font-bold uppercase tracking-widest leading-relaxed">
+                  This action cannot be undone and will purge all logical records associated with
+                  this unit.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-4 bg-nexus-800 text-nexus-muted rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (onDelete) onDelete(object.id);
+                    onClose();
+                  }}
+                  className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-red-500/20"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          ) : (
             <>
-              <div className="h-px bg-nexus-800/30 my-2 mx-4" />
               <ActionButton
-                icon={ArrowUpRight}
-                label={`Origin: ${sourceTitle}`}
-                desc="Jump to scrying focus"
+                icon={Search}
+                label="Inspect Unit"
+                desc="Detailed manifest & records"
                 onClick={() => {
-                  onSelectNode((object as SimpleLink).source_id);
+                  onInspect(object.id);
                   onClose();
                 }}
               />
+
+              {isL && (
+                <ActionButton
+                  icon={Repeat}
+                  label="Invert Logic"
+                  desc="Swap source and terminal direction"
+                  onClick={() => {
+                    if (onInvert) onInvert(object.id);
+                    onClose();
+                  }}
+                />
+              )}
+
+              {(isC || (isL && reified)) && onAddChild && (
+                <ActionButton
+                  icon={Plus}
+                  label="Establish Sub-Unit"
+                  desc="Append nested logical unit"
+                  color="text-nexus-essence"
+                  onClick={() => {
+                    onAddChild(object.id);
+                    onClose();
+                  }}
+                />
+              )}
+
+              {isL && !reified && onReify && (
+                <ActionButton
+                  icon={Share2}
+                  label="Reify Connection"
+                  desc="Promote logic to First-Class Unit"
+                  color="text-nexus-accent"
+                  onClick={() => {
+                    onReify(object.id);
+                    onClose();
+                  }}
+                />
+              )}
+
+              {isL && onSelectNode && (
+                <>
+                  <div className="h-px bg-nexus-800/30 my-2 mx-4" />
+                  <ActionButton
+                    icon={ArrowUpRight}
+                    label={`Origin: ${sourceTitle}`}
+                    desc="Jump to scrying focus"
+                    onClick={() => {
+                      onSelectNode((object as SimpleLink).source_id);
+                      onClose();
+                    }}
+                  />
+                  <ActionButton
+                    icon={ArrowDownLeft}
+                    label={`Terminal: ${targetTitle}`}
+                    desc="Jump to scrying focus"
+                    onClick={() => {
+                      onSelectNode((object as SimpleLink).target_id);
+                      onClose();
+                    }}
+                  />
+                </>
+              )}
+
+              <div className="h-px bg-nexus-800/30 my-2 mx-4" />
+
               <ActionButton
-                icon={ArrowDownLeft}
-                label={`Terminal: ${targetTitle}`}
-                desc="Jump to scrying focus"
+                icon={Trash2}
+                label="Terminate Unit"
+                desc="Permanent purge from registry"
+                color="text-red-500"
                 onClick={() => {
-                  onSelectNode((object as SimpleLink).target_id);
-                  onClose();
+                  const isNormalLink = isL && !reified;
+                  if (isNormalLink) {
+                    if (onDelete) onDelete(object.id);
+                    onClose();
+                  } else {
+                    setConfirmDelete(true);
+                  }
                 }}
               />
             </>
           )}
-
-          <div className="h-px bg-nexus-800/30 my-2 mx-4" />
-
-          <ActionButton
-            icon={Trash2}
-            label="Terminate Unit"
-            desc="Permanent purge from registry"
-            color="text-red-500"
-            onClick={() => {
-              if (onDelete) onDelete(object.id);
-              onClose();
-            }}
-          />
         </div>
 
         <button

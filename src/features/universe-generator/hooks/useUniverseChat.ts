@@ -495,11 +495,21 @@ export const useUniverseChat = (
         updatedAt: new Date().toISOString(),
       };
       await DataService.createChatSession(activeUniverseId, initial);
+
+      // Update Universe Stats
+      const newCount = sessions.length + 1;
+      useSessionStore.getState().updateUniverseMeta(activeUniverseId, { chatCount: newCount });
+
       setCurrentSessionId(newId);
     },
     deleteSession: async (id: string) => {
       if (!activeUniverseId) return;
       await DataService.deleteChatSession(activeUniverseId, id);
+
+      // Update Universe Stats
+      const newCount = Math.max(0, sessions.length - 1);
+      useSessionStore.getState().updateUniverseMeta(activeUniverseId, { chatCount: newCount });
+
       if (currentSessionId === id) setCurrentSessionId(null);
     },
     selectSession: setCurrentSessionId,

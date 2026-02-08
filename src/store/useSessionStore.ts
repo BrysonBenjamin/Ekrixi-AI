@@ -7,6 +7,7 @@ export interface UniverseMetadata {
   name: string;
   description?: string;
   nodeCount: number;
+  chatCount: number;
   lastActive: string;
   createdAt: string;
   ownerId?: string;
@@ -64,27 +65,45 @@ export const useSessionStore = create<SessionState>()(
         }
 
         set({ isLoadingUniverses: true });
-        const unsubscribe = DataService.listenToUniverses(userId, (universesData) => {
+
+        // Track initial load to trigger default creation only once
+        let isInitialLoad = true;
+
+        const unsubscribe = DataService.listenToUniverses(userId, async (universesData) => {
           // Map Firestore data to UniverseMetadata
           const universes = universesData.map((u) => ({
             id: u.id,
             name: u.name,
             description: u.description,
             nodeCount: u.nodeCount || 0,
+            chatCount: u.chatCount || 0,
             lastActive: u.lastActive,
             createdAt: u.createdAt,
             ownerId: u.ownerId,
           })) as UniverseMetadata[];
 
+          // Handle "New Account" initialization
+          if (universes.length === 0 && isInitialLoad) {
+            isInitialLoad = false; // Prevent multiple creation attempts
+            console.log('[SessionStore] No universes found for user. Creating default...');
+            try {
+              await DataService.createUniverse(
+                'Primal Nexus',
+                'Your initial playground for knowledge synthesis.',
+                userId,
+              );
+            } catch (err) {
+              console.error('[SessionStore] Failed to create default universe:', err);
+            }
+            return;
+          }
+
+          isInitialLoad = false;
           set((state) => {
-            // If we have no active universe and universes exist, select first?
-            // Or keep null and let UI force selection/creation.
-            // For now, if activeUniverseId is set but not in list (deleted?), unset it.
             let newActive = state.activeUniverseId;
             if (newActive && !universes.find((u) => u.id === newActive)) {
               newActive = universes.length > 0 ? universes[0].id : null;
             }
-            // If no active and we have universes, select one?
             if (!newActive && universes.length > 0) {
               newActive = universes[0].id;
             }
@@ -97,32 +116,52 @@ export const useSessionStore = create<SessionState>()(
 
       createUniverse: async (name, description) => {
         const user = get().currentUser;
-        const id = await DataService.createUniverse(name, description || '', user?.id || '');
-        // Listener will update state
-        set({ activeUniverseId: id });
-        return id;
+        if (!user?.id) throw new Error('Cannot create universe: Not authenticated');
+
+        try {
+          const id = await DataService.createUniverse(name, description || '', user.id);
+          set({ activeUniverseId: id });
+          return id;
+        } catch (err) {
+          console.error('[SessionStore] createUniverse failed:', err);
+          throw err;
+        }
       },
 
-      setActiveUniverse: (id) =>
-        set((state) => {
-          if (!state.universes.find((u) => u.id === id)) return state;
-          // TODO: Update 'lastActive' in Firestore?
-          // For now just local state switch.
-          return { activeUniverseId: id };
-        }),
+      setActiveUniverse: (id) => {
+        const state = get();
+        if (!state.universes.find((u) => u.id === id)) return;
+
+        set({ activeUniverseId: id });
+
+        // Update lastActive in DB (side effect outside of set)
+        DataService.updateUniverseMeta(id, { lastActive: new Date().toISOString() }).catch((err) =>
+          console.warn('[SessionStore] Failed to update lastActive:', err),
+        );
+      },
 
       deleteUniverse: async (id) => {
-        await DataService.deleteUniverse(id);
-        // Listener handles state update
+        try {
+          await DataService.deleteUniverse(id);
+        } catch (err) {
+          console.error('[SessionStore] deleteUniverse failed:', err);
+          throw err;
+        }
       },
 
-      updateUniverseMeta: (id, updates) => {
-        // This was used for nodeCount updates.
-        // We probably want to push this to Firestore if it's critical,
-        // OR just keep it local/optimistic for node counts until a proper counter is implemented.
+      updateUniverseMeta: async (id, updates) => {
+        // Update local state for immediate feedback
         set((state) => ({
           universes: state.universes.map((u) => (u.id === id ? { ...u, ...updates } : u)),
         }));
+
+        // Persist to DB
+        try {
+          await DataService.updateUniverseMeta(id, updates);
+        } catch (err) {
+          console.error('[SessionStore] updateUniverseMeta failed:', err);
+          // Rollback local state if critical? For now just log.
+        }
       },
 
       setUser: (user, token) => set({ currentUser: user, authToken: token }),
@@ -133,10 +172,6 @@ export const useSessionStore = create<SessionState>()(
         })),
 
       registerUniverse: (meta) => {
-        // Legacy/Import support.
-        // If importing a universe, we should probably save it to Firestore?
-        // For now, just add to local state to allow viewing?
-        // Or strictly push to DB. Let's push to DB to be consistent.
         DataService.importUniverse(meta.id, meta.name, meta.description || '', meta.ownerId || '');
       },
     }),

@@ -60,6 +60,7 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuState, setMenuState] = useState<MenuState>('DEFAULT');
   const [reifySelection, setReifySelection] = useState<{ sourceId?: string }>({});
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const reified = isReified(object);
   const isL = isLink(object) && !reified;
@@ -245,15 +246,49 @@ export const TraditionalContextMenu: React.FC<TraditionalContextMenuProps> = ({
             )}
 
             <div className="h-px bg-nexus-800/50 my-1 mx-3" />
-            <MenuItem
-              icon={Trash2}
-              label="Terminate"
-              color="text-red-500"
-              onClick={() => {
-                if (onDelete) onDelete(object.id);
-                onClose();
-              }}
-            />
+            {confirmDelete ? (
+              <div className="px-1.5 py-1 animate-in slide-in-from-top-1">
+                <div className="text-[7px] font-black text-red-500 uppercase tracking-widest px-3 mb-2 opacity-80">
+                  Irreversible Deletion
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onDelete) onDelete(object.id);
+                      onClose();
+                    }}
+                    className="flex-1 py-2 bg-red-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDelete(false);
+                    }}
+                    className="flex-1 py-2 bg-nexus-800 text-nexus-muted rounded-xl text-[9px] font-black uppercase tracking-widest hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <MenuItem
+                icon={Trash2}
+                label="Terminate"
+                color="text-red-500"
+                onClick={() => {
+                  const isNormalLink = isLink(object) && !reified;
+                  if (isNormalLink) {
+                    if (onDelete) onDelete(object.id);
+                    onClose();
+                  } else {
+                    setConfirmDelete(true);
+                  }
+                }}
+              />
+            )}
           </>
         ) : (
           <div className="p-1 space-y-1">

@@ -16,7 +16,8 @@ import {
   QueryConstraint,
   CollectionReference,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
+import { config } from '../../config';
 import {
   NexusObject,
   SimpleLink,
@@ -228,6 +229,7 @@ export const FirestoreService = {
       createdAt: new Date().toISOString(),
       lastActive: new Date().toISOString(),
       nodeCount: 0,
+      chatCount: 0,
     });
 
     return newUniverseId;
@@ -255,22 +257,59 @@ export const FirestoreService = {
         createdAt: snap.exists() ? snap.data()?.createdAt : new Date().toISOString(),
         lastActive: new Date().toISOString(),
         nodeCount: snap.exists() ? snap.data()?.nodeCount : 0,
+        chatCount: snap.exists() ? snap.data()?.chatCount : 0,
       },
       { merge: true },
     );
   },
 
   async deleteUniverse(universeId: string): Promise<void> {
-    // Recursive delete of subcollections manually
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('Cannot delete universe: Not authenticated');
+    }
+
+    // Try server-side recursive delete first (more robust)
+    if (config.useBackendProxy) {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`${config.backendUrl}/api/delete-universe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ universeId }),
+        });
+
+        if (response.ok) {
+          console.log(
+            `[FirestoreService] Successfully deleted universe ${universeId} via backend.`,
+          );
+          return;
+        }
+
+        const errData = await response.json();
+        console.warn(
+          `[FirestoreService] Backend delete failed: ${errData.error}. Falling back to client-side.`,
+        );
+      } catch (err) {
+        console.warn('[FirestoreService] Backend delete error. Falling back to client-side.', err);
+      }
+    }
+
+    // Fallback: Client-side manual deletion (may fail if rules are restrictive)
+    console.log('[FirestoreService] Attempting client-side recursive deletion fallback...');
+
     // 1. Delete NexusObjects
-    await this.deleteCollection(getNexusObjectsCollectionRef(universeId));
+    await FirestoreService.deleteCollection(getNexusObjectsCollectionRef(universeId));
 
     // 2. Delete Chats and their Messages
     const chatsRef = getChatsCollectionRef(universeId);
     const chatsSnapshot = await getDocs(chatsRef);
     for (const chatDoc of chatsSnapshot.docs) {
       const messagesRef = getMessagesCollectionRef(universeId, chatDoc.id);
-      await this.deleteCollection(messagesRef);
+      await FirestoreService.deleteCollection(messagesRef);
       await deleteDoc(chatDoc.ref);
     }
 
@@ -279,6 +318,13 @@ export const FirestoreService = {
   },
 
   async updateUniverseMeta(universeId: string, updates: UniverseUpdates): Promise<void> {
+    if (!auth.currentUser) {
+      if (import.meta.env.DEV) {
+        console.warn('[FirestoreService] updateUniverseMeta skipped: No authenticated user.');
+      }
+      return;
+    }
+
     const universeRef = getUniverseDocRef(universeId);
     await updateDoc(universeRef, {
       ...updates,
@@ -337,7 +383,7 @@ export const FirestoreService = {
 
     // Recurse if there might be more
     if (snapshot.size >= batchSize) {
-      await this.deleteCollection(collectionRef, batchSize);
+      await FirestoreService.deleteCollection(collectionRef, batchSize);
     }
   },
 
@@ -354,8 +400,16 @@ export const FirestoreService = {
   },
 
   async deleteChatSession(universeId: string, sessionId: string): Promise<void> {
+    if (!auth.currentUser) {
+      throw new Error('Cannot delete chat session: Not authenticated');
+    }
+
+    // 1. Delete Messages subcollection
+    const messagesRef = getMessagesCollectionRef(universeId, sessionId);
+    await FirestoreService.deleteCollection(messagesRef);
+
+    // 2. Delete Chat Doc
     await deleteDoc(getChatDocRef(universeId, sessionId));
-    // Note: Subcollections (messages) need recursive delete if on client.
   },
 
   async updateChatSessionTitle(

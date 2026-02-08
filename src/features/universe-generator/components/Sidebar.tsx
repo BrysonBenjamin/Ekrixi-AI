@@ -37,6 +37,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null);
+
   return (
     <aside className="w-full h-full bg-nexus-900 border-r border-nexus-800 flex flex-col shrink-0">
       {/* Header */}
@@ -67,9 +69,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={i}
               onClick={() => {
                 if (onSuggestionClick) onSuggestionClick(s.text);
-                // Start New Session implicitly handled by parent?
-                // Actually, if we are in sidebar, likely we might need to create new session OR just clicking valid suggestion.
-                // Assuming valid suggestion on empty state.
               }}
               className="w-full text-left p-3 rounded-xl bg-nexus-800/50 border border-nexus-800 hover:border-nexus-accent hover:bg-nexus-800 text-nexus-muted hover:text-nexus-text transition-all group"
             >
@@ -87,47 +86,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
             No active timelines.
           </div>
         )}
-        {sessions.map((session) => (
-          <div
-            key={session.id}
-            onClick={() => onSelect(session.id)}
-            className={`
-                            group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border
-                            ${
-                              activeId === session.id
-                                ? 'bg-nexus-accent/5 border-nexus-accent/20 text-nexus-text shadow-sm'
-                                : 'text-nexus-muted border-transparent hover:bg-nexus-800 hover:text-nexus-text'
-                            }
-                        `}
-          >
-            <div className="flex items-center gap-3 overflow-hidden min-w-0">
-              <div
-                className="w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300"
-                style={{
-                  backgroundColor: activeId === session.id ? 'var(--accent-color)' : 'transparent',
-                }}
-              ></div>
-              <span
-                className={`text-sm truncate font-medium block w-full ${activeId === session.id ? 'font-bold' : ''}`}
-              >
-                {session.title}
-              </span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(session.id);
-              }}
+        {sessions.map((session) => {
+          const isConfirming = confirmDeleteId === session.id;
+          return (
+            <div
+              key={session.id}
+              onClick={() => onSelect(session.id)}
               className={`
-                                p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all opacity-0 group-hover:opacity-100
-                                ${activeId === session.id ? 'opacity-100' : ''}
-                            `}
-              title="Delete Timeline"
+                              group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border
+                              ${
+                                activeId === session.id
+                                  ? 'bg-nexus-accent/5 border-nexus-accent/20 text-nexus-text shadow-sm'
+                                  : 'text-nexus-muted border-transparent hover:bg-nexus-800 hover:text-nexus-text'
+                              }
+                          `}
             >
-              <Trash2 size={12} />
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                <div
+                  className="w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300"
+                  style={{
+                    backgroundColor:
+                      activeId === session.id ? 'var(--accent-color)' : 'transparent',
+                  }}
+                ></div>
+                <span
+                  className={`text-sm truncate font-medium block w-full ${activeId === session.id ? 'font-bold' : ''}`}
+                >
+                  {session.title}
+                </span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isConfirming) {
+                    onDelete(session.id);
+                    setConfirmDeleteId(null);
+                  } else {
+                    setConfirmDeleteId(session.id);
+                    setTimeout(() => setConfirmDeleteId(null), 3000);
+                  }
+                }}
+                className={`
+                                  p-1.5 rounded-lg transition-all
+                                  ${isConfirming ? 'bg-red-500 text-white scale-110' : 'hover:bg-red-500/10 hover:text-red-500 opacity-0 group-hover:opacity-100'}
+                                  ${activeId === session.id && !isConfirming ? 'opacity-100' : ''}
+                              `}
+                title={isConfirming ? 'Click to Confirm' : 'Delete Timeline'}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       <div className="p-4 border-t border-nexus-800 text-[9px] text-nexus-muted font-mono flex items-center justify-center gap-2 uppercase tracking-[0.3em]">
