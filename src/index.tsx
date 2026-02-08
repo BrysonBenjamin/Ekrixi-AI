@@ -5,6 +5,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import { config } from './config';
 import { TutorialProvider } from './components/shared/tutorial/TutorialSystem';
+import { AuthProvider } from './core/auth/AuthContext';
 import './index.css';
 
 interface ErrorBoundaryProps {
@@ -67,9 +68,11 @@ root.render(
     <GoogleOAuthProvider clientId={clientId}>
       <ErrorBoundary>
         <BrowserRouter>
-          <TutorialProvider>
-            <App />
-          </TutorialProvider>
+          <AuthProvider>
+            <TutorialProvider>
+              <App />
+            </TutorialProvider>
+          </AuthProvider>
         </BrowserRouter>
       </ErrorBoundary>
     </GoogleOAuthProvider>

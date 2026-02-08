@@ -135,9 +135,34 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
         });
       }
 
+      if (isReified(obj)) {
+        const sId = (obj as any).source_id;
+        const tId = (obj as any).target_id;
+        if (sId)
+          queue.push({
+            id: sId,
+            depth: depth + 1,
+            pathType: pathType === 'focus' || pathType === 'ancestor' ? 'ancestor' : 'lateral',
+          });
+        if (tId)
+          queue.push({
+            id: tId,
+            depth: depth + 1,
+            pathType: pathType === 'focus' || pathType === 'descendant' ? 'descendant' : 'lateral',
+          });
+      }
+
       (Object.values(registry) as NexusObject[]).forEach((l) => {
         if (isLink(l)) {
           if (l.source_id === id) {
+            if (isReified(l)) {
+              queue.push({
+                id: l.id,
+                depth: depth + 1,
+                pathType:
+                  pathType === 'focus' || pathType === 'descendant' ? 'descendant' : 'lateral',
+              });
+            }
             queue.push({
               id: l.target_id,
               depth: depth + 1,
@@ -145,6 +170,13 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
                 pathType === 'focus' || pathType === 'descendant' ? 'descendant' : 'lateral',
             });
           } else if (l.target_id === id) {
+            if (isReified(l)) {
+              queue.push({
+                id: l.id,
+                depth: depth + 1,
+                pathType: pathType === 'focus' || pathType === 'ancestor' ? 'ancestor' : 'lateral',
+              });
+            }
             queue.push({
               id: l.source_id,
               depth: depth + 1,
@@ -300,6 +332,98 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
     [onRegistryUpdate],
   );
 
+  const handleReparent = useCallback(
+    (sourceId: string, targetId: string, oldParentId?: string, isReference: boolean = false) => {
+      if (sourceId === targetId || !onRegistryUpdate) return;
+      const target = registry[targetId];
+      if (target && isContainer(target) && target.children_ids.includes(sourceId)) return;
+
+      onRegistryUpdate((prev) => {
+        // Detect cycles
+        let current: string | null = targetId;
+        while (current && current !== 'root') {
+          if (current === sourceId) return prev; // Cycle detected
+          const parent = Object.values(prev).find(
+            (o) => isContainer(o) && o.children_ids.includes(current!),
+          );
+          current = parent ? parent.id : null;
+        }
+
+        let next = { ...prev };
+        if (!isReference && oldParentId) {
+          if (oldParentId === 'root') {
+            const node = next[sourceId];
+            if (node) {
+              const sn = node as SimpleNote;
+              next[sourceId] = {
+                ...sn,
+                tags: (sn.tags || []).filter((t: string) => t !== '__is_root__'),
+              };
+            }
+          } else {
+            const op = next[oldParentId];
+            if (op && isContainer(op)) {
+              const cn = op as ContainerNote;
+              next[oldParentId] = {
+                ...cn,
+                children_ids: cn.children_ids.filter((id) => id !== sourceId),
+              };
+            }
+            Object.keys(next).forEach((k) => {
+              const o = next[k];
+              if (
+                isLink(o) &&
+                o._type === NexusType.HIERARCHICAL_LINK &&
+                o.source_id === oldParentId &&
+                o.target_id === sourceId
+              )
+                delete next[k];
+            });
+          }
+        }
+        if (targetId === 'root') {
+          const node = next[sourceId];
+          if (node) {
+            const sn = node as SimpleNote;
+            next[sourceId] = {
+              ...sn,
+              tags: Array.from(new Set([...(sn.tags || []), '__is_root__'])),
+            };
+          }
+          return next;
+        }
+        const targetNode = next[targetId];
+        if (!targetNode || isLink(targetNode)) return next;
+
+        // Promote to container if not already one
+        if (!isContainer(targetNode)) {
+          next[targetId] = {
+            ...targetNode,
+            _type:
+              targetNode._type === NexusType.STORY_NOTE
+                ? NexusType.STORY_NOTE
+                : NexusType.CONTAINER_NOTE,
+            children_ids: [sourceId],
+            containment_type: ContainmentType.FOLDER,
+            is_collapsed: false,
+            default_layout: DefaultLayout.GRID,
+          } as NexusObject;
+        } else {
+          const cn = targetNode as ContainerNote;
+          next[targetId] = {
+            ...cn,
+            children_ids: Array.from(new Set([...cn.children_ids, sourceId])),
+          };
+        }
+
+        const shadowLink = NexusGraphUtils.createShadowLink(targetId, sourceId);
+        next[shadowLink.id] = shadowLink;
+        return next;
+      });
+    },
+    [onRegistryUpdate, registry],
+  );
+
   const handleDelete = useCallback(
     (id: string) => {
       if (!onRegistryUpdate) return;
@@ -369,6 +493,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           onReifyNode={handleReifyNode}
           onReifyNodeToLink={handleReifyNodeToLink}
           onEstablishLink={handleEstablishLink}
+          onReparent={handleReparent}
           integrityFocus={integrityFocus}
         />
       </main>

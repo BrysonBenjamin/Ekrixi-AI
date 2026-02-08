@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { PanelLeftClose, PanelLeft, Plus, ChevronDown, MoreHorizontal } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  PanelLeftClose,
+  PanelLeft,
+  Plus,
+  MoreHorizontal,
+  Trash2,
+  Edit2,
+  Check,
+  X,
+} from 'lucide-react';
 import { useUniverseChat } from './hooks/useUniverseChat';
 import { Sidebar } from './components/Sidebar';
 import { MessageList } from './components/MessageList';
@@ -30,10 +39,39 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
     sendMessage,
     editMessage,
     regenerate,
+    updateTitle,
     navigateBranch,
   } = useUniverseChat(registry, activeUniverseId);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleStartRename = () => {
+    setEditTitle(currentSession?.title || 'New Project');
+    setIsRenaming(true);
+    setIsMenuOpen(false);
+  };
+
+  const handleRename = async () => {
+    if (currentSessionId && editTitle.trim()) {
+      await updateTitle(currentSessionId, editTitle.trim());
+    }
+    setIsRenaming(false);
+  };
+
   const hasMessages = thread.length > 0;
 
   return (
@@ -94,21 +132,92 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
             </button>
           </div>
 
-          {/* Centered Title */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-nexus-800 cursor-pointer transition-all group max-w-[200px] sm:max-w-xs">
-            <span className="font-display font-semibold text-nexus-text text-sm truncate">
-              {currentSession?.title || 'New Project'}
-            </span>
-            <ChevronDown
-              size={14}
-              className="text-nexus-muted group-hover:text-nexus-text shrink-0"
-            />
+          {/* Centered Title Section */}
+          <div className="flex-1 flex justify-center min-w-0 px-4">
+            {isRenaming ? (
+              <div className="flex items-center gap-2 bg-nexus-800 px-3 py-1.5 rounded-xl border border-nexus-700 w-full max-w-xs shadow-lg">
+                <input
+                  autoFocus
+                  className="bg-transparent border-none outline-none text-sm text-nexus-text w-full font-display font-semibold"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRename();
+                    if (e.key === 'Escape') setIsRenaming(false);
+                  }}
+                />
+                <button
+                  onClick={handleRename}
+                  className="p-1 hover:text-nexus-accent transition-colors"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  onClick={() => setIsRenaming(false)}
+                  className="p-1 hover:text-red-400 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={handleStartRename}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-nexus-800 cursor-pointer transition-all group max-w-[200px] sm:max-w-xs"
+                title="Click to rename"
+              >
+                <span className="font-display font-semibold text-nexus-text text-sm truncate">
+                  {currentSession?.title || 'New Project'}
+                </span>
+                <Edit2
+                  size={12}
+                  className="text-nexus-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <button className="p-3 md:p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all">
+          <div className="flex items-center gap-2 relative" ref={menuRef}>
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`p-3 md:p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all ${isMenuOpen ? 'bg-nexus-800 text-nexus-text' : ''}`}
+            >
               <MoreHorizontal size={20} />
             </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-nexus-900 border border-nexus-800 rounded-2xl shadow-2xl z-[70] overflow-hidden py-2 backdrop-blur-xl bg-nexus-900/90 animate-slide-up">
+                <button
+                  onClick={handleStartRename}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all group"
+                >
+                  <Edit2 size={16} className="group-hover:text-nexus-accent transition-colors" />
+                  <span>Rename Session</span>
+                </button>
+                <button
+                  onClick={() => {
+                    createSession();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all group"
+                >
+                  <Plus size={16} className="group-hover:text-nexus-accent transition-colors" />
+                  <span>New Chat</span>
+                </button>
+                <div className="h-px bg-nexus-800 mx-2 my-1" />
+                <button
+                  onClick={() => {
+                    if (currentSessionId) {
+                      deleteSession(currentSessionId);
+                      setIsMenuOpen(false);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                >
+                  <Trash2 size={16} />
+                  <span>Delete Session</span>
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

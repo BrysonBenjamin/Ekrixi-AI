@@ -75,6 +75,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       const inContainer = allObjects.some(
         (p: NexusObject) => isContainer(p) && p.children_ids.includes(o.id),
       );
+
+      // Implicit parenting for reified units: if it has a source node, it will be rendered as a child of that source
+      if (isReified(o) && (o as any).source_id && !inContainer) return false;
+
       const isManualRoot = 'tags' in o && (o as any).tags?.includes('__is_root__');
       return !inContainer || isManualRoot;
     });
@@ -83,19 +87,30 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       if (!node || visited.has(node.id)) return null;
       visited.add(node.id);
 
+      const explicitChildren = isContainer(node)
+        ? node.children_ids.map((cid) => registry[cid]).filter((n): n is NexusObject => !!n)
+        : [];
+
+      // Find reified units that originate from this node and have no explicit container parent
+      const implicitLogicChildren = allObjects.filter((o) => {
+        return (
+          isReified(o) &&
+          (o as any).source_id === node.id &&
+          !allObjects.some((p) => isContainer(p) && p.children_ids.includes(o.id))
+        );
+      });
+
+      const allMergedChildren = [...explicitChildren, ...implicitLogicChildren];
+
       return {
         id: node.id,
         name: 'title' in node ? (node as any).title || 'Untitled' : 'Untitled',
         category: 'category_id' in node ? (node as any).category_id : undefined,
         reified: isReified(node),
         gist: 'gist' in node ? (node as any).gist || '' : 'No summary available.',
-        children: isContainer(node)
-          ? node.children_ids
-              .map((cid) => registry[cid])
-              .filter((n): n is NexusObject => !!n)
-              .map((c) => buildTree(c, new Set(visited)))
-              .filter((n): n is TreeData => !!n)
-          : [],
+        children: allMergedChildren
+          .map((c) => buildTree(c, new Set(visited)))
+          .filter((n): n is TreeData => !!n),
       };
     };
 

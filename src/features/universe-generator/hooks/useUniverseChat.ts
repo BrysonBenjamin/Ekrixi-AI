@@ -45,14 +45,6 @@ export const useUniverseChat = (
           return prev;
         });
       } else {
-        // If no sessions, create default?
-        // Logic moved to createSession call or explicit user action usually.
-        // But valid to ensure at least one exists.
-        // Let's create one if completely empty to match old behavior?
-        // Actually, let's leave it empty and let UI prompt or create one.
-        // BUT old behavior created on mount. Let's replicate that securely.
-        // We can't easily check "if empty create" inside listener without infinite loops if create fails/lags.
-        // Safer to let UI handle "No Chats" state.
         setCurrentSessionId(null);
       }
     });
@@ -157,15 +149,6 @@ export const useUniverseChat = (
           systemInstruction,
         );
 
-        // Streaming simulation locally vs Firestore
-        // Firestore is "slow" for per-character streaming.
-        // We will stream LOCALLY to `activeSessionMessages` state for UI smoothness,
-        // then update Firestore at the end (or in chunks).
-        // BUT `activeSessionMessages` is driven by the listener.
-        // Overriding it locally might cause flickering when listener updates?
-        // Let's rely on Firestore speed? No, too many writes.
-        // Best approach: Local state override for streaming node, then final save.
-
         let currentText = '';
         const chars = fullText.split('');
         const chunkAmount = 30; // Larger chunks for speed
@@ -207,61 +190,80 @@ export const useUniverseChat = (
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!currentSessionId || isLoading || !activeUniverseId) return;
-      const userMsgId = generateId();
-      const timestamp = new Date().toISOString();
-      const session = currentSession; // captured from closure/render
+      if (import.meta.env.DEV) {
+        console.log('[useUniverseChat] sendMessage sequence started:', {
+          text,
+          currentSessionId,
+          activeUniverseId,
+          isLoading,
+        });
+      }
 
-      // Safety check: verify we have the session loaded
-      if (!session) return;
+      if (isLoading || !activeUniverseId) {
+        if (import.meta.env.DEV) {
+          console.warn('[useUniverseChat] sendMessage cancelled: busy or no universe', {
+            isLoading,
+            activeUniverseId,
+          });
+        }
+        return;
+      }
 
-      const newNode: MessageNode = {
-        id: userMsgId,
-        role: 'user',
-        text,
-        parentId: session.currentLeafId,
-        childrenIds: [],
-        selectedChildId: null,
-        createdAt: timestamp,
-        senderId: currentUser?.id || 'system',
-      };
+      setIsLoading(true); // Immediate feedback
 
-      // Determine Root Updates
-      let rootUpdate = undefined;
-      const isNewRoot = !session.currentLeafId;
+      try {
+        let sessionId = currentSessionId;
 
-      if (isNewRoot) {
-        rootUpdate = {
-          newRootId: userMsgId,
-          isSelectionChange: true,
+        // Auto-create session if none exists
+        if (!sessionId) {
+          if (import.meta.env.DEV) {
+            console.log('[useUniverseChat] No active session. Creating one...');
+          }
+          const newSessionId = generateId();
+          const initial = {
+            id: newSessionId,
+            universeId: activeUniverseId,
+            title: text.slice(0, 30) || 'New Project',
+            messageMap: {},
+            rootNodeIds: [],
+            selectedRootId: null,
+            currentLeafId: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          await DataService.createChatSession(activeUniverseId, initial);
+          sessionId = newSessionId;
+          setCurrentSessionId(newSessionId); // Select it locally
+        }
+
+        const userMsgId = generateId();
+        const timestamp = new Date().toISOString();
+        const session = currentSession || {
+          id: sessionId,
+          universeId: activeUniverseId,
+          title: text.slice(0, 30),
+          messageMap: {},
+          rootNodeIds: [],
+          selectedRootId: null,
+          currentLeafId: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
         };
-      }
 
-      const newTitle =
-        session.rootNodeIds.length === 0 && isNewRoot ? text.slice(0, 30) : undefined;
+        const newNode: MessageNode = {
+          id: userMsgId,
+          role: 'user',
+          text,
+          parentId: session.currentLeafId,
+          childrenIds: [],
+          selectedChildId: null,
+          createdAt: timestamp,
+          senderId: currentUser?.id || 'system',
+        };
 
-      if (newTitle) {
-        DataService.updateChatSessionTitle(activeUniverseId, currentSessionId, newTitle);
-      }
-
-      await DataService.addMessageToChat(
-        activeUniverseId,
-        currentSessionId,
-        newNode,
-        session.currentLeafId,
-        rootUpdate,
-      );
-
-      // Calculate history for generation
-      // We need to wait for local state to update via listener?
-      // OR we predict the structure.
-      // `triggerGeneration` takes `historyNodes`.
-      // We can construct history including the new node.
-
-      const tempSession = {
-        ...session,
-        messageMap: {
-          ...session.messageMap,
+        // OPTIMISTIC UPDATE: Local state update for immediate UI feedback
+        setActiveSessionMessages((prev) => ({
+          ...prev,
           [userMsgId]: newNode,
           ...(session.currentLeafId
             ? {
@@ -271,12 +273,58 @@ export const useUniverseChat = (
                 },
               }
             : {}),
-        },
-        currentLeafId: userMsgId,
-      };
+        }));
 
-      const history = getThread(tempSession);
-      triggerGeneration(currentSessionId, userMsgId, history);
+        // Determine Root Updates
+        let rootUpdate = undefined;
+        const isNewRoot = !session.currentLeafId;
+
+        if (isNewRoot) {
+          rootUpdate = {
+            newRootId: userMsgId,
+            isSelectionChange: true,
+          };
+        }
+
+        const newTitle =
+          session.rootNodeIds.length === 0 && isNewRoot ? text.slice(0, 30) : undefined;
+
+        if (newTitle) {
+          DataService.updateChatSessionTitle(activeUniverseId, sessionId, newTitle);
+        }
+
+        await DataService.addMessageToChat(
+          activeUniverseId,
+          sessionId,
+          newNode,
+          session.currentLeafId,
+          rootUpdate,
+        );
+
+        // Calculate history for generation
+        const tempSession = {
+          ...session,
+          messageMap: {
+            ...session.messageMap,
+            [userMsgId]: newNode,
+            ...(session.currentLeafId
+              ? {
+                  [session.currentLeafId]: {
+                    ...session.messageMap[session.currentLeafId],
+                    selectedChildId: userMsgId,
+                  },
+                }
+              : {}),
+          },
+          currentLeafId: userMsgId,
+        };
+
+        const history = getThread(tempSession);
+        triggerGeneration(sessionId, userMsgId, history);
+      } catch (error) {
+        console.error('[useUniverseChat] Failed to send message:', error);
+        setIsLoading(false);
+      }
     },
     [
       currentSessionId,
@@ -285,7 +333,7 @@ export const useUniverseChat = (
       currentSession,
       getThread,
       triggerGeneration,
-      currentUser?.id,
+      currentUser,
     ],
   );
 
@@ -330,7 +378,6 @@ export const useUniverseChat = (
 
       // Trigger generation if user message
       if (originalNode.role === 'user') {
-        // similar history construction...
         const tempSession = {
           ...session,
           messageMap: {
@@ -364,7 +411,6 @@ export const useUniverseChat = (
 
   const regenerate = useCallback(
     async (nodeId: string) => {
-      // ... (reuse logic or keep simple)
       if (!currentSessionId || isLoading || !currentSession || !activeUniverseId) return;
       const node = currentSession.messageMap[nodeId];
       if (!node) return;
@@ -389,19 +435,12 @@ export const useUniverseChat = (
 
   const navigateBranch = useCallback(
     (nodeId: string, direction: 'prev' | 'next') => {
-      // Navigation is tricky with Firestore immutable model.
-      // We need to update `selectedChildId` on the parent,
-      // AND `currentLeafId` on the session.
-      // This is a UI state change that persists.
-
       if (!currentSession || !activeUniverseId) return;
       const session = currentSession;
       const node = session.messageMap[nodeId];
       if (!node) return;
 
-      // Identify target
       let targetId: string | null = null;
-
       if (node.parentId && session.messageMap[node.parentId]) {
         const parent = session.messageMap[node.parentId];
         const idx = parent.childrenIds.indexOf(nodeId);
@@ -418,10 +457,6 @@ export const useUniverseChat = (
       }
 
       if (targetId) {
-        // We need to traverse down to leaf to set `currentLeafId`?
-        // Or just selecting this branch implies we follow `selectedChildId` down?
-        // The `findLatestLeaf` helper did exactly that.
-
         const findLatestLeaf = (startId: string, map: Record<string, MessageNode>): string => {
           let cur = startId;
           while (true) {
@@ -432,11 +467,8 @@ export const useUniverseChat = (
         };
 
         const newLeafId = findLatestLeaf(targetId, session.messageMap);
-
-        // Perform Updates in Firestore
         const updates: Promise<void>[] = [];
 
-        // 1. If parent exists, update its `selectedChildId`
         if (node.parentId) {
           updates.push(
             DataService.updateMessage(activeUniverseId, session.id, node.parentId, {
@@ -444,7 +476,6 @@ export const useUniverseChat = (
             }),
           );
         } else {
-          // Update session `selectedRootId`
           updates.push(
             DataService.updateChatSession(activeUniverseId, session.id, {
               selectedRootId: targetId,
@@ -452,7 +483,6 @@ export const useUniverseChat = (
           );
         }
 
-        // 2. Update session `currentLeafId`
         updates.push(
           DataService.updateChatSession(activeUniverseId, session.id, {
             currentLeafId: newLeafId,
@@ -464,11 +494,6 @@ export const useUniverseChat = (
     },
     [currentSession, activeUniverseId],
   );
-
-  // Helper for navigateBranch to actually persist
-  // We'll skip implementing `navigateBranch` fully for now
-  // and focus on basic messaging first, as `navigateBranch` requires complex updates.
-  // Actually, I can just not persist it? No, UI depends on it.
 
   const thread = useMemo(() => {
     return currentSession ? getThread(currentSession) : [];
@@ -496,7 +521,6 @@ export const useUniverseChat = (
       };
       await DataService.createChatSession(activeUniverseId, initial);
 
-      // Update Universe Stats
       const newCount = sessions.length + 1;
       useSessionStore.getState().updateUniverseMeta(activeUniverseId, { chatCount: newCount });
 
@@ -506,7 +530,6 @@ export const useUniverseChat = (
       if (!activeUniverseId) return;
       await DataService.deleteChatSession(activeUniverseId, id);
 
-      // Update Universe Stats
       const newCount = Math.max(0, sessions.length - 1);
       useSessionStore.getState().updateUniverseMeta(activeUniverseId, { chatCount: newCount });
 
@@ -516,6 +539,10 @@ export const useUniverseChat = (
     sendMessage,
     editMessage,
     regenerate,
+    updateTitle: async (id: string, title: string) => {
+      if (!activeUniverseId) return;
+      await DataService.updateChatSessionTitle(activeUniverseId, id, title);
+    },
     navigateBranch,
   };
 };

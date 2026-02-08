@@ -25,7 +25,6 @@ export const WikiEncyclopediaView: React.FC<WikiEncyclopediaViewProps> = ({
 }) => {
   const note = currentObject as SimpleNote;
   const themeColor = note.theme_color;
-  const hasStoredEncyclopedia = !!note.encyclopedia_content;
   const displayContent = currentArtifact?.content || note.encyclopedia_content;
 
   return (

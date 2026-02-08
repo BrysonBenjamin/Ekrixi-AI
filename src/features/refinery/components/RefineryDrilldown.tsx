@@ -15,6 +15,13 @@ interface RefineryDrilldownProps {
   onReifyLink?: (id: string) => void;
   onReifyNode?: (id: string) => void;
   onReifyNodeToLink?: (nodeId: string, sourceId: string, targetId: string) => void;
+  onReparent?: (
+    sourceId: string,
+    targetId: string,
+    oldParentId?: string,
+    isReference?: boolean,
+  ) => void;
+  onEstablishLink?: (sourceId: string, targetId: string, verb?: string) => void;
 }
 
 export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
@@ -28,6 +35,8 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
   onReifyLink,
   onReifyNode,
   onReifyNodeToLink,
+  onReparent,
+  onEstablishLink,
 }) => {
   // Logic to calculate visible nodes based on local registry
   const visibleNodesRegistry = useMemo(() => {
@@ -74,21 +83,55 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
           });
         });
       }
+
+      if (isReified(obj)) {
+        const sId = (obj as any).source_id;
+        const tId = (obj as any).target_id;
+        if (sId)
+          queue.push({
+            id: sId,
+            depth: depth + 1,
+            pathType: pathType === 'focus' || pathType === 'ancestor' ? 'ancestor' : 'lateral',
+          });
+        if (tId)
+          queue.push({
+            id: tId,
+            depth: depth + 1,
+            pathType: pathType === 'focus' || pathType === 'descendant' ? 'descendant' : 'lateral',
+          });
+      }
+
       (Object.values(registry) as NexusObject[]).forEach((l) => {
         if (isLink(l)) {
-          if (l.source_id === id)
+          if (l.source_id === id) {
+            if (isReified(l)) {
+              queue.push({
+                id: l.id,
+                depth: depth + 1,
+                pathType:
+                  pathType === 'focus' || pathType === 'descendant' ? 'descendant' : 'lateral',
+              });
+            }
             queue.push({
               id: l.target_id,
               depth: depth + 1,
               pathType:
                 pathType === 'focus' || pathType === 'descendant' ? 'descendant' : 'lateral',
             });
-          else if (l.target_id === id)
+          } else if (l.target_id === id) {
+            if (isReified(l)) {
+              queue.push({
+                id: l.id,
+                depth: depth + 1,
+                pathType: pathType === 'focus' || pathType === 'ancestor' ? 'ancestor' : 'lateral',
+              });
+            }
             queue.push({
               id: l.source_id,
               depth: depth + 1,
               pathType: pathType === 'focus' || pathType === 'ancestor' ? 'ancestor' : 'lateral',
             });
+          }
         }
       });
     }
@@ -141,6 +184,8 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
           onReifyLink={onReifyLink}
           onReifyNode={onReifyNode}
           onReifyNodeToLink={onReifyNodeToLink}
+          onReparent={onReparent}
+          onEstablishLink={onEstablishLink}
           focusId={focusId || undefined}
         />
       </main>

@@ -41,7 +41,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
 
     // 1. First pass: Filter Nodes
     all.forEach((obj) => {
-      if (isLink(obj)) return;
+      if (isLink(obj) && !isReified(obj)) return;
       const sn = obj as SimpleNote;
       const isStory = sn._type === NexusType.STORY_NOTE;
       const isAuthor = sn.is_author_note;
@@ -78,12 +78,12 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
       const newNode = NexusGraphUtils.createNode('New Unit', NexusType.SIMPLE_NOTE);
       onRegistryUpdate((prev) => {
         const parent = prev[parentId];
-        if (!parent || isLink(parent)) return prev;
+        if (!parent || (isLink(parent) && !isReified(parent))) return prev;
 
         // Omni-container logic: Promote any leaf node to container status upon child addition
         const updatedParent: NexusObject = isContainer(parent)
-          ? { ...parent, children_ids: [...parent.children_ids, newNode.id] }
-          : {
+          ? ({ ...parent, children_ids: [...(parent as any).children_ids, newNode.id] } as any)
+          : ({
               ...parent,
               _type:
                 parent._type === NexusType.STORY_NOTE
@@ -93,7 +93,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
               containment_type: ContainmentType.FOLDER,
               is_collapsed: false,
               default_layout: DefaultLayout.GRID,
-            };
+            } as NexusObject);
 
         const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(
           updatedParent,
@@ -235,6 +235,9 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
   const handleReparent = useCallback(
     (sourceId: string, targetId: string, oldParentId?: string, isReference: boolean = false) => {
       if (sourceId === targetId) return;
+      const target = registry[targetId];
+      if (target && isContainer(target) && target.children_ids.includes(sourceId)) return;
+
       onRegistryUpdate((prev) => {
         if (targetId !== 'root' && GraphIntegrityService.detectCycle(targetId, sourceId, prev))
           return prev;
@@ -310,7 +313,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         return next;
       });
     },
-    [onRegistryUpdate],
+    [onRegistryUpdate, registry],
   );
 
   return (

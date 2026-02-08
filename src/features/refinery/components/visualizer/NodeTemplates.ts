@@ -98,12 +98,12 @@ export const createNodeHTML = (
   const textMuted = 'var(--text-muted)';
 
   return `
-        <div xmlns="http://www.w3.org/1999/xhtml" class="node-pill flex flex-col rounded-xl border transition-all duration-300 pointer-events-auto cursor-pointer w-full h-full" style="border-color: ${borderColor}; background: ${background};">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node-pill flex flex-col rounded-xl border transition-all duration-300 pointer-events-auto cursor-pointer w-full h-full ${isReifiedNode ? 'border-dashed' : ''}" style="border-color: ${borderColor}; background: ${background}; ${isReifiedNode ? 'box-shadow: 0 0 15px rgba(6, 182, 212, 0.1);' : ''}">
             <div class="flex items-center gap-3 p-3 w-full">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border" style="background: ${color}20; border-color: ${color}30;">${icon}</div>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-transform duration-500 ${isHovered ? 'rotate-12' : ''}" style="background: ${color}20; border-color: ${color}30;">${icon}</div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-[12px] font-bold uppercase tracking-tight truncate" style="color: ${textMain};">${d.data.name}</div>
-                    <div class="text-[8px] font-mono uppercase tracking-widest mt-0.5 opacity-70" style="color: ${textMuted};">${d.data.category}</div>
+                    <div class="text-[12px] font-bold uppercase tracking-tight truncate ${isReifiedNode ? 'text-nexus-accent' : ''}" style="color: ${isReifiedNode ? 'var(--accent-color)' : textMain};">${d.data.name}</div>
+                    <div class="text-[8px] font-mono uppercase tracking-widest mt-0.5 opacity-70" style="color: ${textMuted};">${isReifiedNode ? 'LOGIC UNIT' : d.data.category}</div>
                 </div>
             </div>
             ${
@@ -111,6 +111,16 @@ export const createNodeHTML = (
                 ? `
                 <div class="px-4 pb-4 border-t border-white/5 pt-3">
                     <p class="text-[10px] leading-relaxed italic mb-3 line-clamp-3" style="color: ${textMuted};">${d.data.gist}</p>
+                    ${
+                      isReifiedNode
+                        ? `
+                      <div class="mt-2 p-2 bg-black/20 rounded-lg border border-white/5 flex items-center justify-center gap-2">
+                         <div class="w-1.5 h-1.5 rounded-full bg-nexus-accent animate-pulse"></div>
+                         <span class="text-[7px] font-display font-black text-nexus-accent uppercase tracking-widest">Active Causal Bridge</span>
+                      </div>
+                    `
+                        : ''
+                    }
                 </div>
             `
                 : ''
