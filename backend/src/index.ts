@@ -3,7 +3,22 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { GoogleGenerativeAI, Content, GenerationConfig } from '@google/generative-ai';
-import { db, auth } from './firebase-admin';
+import * as admin from 'firebase-admin';
+
+// Initialize Firebase Admin
+try {
+  admin.initializeApp();
+  console.log('✅ Firebase Admin initialized');
+} catch (error) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('⚠️ Firebase Admin failed to initialize with default credentials.');
+  } else {
+    console.error('❌ Failed to initialize Firebase Admin:', error);
+  }
+}
+
+const db = admin.firestore();
+const auth = admin.auth();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
