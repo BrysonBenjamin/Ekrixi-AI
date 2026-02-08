@@ -12,7 +12,7 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
   const timestamp = new Date().toISOString();
   const registry: Record<string, NexusObject> = {};
 
-  const createAndAdd = (obj: any) => {
+  const createAndAdd = (obj: NexusObject) => {
     registry[obj.id] = obj;
     return obj.id;
   };
@@ -38,7 +38,7 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
     is_collapsed: false,
     default_layout: DefaultLayout.TREE,
     children_ids: [], // To be populated
-  });
+  } as NexusObject);
 
   // 2. Continents
   const aetheriaId = createAndAdd({
@@ -59,7 +59,7 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
     is_collapsed: false,
     default_layout: DefaultLayout.GRID,
     children_ids: [],
-  });
+  } as NexusObject);
 
   const abyssaId = createAndAdd({
     id: generateId(),
@@ -79,7 +79,7 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
     is_collapsed: false,
     default_layout: DefaultLayout.GRID,
     children_ids: [],
-  });
+  } as NexusObject);
 
   // 3. Factions
   const councilId = createAndAdd({
@@ -100,7 +100,7 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
     is_collapsed: false,
     default_layout: DefaultLayout.TREE,
     children_ids: [],
-  });
+  } as NexusObject);
 
   // 4. Characters
   const elaraId = createAndAdd({
@@ -119,15 +119,19 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
     tags: ['pilot', 'empath'],
     prose_content:
       "Elara was the first to realize that Gaia's tectonic shifts were actually a form of long-wave communication.",
-  });
+  } as NexusObject);
 
   // 5. Build Hierarchy Links
   const addHierarchy = (parentId: string, childId: string) => {
-    const parent = registry[parentId] as any;
-    parent.children_ids.push(childId);
+    const parent = registry[parentId];
+    if (parent && 'children_ids' in parent) {
+      if (!parent.children_ids.includes(childId)) {
+        parent.children_ids.push(childId);
+      }
+    }
 
     const linkId = generateId();
-    const link: any = {
+    const link: NexusObject = {
       id: linkId,
       _type: NexusType.HIERARCHICAL_LINK,
       source_id: parentId,
@@ -139,9 +143,9 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
       created_at: timestamp,
       last_modified: timestamp,
       link_ids: [],
-    };
+    } as NexusObject;
     registry[linkId] = link;
-    parent.link_ids.push(linkId);
+    if (parent) parent.link_ids.push(linkId);
     registry[childId].link_ids.push(linkId);
   };
 
@@ -164,7 +168,7 @@ export const getGaiaFixture = (): Record<string, NexusObject> => {
     created_at: timestamp,
     last_modified: timestamp,
     link_ids: [],
-  } as any;
+  } as NexusObject;
   registry[elaraId].link_ids.push(semanticLinkId);
   registry[abyssaId].link_ids.push(semanticLinkId);
 

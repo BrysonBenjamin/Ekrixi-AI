@@ -12,9 +12,9 @@ import {
   orderBy,
   onSnapshot,
   runTransaction,
-  DocumentData,
   writeBatch,
   QueryConstraint,
+  CollectionReference,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -26,6 +26,7 @@ import {
   ContainmentType,
   DefaultLayout,
 } from '../../types';
+import { Universe, UniverseUpdates } from '../types/data-service';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
 
 // Collection References
@@ -277,7 +278,7 @@ export const FirestoreService = {
     await deleteDoc(getUniverseDocRef(universeId));
   },
 
-  async updateUniverseMeta(universeId: string, updates: any): Promise<void> {
+  async updateUniverseMeta(universeId: string, updates: UniverseUpdates): Promise<void> {
     const universeRef = getUniverseDocRef(universeId);
     await updateDoc(universeRef, {
       ...updates,
@@ -285,7 +286,7 @@ export const FirestoreService = {
     });
   },
 
-  listenToUniverses(userId: string | null, callback: (universes: any[]) => void): () => void {
+  listenToUniverses(userId: string | null, callback: (universes: Universe[]) => void): () => void {
     if (import.meta.env.DEV) {
       console.log(
         `[FirestoreService] listenToUniverses called with userId:`,
@@ -306,7 +307,7 @@ export const FirestoreService = {
     return onSnapshot(
       q,
       (snapshot) => {
-        callback(snapshot.docs.map((doc) => doc.data()));
+        callback(snapshot.docs.map((doc) => doc.data() as Universe));
       },
       (error) => {
         console.error('[FirestoreService] listenToUniverses error:', error);
@@ -316,7 +317,10 @@ export const FirestoreService = {
 
   // --- Helpers ---
 
-  async deleteCollection(collectionRef: any, batchSize: number = 50): Promise<void> {
+  async deleteCollection(
+    collectionRef: CollectionReference,
+    batchSize: number = 50,
+  ): Promise<void> {
     const q = query(collectionRef, limit(batchSize));
     const snapshot = await getDocs(q);
 
@@ -343,7 +347,8 @@ export const FirestoreService = {
     // We only save the session metadata here. Messages are empty initially.
     // We strip the messageMap to avoid saving it in the main doc if we were passing full object
     // But for consistency we'll save the "root" structure fields.
-    const { messageMap, ...sessionData } = session;
+    const sessionData = { ...session };
+    delete (sessionData as any).messageMap;
     const docRef = getChatDocRef(universeId, session.id);
     await setDoc(docRef, sessionData);
   },
@@ -369,7 +374,8 @@ export const FirestoreService = {
   ): Promise<void> {
     const docRef = getChatDocRef(universeId, sessionId);
     // Ensure we don't accidentally write messageMap if it was passed
-    const { messageMap, ...safeUpdates } = updates;
+    const safeUpdates = { ...updates };
+    delete (safeUpdates as any).messageMap;
     await updateDoc(docRef, { ...safeUpdates, updatedAt: new Date().toISOString() });
   },
 
@@ -458,7 +464,7 @@ export const FirestoreService = {
       }
 
       // C. Update Session
-      const sessionUpdates: any = {
+      const sessionUpdates: Partial<ChatSession> & { updatedAt: string } = {
         currentLeafId: message.id,
         updatedAt: new Date().toISOString(),
       };

@@ -63,8 +63,9 @@ export const NexusMarkdown: React.FC<NexusMarkdownProps> = ({
       // Create a map of titles to IDs for faster lookup
       const titleToIdMap: Record<string, string> = {};
       nodes.forEach((node) => {
-        const anyNode = node as any;
-        const title = anyNode.title || anyNode.verb;
+        const title =
+          ('title' in node ? (node as any).title : null) ||
+          ('verb' in node ? (node as any).verb : null);
         if (title) {
           titleToIdMap[title.toLowerCase()] = node.id;
         }
@@ -82,7 +83,11 @@ export const NexusMarkdown: React.FC<NexusMarkdownProps> = ({
         if (!id && nodes.length > 0) {
           // Find first node where title includes the search key or vice versa
           const bestMatch = nodes.find((n) => {
-            const t = ((n as any).title || (n as any).verb || '').toLowerCase();
+            const t = (
+              ('title' in n ? (n as any).title : null) ||
+              ('verb' in n ? (n as any).verb : null) ||
+              ''
+            ).toLowerCase();
             return t.includes(searchKey) || searchKey.includes(t);
           });
 
@@ -108,14 +113,17 @@ export const NexusMarkdown: React.FC<NexusMarkdownProps> = ({
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ node, ...props }) => {
+          a: ({ node: _, ...props }) => {
             const href = props.href || '';
 
             // Handle Internal Navigation
             if (href.startsWith('#navigate-')) {
               const id = decodeURIComponent(href.replace('#navigate-', ''));
               const targetNode = registry[id];
-              const category = (targetNode as any)?.category_id || 'CONCEPT';
+              const category =
+                targetNode && 'category_id' in targetNode
+                  ? (targetNode as any).category_id
+                  : 'CONCEPT';
               const linkColor = CATEGORY_COLORS[category] || color || '#e11d48';
 
               return (
@@ -130,7 +138,7 @@ export const NexusMarkdown: React.FC<NexusMarkdownProps> = ({
                     color: linkColor,
                     border: `1px solid ${linkColor}30`, // Subtle border
                   }}
-                  title={`Navigate to: ${(targetNode as any)?.title || id} (${category})`}
+                  title={`Navigate to: ${targetNode && 'title' in targetNode ? (targetNode as any).title : id} (${category})`}
                 >
                   <span style={{ opacity: 0.7 }}>{getCategoryIcon(category)}</span>
                   <span>{props.children}</span>
@@ -162,7 +170,7 @@ export const NexusMarkdown: React.FC<NexusMarkdownProps> = ({
             );
           },
           // Table Support Styling
-          table: ({ node, ...props }) => (
+          table: ({ node: _, ...props }) => (
             <div className="overflow-x-auto my-4">
               <table
                 className="w-full text-left border-collapse border border-nexus-800 rounded-lg overflow-hidden bg-nexus-900/30"
@@ -170,14 +178,16 @@ export const NexusMarkdown: React.FC<NexusMarkdownProps> = ({
               />
             </div>
           ),
-          thead: ({ node, ...props }) => (
+          thead: ({ node: _, ...props }) => (
             <thead
               className="bg-nexus-900/60 text-xs uppercase font-bold text-nexus-muted tracking-wider"
               {...props}
             />
           ),
-          th: ({ node, ...props }) => <th className="p-3 border-b border-nexus-800" {...props} />,
-          td: ({ node, ...props }) => (
+          th: ({ node: _, ...props }) => (
+            <th className="p-3 border-b border-nexus-800" {...props} />
+          ),
+          td: ({ node: _, ...props }) => (
             <td
               className="p-3 border-b border-nexus-800/50 text-sm text-nexus-text/80"
               {...props}

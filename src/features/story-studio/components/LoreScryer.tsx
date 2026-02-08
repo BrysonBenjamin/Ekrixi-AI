@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, MapPin, Users, Box, Ghost, ArrowRight, Share2 } from 'lucide-react';
+import { Search, X, MapPin, Users, Box, Ghost, Share2 } from 'lucide-react';
 import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../types';
 
 interface LoreScryerProps {
@@ -14,18 +14,24 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
 
   const items = useMemo(() => {
     const all = Object.values(registry) as NexusObject[];
-    const filtered = all.filter(
-      (o) =>
-        (!isLink(o) || isReified(o)) &&
-        o._type !== NexusType.STORY_NOTE &&
-        ((o as any).title?.toLowerCase().includes(search.toLowerCase()) ||
-          (o as any).gist?.toLowerCase().includes(search.toLowerCase())),
-    );
+    const filtered = all.filter((o) => {
+      if (isLink(o) && !isReified(o)) return false;
+      if (o._type === NexusType.STORY_NOTE) return false;
+
+      const title = 'title' in o ? (o as any).title : '';
+      const gist = 'gist' in o ? (o as any).gist : '';
+
+      return (
+        title?.toLowerCase().includes(search.toLowerCase()) ||
+        gist?.toLowerCase().includes(search.toLowerCase())
+      );
+    });
     return filtered;
   }, [registry, search]);
 
-  const handleDragStart = (e: React.DragEvent, item: any) => {
-    e.dataTransfer.setData('application/nexus-scry-title', item.title);
+  const handleDragStart = (e: React.DragEvent, item: NexusObject) => {
+    const title = 'title' in item ? (item as any).title : 'Unit';
+    e.dataTransfer.setData('application/nexus-scry-title', title);
     e.dataTransfer.setData('application/nexus-scry-id', item.id);
   };
 
@@ -73,30 +79,37 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
             </p>
           </div>
         ) : (
-          items.map((item: any) => (
-            <div
-              key={item.id}
-              draggable
-              onDragStart={(e) => handleDragStart(e, item)}
-              className="p-4 bg-nexus-950/40 border border-nexus-800 rounded-2xl cursor-grab active:cursor-grabbing hover:border-nexus-accent group transition-all"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <CategoryIcon cat={item.category_id} reified={isReified(item)} />
-                <span className="text-[11px] font-display font-bold text-nexus-text group-hover:text-nexus-accent truncate">
-                  {item.title}
-                </span>
-              </div>
-              <p className="text-[9px] text-nexus-muted italic line-clamp-2 font-serif">
-                "{item.gist}"
-              </p>
-              <div className="mt-3 flex justify-between items-center">
-                <div className="text-[7px] font-mono text-nexus-muted uppercase tracking-widest">
-                  DRAG_UNIT
+          items.map((item) => {
+            const title = 'title' in item ? (item as any).title : 'Unit';
+            const gist = 'gist' in item ? (item as any).gist : '';
+            const categoryId =
+              'category_id' in item ? (item as any).category_id : NexusCategory.CONCEPT;
+
+            return (
+              <div
+                key={item.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item)}
+                className="p-4 bg-nexus-950/40 border border-nexus-800 rounded-2xl cursor-grab active:cursor-grabbing hover:border-nexus-accent group transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <CategoryIcon cat={categoryId} reified={isReified(item)} />
+                  <span className="text-[11px] font-display font-bold text-nexus-text group-hover:text-nexus-accent truncate">
+                    {title}
+                  </span>
                 </div>
-                <div className="w-1.5 h-1.5 rounded-full bg-nexus-800 group-hover:bg-nexus-accent" />
+                <p className="text-[9px] text-nexus-muted italic line-clamp-2 font-serif">
+                  "{gist}"
+                </p>
+                <div className="mt-3 flex justify-between items-center">
+                  <div className="text-[7px] font-mono text-nexus-muted uppercase tracking-widest">
+                    DRAG_UNIT
+                  </div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-nexus-800 group-hover:bg-nexus-accent" />
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

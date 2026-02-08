@@ -14,6 +14,7 @@ import {
   User,
   LogOut,
   X,
+  LucideIcon,
 } from 'lucide-react';
 import { useSessionStore } from '../../store/useSessionStore';
 import { useGoogleDrive } from '../../features/system/hooks/useGoogleDrive';
@@ -32,7 +33,7 @@ interface AppShellProps {
 
 interface NavItemProps {
   path: string;
-  icon: any;
+  icon: LucideIcon;
   label: string;
   isActive: boolean;
   onClick: (path: string) => void;
@@ -287,26 +288,31 @@ export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
                   { path: '/explore', icon: MapIcon, label: 'Explorer' },
                   { path: '/library', icon: BookType, label: 'Library' },
                   { path: '/studio', icon: PenTool, label: 'Studio' },
-                ].map((item) => (
-                  <button
-                    key={item.path}
-                    onClick={() => handleNavigate(item.path)}
-                    className={`
-                            w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left
-                            ${isActiveView(item.path) ? 'bg-nexus-accent/10 text-nexus-text border border-nexus-accent/20' : 'hover:bg-nexus-800 text-nexus-muted'}
-                        `}
-                  >
-                    <item.icon
-                      size={18}
-                      className={isActiveView(item.path) ? 'text-nexus-accent' : 'text-nexus-muted'}
-                    />
-                    <span
-                      className={`font-medium text-sm ${isActiveView(item.path) ? 'font-bold' : ''}`}
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => handleNavigate(item.path)}
+                      className={`
+                              w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left
+                              ${isActiveView(item.path) ? 'bg-nexus-accent/10 text-nexus-text border border-nexus-accent/20' : 'hover:bg-nexus-800 text-nexus-muted'}
+                          `}
                     >
-                      {item.label}
-                    </span>
-                  </button>
-                ))}
+                      <Icon
+                        size={18}
+                        className={
+                          isActiveView(item.path) ? 'text-nexus-accent' : 'text-nexus-muted'
+                        }
+                      />
+                      <span
+                        className={`font-medium text-sm ${isActiveView(item.path) ? 'font-bold' : ''}`}
+                      >
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="space-y-2">

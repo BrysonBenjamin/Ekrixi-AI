@@ -19,7 +19,7 @@ import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
 interface RefineryInspectorProps {
   object: NexusObject;
   registry: Record<string, NexusObject>;
-  onUpdate: (updates: any) => void;
+  onUpdate: (updates: Partial<NexusObject>) => void;
   onClose: () => void;
 }
 
@@ -32,7 +32,9 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
   const isL = isLink(object);
   const reified = isReified(object);
   const isStory = object._type === NexusType.STORY_NOTE;
-  const title = (object as any).title || (isL ? (object as any).verb : 'Untitled');
+  const title =
+    ('title' in object ? (object as any).title : null) ||
+    (isL && 'verb' in object ? (object as any).verb : 'Untitled');
   const proseRef = useRef<HTMLTextAreaElement>(null);
 
   return (
@@ -97,8 +99,8 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
                   Designation
                 </label>
                 <input
-                  value={(object as any).title}
-                  onChange={(e) => onUpdate({ title: e.target.value })}
+                  value={'title' in object ? (object as any).title : ''}
+                  onChange={(e) => onUpdate({ title: e.target.value } as Partial<NexusObject>)}
                   className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-xs font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner"
                 />
               </div>
@@ -107,9 +109,13 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
                   Category Signature
                 </label>
                 <select
-                  value={(object as any).category_id}
+                  value={'category_id' in object ? (object as any).category_id : ''}
                   disabled={isStory}
-                  onChange={(e) => onUpdate({ category_id: e.target.value as NexusCategory })}
+                  onChange={(e) =>
+                    onUpdate({
+                      category_id: e.target.value as NexusCategory,
+                    } as Partial<NexusObject>)
+                  }
                   className={`w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-[10px] font-black uppercase text-nexus-text focus:border-nexus-accent outline-none tracking-widest cursor-pointer ${isStory ? 'opacity-50 grayscale' : ''}`}
                 >
                   {Object.values(NexusCategory).map((c) => (
@@ -133,7 +139,9 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
                     Origin
                   </div>
                   <div className="text-[9px] font-bold text-nexus-text truncate px-2">
-                    {(registry[object.source_id] as any)?.title}
+                    {isLink(object) && 'title' in (registry[object.source_id] || {})
+                      ? (registry[object.source_id] as any).title
+                      : 'Unknown'}
                   </div>
                 </div>
                 <ArrowRight size={14} className="text-nexus-accent opacity-30" />
@@ -142,7 +150,9 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
                     Terminal
                   </div>
                   <div className="text-[9px] font-bold text-nexus-text truncate px-2">
-                    {(registry[object.target_id] as any)?.title}
+                    {isLink(object) && 'title' in (registry[object.target_id] || {})
+                      ? (registry[object.target_id] as any).title
+                      : 'Unknown'}
                   </div>
                 </div>
               </div>
@@ -153,8 +163,8 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
                     Active Verb
                   </label>
                   <input
-                    value={(object as any).verb}
-                    onChange={(e) => onUpdate({ verb: e.target.value })}
+                    value={isLink(object) && 'verb' in object ? (object as any).verb : ''}
+                    onChange={(e) => onUpdate({ verb: e.target.value } as Partial<NexusObject>)}
                     className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-xs font-bold text-nexus-text focus:border-nexus-accent outline-none"
                     placeholder="Logic..."
                   />
@@ -164,8 +174,12 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
                     Inverse
                   </label>
                   <input
-                    value={(object as any).verb_inverse}
-                    onChange={(e) => onUpdate({ verb_inverse: e.target.value })}
+                    value={
+                      isLink(object) && 'verb_inverse' in object ? (object as any).verb_inverse : ''
+                    }
+                    onChange={(e) =>
+                      onUpdate({ verb_inverse: e.target.value } as Partial<NexusObject>)
+                    }
                     className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-xs font-bold text-nexus-text focus:border-nexus-accent outline-none"
                     placeholder="Reciprocal..."
                   />
@@ -185,8 +199,8 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
             </h3>
           </div>
           <textarea
-            value={(object as any).gist}
-            onChange={(e) => onUpdate({ gist: e.target.value })}
+            value={'gist' in object ? (object as any).gist : ''}
+            onChange={(e) => onUpdate({ gist: e.target.value } as Partial<NexusObject>)}
             className="w-full h-28 bg-nexus-900 border border-nexus-800 rounded-2xl p-4 text-[13px] text-nexus-text/90 font-serif italic outline-none focus:border-nexus-accent resize-none no-scrollbar leading-relaxed"
             placeholder="Establish the core essence..."
           />
@@ -210,13 +224,13 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
           <div className="space-y-3">
             <MarkdownToolbar
               textareaRef={proseRef}
-              content={(object as any).prose_content || ''}
-              onUpdate={(val) => onUpdate({ prose_content: val })}
+              content={'prose_content' in object ? (object as any).prose_content || '' : ''}
+              onUpdate={(val) => onUpdate({ prose_content: val } as Partial<NexusObject>)}
             />
             <textarea
               ref={proseRef}
-              value={(object as any).prose_content}
-              onChange={(e) => onUpdate({ prose_content: e.target.value })}
+              value={'prose_content' in object ? (object as any).prose_content || '' : ''}
+              onChange={(e) => onUpdate({ prose_content: e.target.value } as Partial<NexusObject>)}
               spellCheck={false}
               className="w-full h-80 bg-nexus-900 border border-nexus-800 rounded-2xl p-6 text-[13px] text-nexus-text font-mono outline-none focus:border-nexus-accent resize-none no-scrollbar leading-[1.8] shadow-inner selection:bg-nexus-accent/30 tracking-tight"
               placeholder="# Chronicling deep causality..."

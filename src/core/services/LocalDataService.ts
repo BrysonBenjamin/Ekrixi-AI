@@ -1,6 +1,6 @@
 import { NexusObject, SimpleLink, SimpleNote } from '../types';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
-import { IDataService } from '../types/data-service';
+import { IDataService, Universe, UniverseUpdates } from '../types/data-service';
 
 // --- Internal Storage Helpers (Private to this module) ---
 const _getStorageKey = (
@@ -108,19 +108,19 @@ export const LocalDataService: IDataService = {
       ...newNoteData,
       id: crypto.randomUUID(),
       _type: 'SIMPLE_NOTE',
-    } as any;
+    } as SimpleNote;
 
-    await this.createOrUpdateNexusObject(universeId, newNote as unknown as NexusObject);
+    await this.createOrUpdateNexusObject(universeId, newNote as NexusObject);
     return newNote;
   },
 
   // --- Universe Management ---
   async createUniverse(name: string, description: string, ownerId: string): Promise<string> {
     const key = 'ekrixi_local_universes';
-    const universes = _getData<any>(key);
+    const universes = _getData<Universe>(key);
     const id = crypto.randomUUID();
 
-    const newUniverse = {
+    const newUniverse: Universe = {
       id,
       name,
       description,
@@ -140,20 +140,26 @@ export const LocalDataService: IDataService = {
     ownerId: string,
   ): Promise<void> {
     const key = 'ekrixi_local_universes';
-    const universes = _getData<any>(key);
+    const universes = _getData<Universe>(key);
 
-    if (!universes.find((u: any) => u.id === id)) {
-      universes.push({ id, name, description, ownerId });
+    if (!universes.find((u) => u.id === id)) {
+      universes.push({
+        id,
+        name,
+        description,
+        ownerId,
+        createdAt: new Date().toISOString(),
+      });
       _saveData(key, universes);
     }
   },
 
   async deleteUniverse(universeId: string): Promise<void> {
     const key = 'ekrixi_local_universes';
-    const universes = _getData<any>(key);
+    const universes = _getData<Universe>(key);
     _saveData(
       key,
-      universes.filter((u: any) => u.id !== universeId),
+      universes.filter((u) => u.id !== universeId),
     );
 
     // Clean up associated data
@@ -162,10 +168,10 @@ export const LocalDataService: IDataService = {
     localStorage.removeItem(_getStorageKey(universeId, 'messages'));
   },
 
-  async updateUniverseMeta(universeId: string, updates: any): Promise<void> {
+  async updateUniverseMeta(universeId: string, updates: UniverseUpdates): Promise<void> {
     const key = 'ekrixi_local_universes';
-    const universes = _getData<any>(key);
-    const index = universes.findIndex((u: any) => u.id === universeId);
+    const universes = _getData<Universe>(key);
+    const index = universes.findIndex((u) => u.id === universeId);
 
     if (index >= 0) {
       universes[index] = { ...universes[index], ...updates };
@@ -173,11 +179,11 @@ export const LocalDataService: IDataService = {
     }
   },
 
-  listenToUniverses(userId: string | null, callback: (universes: any[]) => void): () => void {
+  listenToUniverses(userId: string | null, callback: (universes: Universe[]) => void): () => void {
     const key = 'ekrixi_local_universes';
     const getFiltered = () => {
-      const all = _getData<any>(key);
-      return userId ? all.filter((u: any) => u.ownerId === userId) : all;
+      const all = _getData<Universe>(key);
+      return userId ? all.filter((u) => u.ownerId === userId) : all;
     };
 
     callback(getFiltered());

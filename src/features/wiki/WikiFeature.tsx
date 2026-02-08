@@ -183,7 +183,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
     if (currentArtifact && currentObject) {
       onUpdateObject(currentObject.id, {
         encyclopedia_content: currentArtifact.content,
-        weaving_protocol: (currentArtifact as any).weaving_protocol || '',
+        weaving_protocol: currentArtifact.weaving_protocol || '',
         last_modified: new Date().toISOString(),
       });
       setShowSaveSuccess(true);

@@ -157,7 +157,9 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
       const result = JSON.parse(resultJson.text() || '{}');
       setMessages((prev) => [...prev, { role: 'assistant', text: result.reply, action: result }]);
       setContextNodes([]);
-    } catch (_err) {
+      setContextNodes([]);
+    } catch (err) {
+      console.error('[StudioChatWidget] Error:', err);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: 'Neural Chat connection interrupted. Please re-synchronize.' },
@@ -167,7 +169,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
     }
   };
 
-  const handleExecuteAction = (type: string, data: any) => {
+  const handleExecuteAction = (type: 'CHAPTERS' | 'PROTOCOLS', data: any) => {
     const now = new Date().toISOString();
     let nextItems = [...items];
 
@@ -211,7 +213,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
             created_at: now,
             last_modified: now,
             link_ids: [],
-          } as any);
+          } as NexusObject);
         }
       });
     } else if (type === 'PROTOCOLS') {
@@ -247,7 +249,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
                   created_at: now,
                   last_modified: now,
                   link_ids: [],
-                } as any);
+                } as NexusObject);
               }
             });
           }
@@ -298,7 +300,7 @@ export const StudioChatWidget: React.FC<StudioChatWidgetProps> = ({
           >
             {m.context && m.context.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-1">
-                {m.context.map((n: any) => (
+                {m.context.map((n) => (
                   <span
                     key={n.id}
                     className="px-2 py-0.5 bg-nexus-accent/10 border border-nexus-accent/30 rounded text-[7px] font-bold text-nexus-accent uppercase"

@@ -1,22 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
-import {
-  X,
-  Send,
-  Sparkles,
-  RotateCw,
-  Activity,
-  Type,
-  Layers,
-  Scale,
-  Plus,
-  Bot,
-  User,
-  ChevronRight,
-  Zap,
-  Box,
-  Check,
-} from 'lucide-react';
+import { X, Send, Sparkles, RotateCw, Activity, Type, Zap, Plus } from 'lucide-react';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../types';
 import { generateId } from '../../../utils/ids';
@@ -24,6 +8,20 @@ import { useLLM } from '../../system/hooks/useLLM';
 import { GEMINI_MODELS } from '../../../core/llm';
 import { NexusObject } from '../../../types';
 import { LITERARY_ARCHETYPES } from './ManifestoForge';
+
+interface ProposedBlock {
+  type: StudioBlock['type'];
+  data: any; // Data depends on type
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  text: string;
+  action?: {
+    proposedBlocks: ProposedBlock[];
+    reply: string;
+  };
+}
 
 interface ManifestoChatbotProps {
   blocks: StudioBlock[];
@@ -40,7 +38,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({
 }) => {
   const { generateContent } = useLLM();
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -114,7 +112,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({
     }
   };
 
-  const handleApplyBlocks = (proposed: any[]) => {
+  const handleApplyBlocks = (proposed: ProposedBlock[]) => {
     const nextBlocks = [...blocks];
     proposed.forEach((p) => {
       nextBlocks.push({
@@ -181,7 +179,7 @@ export const ManifestoChatbot: React.FC<ManifestoChatbotProps> = ({
                     <Activity size={10} className="text-nexus-ruby animate-pulse" />
                   </div>
                   <div className="space-y-2">
-                    {m.action.proposedBlocks.map((b: any, idx: number) => (
+                    {m.action.proposedBlocks.map((b, idx) => (
                       <div
                         key={idx}
                         className="flex items-center gap-2 p-2 bg-nexus-900 border border-nexus-800 rounded-lg"

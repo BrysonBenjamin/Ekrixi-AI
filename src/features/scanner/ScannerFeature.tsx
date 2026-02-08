@@ -57,6 +57,25 @@ export type ExtractedItem = NexusObject & {
   };
 };
 
+interface ArchitectLink {
+  source: string;
+  target: string;
+  verb: string;
+  type: 'HIERARCHICAL' | 'SEMANTIC';
+  verb_inverse?: string;
+}
+
+interface ArchitectUpdate {
+  title: string;
+  gist: string;
+  records: string;
+}
+
+interface ArchitectResponse {
+  links: ArchitectLink[];
+  updates: ArchitectUpdate[];
+}
+
 export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
   onCommitBatch,
   registry = {},
@@ -115,10 +134,13 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
       });
 
       const result = await architectResponse.response;
-      const architecture = safeParseJson(result.text() || '{"links": [], "updates": []}', {
-        links: [],
-        updates: [],
-      });
+      const architecture = safeParseJson<ArchitectResponse>(
+        result.text() || '{"links": [], "updates": []}',
+        {
+          links: [],
+          updates: [],
+        },
+      );
 
       const finalBatch: ExtractedItem[] = [];
       const idMap: Record<string, string> = {};
@@ -146,7 +168,11 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
             link_ids: [],
             internal_weight: 1.0,
             total_subtree_mass: 0,
-          } as any);
+            prose_content: '',
+            is_ghost: false,
+            aliases: [],
+            tags: [],
+          } as NexusObject);
 
           // Create hierarchical link for suggested child
           finalBatch.push({
@@ -162,12 +188,12 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
             link_ids: [],
             internal_weight: 1.0,
             total_subtree_mass: 0,
-          } as any);
+          } as NexusObject);
         });
 
         // Get content update for this seed
         const update = architecture.updates?.find(
-          (u: any) => u.title.toLowerCase() === s.title.toLowerCase(),
+          (u) => u.title.toLowerCase() === s.title.toLowerCase(),
         );
 
         finalBatch.push({
@@ -183,6 +209,9 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
           link_ids: [],
           internal_weight: 1.0,
           total_subtree_mass: 0,
+          aliases: s.aliases || [],
+          tags: [],
+          is_ghost: false,
           ...(childIds.length > 0
             ? {
                 children_ids: childIds,
@@ -191,7 +220,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
                 default_layout: DefaultLayout.GRID,
               }
             : {}),
-        } as any);
+        } as NexusObject);
       });
 
       // 2. Resolve Links from AI Architecture
@@ -201,7 +230,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
         tempRegistry[item.id] = item;
       });
 
-      (architecture.links || []).forEach((l: any) => {
+      (architecture.links || []).forEach((l) => {
         const sId = idMap[l.source.toLowerCase()];
         const tId = idMap[l.target.toLowerCase()];
 
@@ -218,7 +247,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
 
           const newLink: ExtractedItem = {
             id: generateId(),
-            _type: linkType as any,
+            _type: linkType as NexusType.HIERARCHICAL_LINK | NexusType.SEMANTIC_LINK,
             source_id: sId,
             target_id: tId,
             verb: l.verb || (isHierarchical ? 'contains' : 'relates to'),
@@ -229,7 +258,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
             internal_weight: 1.0,
             total_subtree_mass: 0,
             conflict: integrity,
-          } as any;
+          } as ExtractedItem;
 
           if (isHierarchical) {
             (newLink as any).hierarchy_type = HierarchyType.PARENT_OF;
@@ -255,10 +284,10 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
 
       setExtractedItems(finalBatch);
       setStage('REVIEW');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Scanner Processing Error:', err);
-      // Construct a more helpful error message checks
-      let msg = err.message || 'Extraction Pipeline Interrupted.';
+      const errorMessage = err instanceof Error ? err.message : 'Extraction Pipeline Interrupted.';
+      let msg = errorMessage;
       if (msg.includes('404')) msg += ' (Model not found? Check GEMINI_MODELS)';
       if (msg.includes('400')) msg += ' (Bad Request? Check prompt/context size)';
 

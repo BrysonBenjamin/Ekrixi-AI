@@ -43,6 +43,8 @@ export interface RefineryBatch {
   source: 'SCANNER' | 'IMPORT' | 'GENERATOR';
 }
 
+type ViewMode = 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR';
+
 interface Toast {
   id: string;
   message: string;
@@ -269,7 +271,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               ? NexusType.AGGREGATED_HIERARCHICAL_LINK
               : NexusType.AGGREGATED_SEMANTIC_LINK,
           is_reified: true,
-          title: `${(source as SimpleNote)?.title || 'Origin'} → ${(target as SimpleNote)?.title || 'Terminal'}`,
+          title: `${('title' in (source || {}) ? (source as any).title : 'Origin') || 'Origin'} → ${('title' in (target || {}) ? (target as any).title : 'Terminal') || 'Terminal'}`,
           gist: `Logic: ${item.verb}`,
           category_id: NexusCategory.META,
           children_ids: [],
@@ -277,7 +279,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
           is_collapsed: false,
           default_layout: DefaultLayout.GRID,
           last_modified: new Date().toISOString(),
-        } as any;
+        } as NexusObject;
       });
       setLocalQueue(nextQueue);
       if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
@@ -298,7 +300,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
           default_layout: DefaultLayout.GRID,
           children_ids: [],
           last_modified: new Date().toISOString(),
-        } as any;
+        } as NexusObject;
       });
       setLocalQueue(nextQueue);
       if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
@@ -340,7 +342,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             is_collapsed: false,
             default_layout: DefaultLayout.GRID,
             last_modified: new Date().toISOString(),
-          } as any;
+          } as NexusObject;
         }
         return item;
       });
@@ -554,7 +556,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   }}
                   onResetStack={() => setDrillStack([])}
                   onSelect={setSelectedId}
-                  onViewModeChange={(mode: any) => {
+                  onViewModeChange={(mode: ViewMode) => {
                     if (mode === 'INSPECTOR') setShowInspector(true);
                   }}
                   onReifyLink={handleReifyLink}
@@ -567,7 +569,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   selectedId={selectedId}
                   onSelect={setSelectedId}
                   onAddChild={handleAddChild}
-                  onViewModeChange={(mode: any) => {
+                  onViewModeChange={(mode: ViewMode) => {
                     if (mode === 'INSPECTOR') setShowInspector(true);
                   }}
                   onDrilldown={handleDrilldownAction}
