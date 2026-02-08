@@ -788,7 +788,7 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
                       <textarea
                         value={ch.gist}
                         onChange={(e) => handleUpdateBeat(ch.id, { gist: e.target.value })}
-                        className="w-full h-24 bg-nexus-950 border border-nexus-800 rounded-xl px-4 py-3 text-sm font-serif italic outline-none focus:border-nexus-ruby resize-none no-scrollbar text-nexus-text"
+                        className="w-full min-h-[120px] bg-nexus-950 border border-nexus-800 rounded-xl px-4 py-3 text-sm font-serif italic outline-none focus:border-nexus-ruby resize-y text-nexus-text"
                         placeholder="Description..."
                       />
                     </div>

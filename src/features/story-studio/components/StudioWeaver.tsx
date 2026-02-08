@@ -294,7 +294,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
                   onChange={(e) => handleTextChange(e.target.value)}
                   placeholder="Manifest the search..."
                   spellCheck={false}
-                  className="flex-1 w-full bg-transparent border-none outline-none resize-none font-serif text-2xl leading-[1.8] text-nexus-text selection:bg-nexus-accent/20 placeholder:text-nexus-muted/20 no-scrollbar"
+                  className="w-full min-h-[60vh] bg-transparent border-none outline-none resize-none font-serif text-2xl leading-[1.8] text-nexus-text selection:bg-nexus-accent/20 placeholder:text-nexus-muted/20 no-scrollbar overflow-hidden"
                 />
               </div>
             )}
@@ -326,6 +326,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
         <div className="md:w-2/5 flex flex-col bg-nexus-900 relative border-l border-nexus-800 animate-in slide-in-from-right-8 duration-700">
           <ContextTabs
             registry={localizedRegistry(studioItems, worldRegistry, scannedMentions)}
+            worldRegistry={worldRegistry}
             mentions={scannedMentions}
             notes={activeNotes}
             chapter={focusedNode}
@@ -345,6 +346,7 @@ interface ContextTabsProps {
   chapter: StoryNote | SimpleNote | null;
   isChapterMode?: boolean;
   registry: Record<string, NexusObject>;
+  worldRegistry: Record<string, NexusObject>;
   mentions: Set<string>;
   notes: SimpleNote[];
   onUpdate: (items: NexusObject[]) => void;
@@ -357,6 +359,7 @@ const ContextTabs = ({
   chapter,
   isChapterMode,
   registry,
+  worldRegistry,
   mentions,
   notes,
   onUpdate,
@@ -390,7 +393,9 @@ const ContextTabs = ({
       </nav>
 
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'WIKI' && <LocalizedWorldWiki registry={registry} mentions={mentions} />}
+        {activeTab === 'WIKI' && (
+          <LocalizedWorldWiki registry={worldRegistry} mentions={mentions} />
+        )}
         {activeTab === 'CHAT' && (
           <WeaverChatAssistant
             chapter={chapter}
@@ -398,7 +403,7 @@ const ContextTabs = ({
             notes={notes}
             studioItems={studioItems}
             onUpdate={onUpdate}
-            worldRegistry={registry}
+            worldRegistry={worldRegistry}
             selection={selectedText}
             onClearSelection={onClearSelection}
           />

@@ -69,16 +69,16 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
     });
   };
 
-  const { roots, registry, reifiedLinksByTarget } = useMemo(() => {
+  const { roots, registry, reifiedLinksByOrigin } = useMemo(() => {
     const reg: Record<string, NexusObject> = {};
-    const byTarget: Record<string, string[]> = {};
+    const byOrigin: Record<string, string[]> = {};
 
     items.forEach((item) => {
       reg[item.id] = item;
       if (isReified(item)) {
-        const targetId = (item as any).target_id;
-        if (!byTarget[targetId]) byTarget[targetId] = [];
-        byTarget[targetId].push(item.id);
+        const sourceId = (item as any).source_id;
+        if (!byOrigin[sourceId]) byOrigin[sourceId] = [];
+        byOrigin[sourceId].push(item.id);
       }
     });
 
@@ -89,15 +89,26 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
       }
     });
 
-    const rootNodes = items.filter(
-      (item) =>
-        (!childIds.has(item.id) || (item as any).tags?.includes('__is_root__')) && !isLink(item),
-    );
+    const rootNodes = items.filter((item) => {
+      const isExplicitChild = childIds.has(item.id);
+      const isManualRoot = (item as any).tags?.includes('__is_root__');
+      const isRelLink = isLink(item) && !isReified(item);
+
+      if (isRelLink) return false;
+
+      // Reified items are only roots if not explicitly parented AND not implicitly parented by their source
+      if (isReified(item)) {
+        const hasSourceParent = (item as any).source_id && reg[(item as any).source_id];
+        return !isExplicitChild && !hasSourceParent;
+      }
+
+      return !isExplicitChild || isManualRoot;
+    });
 
     return {
       roots: rootNodes,
       registry: reg,
-      reifiedLinksByTarget: byTarget,
+      reifiedLinksByOrigin: byOrigin,
     };
   }, [items]);
 
@@ -164,7 +175,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
     const isDraggingOver = dragOverId === node.id;
     const title = (node as any).title || (isLink(node) ? (node as any).verb : 'Untitled Unit');
 
-    const incomingReifiedIds = !isShadowAttachment ? reifiedLinksByTarget[node.id] || [] : [];
+    const incomingReifiedIds = !isShadowAttachment ? reifiedLinksByOrigin[node.id] || [] : [];
 
     return (
       <React.Fragment

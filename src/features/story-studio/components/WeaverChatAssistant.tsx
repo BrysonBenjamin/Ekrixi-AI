@@ -10,6 +10,7 @@ import {
   X,
   FileText,
   Layers,
+  Zap,
 } from 'lucide-react';
 import { NexusObject, StoryType, SimpleNote, StoryNote } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
@@ -22,6 +23,7 @@ interface ChatMessage {
   selection?: string;
   proseSuggestion?: string;
   logicObservation?: string;
+  targetSelection?: string;
 }
 
 interface WeaverChatAssistantProps {
@@ -43,6 +45,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
   worldRegistry,
   selection,
   onClearSelection,
+  onUpdate,
 }) => {
   const { generateContent } = useLLM();
   const [input, setInput] = useState('');
@@ -104,7 +107,10 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
 
       const resultJson = await response.response;
       const result = JSON.parse(resultJson.text() || '{}');
-      setMessages((prev) => [...prev, { role: 'assistant', ...result }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', ...result, targetSelection: currentSelection },
+      ]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -115,6 +121,64 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
       ]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleApplyProse = (suggestion: string, targetSelection?: string) => {
+    // 1. Scene Mode: Direct update
+    if (!isChapterMode && chapter) {
+      const currentContent = chapter.prose_content || '';
+      let newContent = currentContent;
+
+      if (targetSelection && currentContent.includes(targetSelection)) {
+        newContent = currentContent.replace(targetSelection, suggestion);
+      } else {
+        // Append with spacing
+        newContent = currentContent ? currentContent + '\n\n' + suggestion : suggestion;
+      }
+
+      const nextItems = studioItems.map((item) =>
+        item.id === chapter.id
+          ? { ...item, prose_content: newContent, last_modified: new Date().toISOString() }
+          : item,
+      );
+      onUpdate(nextItems);
+      return;
+    }
+
+    // 2. Chapter Mode: Smart Search & Replace
+    if (isChapterMode && targetSelection) {
+      // Find which scene contains the selection
+      // We need to find scenes that are linked to the current chapter (focusedNode/chapter)
+      // BUT `chapter` prop here is the Chapter Node itself.
+      // We need to look through ALL studioItems to find the scene containing the text.
+
+      const targetScene = studioItems.find(
+        (i) =>
+          (i as StoryNote).story_type === StoryType.SCENE &&
+          (i as StoryNote).prose_content?.includes(targetSelection),
+      );
+
+      if (targetScene) {
+        const currentContent = (targetScene as StoryNote).prose_content || '';
+        const newContent = currentContent.replace(targetSelection, suggestion);
+
+        const nextItems = studioItems.map((item) =>
+          item.id === targetScene.id
+            ? { ...item, prose_content: newContent, last_modified: new Date().toISOString() }
+            : item,
+        );
+        onUpdate(nextItems);
+      } else {
+        // Fallback: If we can't find the source, we can't apply in Chapter Mode safely.
+        alert(
+          'Could not locate the original text segment in the chapter stack. Please edit manually.',
+        );
+      }
+    } else if (isChapterMode) {
+      alert(
+        'Cannot append to Composite View without a target reference. Please select text to replace.',
+      );
     }
   };
 
@@ -185,13 +249,22 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
                   <span className="text-[8px] font-black uppercase text-nexus-accent tracking-widest flex items-center gap-2">
                     <Sparkles size={10} /> Suggested Raw Manifest
                   </span>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(m.proseSuggestion)}
-                    className="p-1.5 bg-nexus-900 border border-nexus-800 rounded-lg text-nexus-muted hover:text-nexus-accent transition-all"
-                    title="Copy Suggested Prose"
-                  >
-                    <Layers size={14} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleApplyProse(m.proseSuggestion!, m.targetSelection)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-nexus-accent text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-nexus-accent/20 transition-all"
+                      title="Apply Revision to Manuscript"
+                    >
+                      <Zap size={10} fill="currentColor" /> Apply
+                    </button>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(m.proseSuggestion!)}
+                      className="p-1.5 bg-nexus-900 border border-nexus-800 rounded-lg text-nexus-muted hover:text-nexus-accent transition-all"
+                      title="Copy Suggested Prose"
+                    >
+                      <Layers size={14} />
+                    </button>
+                  </div>
                 </div>
                 <div className="text-[13px] text-nexus-text font-serif leading-relaxed whitespace-pre-wrap border-l-2 border-nexus-accent/20 pl-4 py-2">
                   {m.proseSuggestion}

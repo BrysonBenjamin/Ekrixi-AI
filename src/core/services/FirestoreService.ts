@@ -404,11 +404,20 @@ export const FirestoreService = {
       throw new Error('Cannot delete chat session: Not authenticated');
     }
 
-    // 1. Delete Messages subcollection
-    const messagesRef = getMessagesCollectionRef(universeId, sessionId);
-    await FirestoreService.deleteCollection(messagesRef);
+    try {
+      // 1. Try to delete Messages subcollection (cleanup)
+      const messagesRef = getMessagesCollectionRef(universeId, sessionId);
+      await FirestoreService.deleteCollection(messagesRef);
+    } catch (err) {
+      // If we don't have permission to delete the subcollection (e.g. strict rules),
+      // we still want to delete the main session document so it disappears from the UI.
+      console.warn(
+        '[FirestoreService] Subcollection cleanup skipped (permission or other error):',
+        err,
+      );
+    }
 
-    // 2. Delete Chat Doc
+    // 2. Delete Chat Doc (the primary record)
     await deleteDoc(getChatDocRef(universeId, sessionId));
   },
 

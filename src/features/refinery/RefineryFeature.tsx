@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Package,
   ArrowLeft,
@@ -63,7 +64,8 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
   onUpdateBatch,
   onCommitBatch,
 }) => {
-  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+  const { batchId: activeBatchId } = useParams<{ batchId: string }>();
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<'STRUCTURE' | 'EXPLORER'>('STRUCTURE');
   const [showInspector, setShowInspector] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -125,11 +127,11 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
     (parentId: string) => {
       const newNode = NexusGraphUtils.createNode('New Unit', NexusType.SIMPLE_NOTE);
       const parent = localQueue.find((i) => i.id === parentId);
-      if (!parent || isLink(parent)) return;
+      if (!parent || (isLink(parent) && !isReified(parent))) return;
 
       // Upgrade parent to container if it isn't one
-      const updatedParent = isContainer(parent)
-        ? { ...parent, children_ids: [...parent.children_ids, newNode.id] }
+      const updatedParent: NexusObject = isContainer(parent)
+        ? ({ ...parent, children_ids: [...(parent as any).children_ids, newNode.id] } as any)
         : ({
             ...parent,
             _type:
@@ -174,7 +176,17 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
 
   const handleReparent = useCallback(
     (sourceId: string, targetId: string, oldParentId?: string, isReference: boolean = false) => {
-      if (sourceId === targetId) return;
+      if (sourceId === targetId) {
+        addToast('Self-Reference Blocked: A unit cannot contain itself.', 'error');
+        return;
+      }
+
+      const target = localQueue.find((i) => i.id === targetId);
+      if (target && isContainer(target) && target.children_ids.includes(sourceId)) {
+        addToast('Duplicate Reference: Unit already exists in target.', 'info');
+        return;
+      }
+
       if (targetId !== 'root' && GraphIntegrityService.detectCycle(targetId, sourceId, registry)) {
         addToast('Cycle Detected: Operation Aborted.', 'error');
         return;
@@ -354,6 +366,32 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
     [localQueue, activeBatchId, onUpdateBatch],
   );
 
+  const handleEstablishLink = useCallback(
+    (sourceId: string, targetId: string, verb: string = 'binds') => {
+      const source = localQueue.find((i) => i.id === sourceId);
+      const target = localQueue.find((i) => i.id === targetId);
+      if (!source || !target || sourceId === targetId) return;
+
+      const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(
+        source,
+        target,
+        NexusType.SEMANTIC_LINK,
+        verb,
+      );
+
+      const nextQueue = [
+        ...localQueue.filter((i) => i.id !== sourceId && i.id !== targetId),
+        updatedSource,
+        updatedTarget,
+        link,
+      ];
+      setLocalQueue(nextQueue);
+      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
+      addToast('Semantic connection established.', 'success');
+    },
+    [localQueue, activeBatchId, onUpdateBatch],
+  );
+
   const handleDeleteItem = useCallback(
     (id: string) => {
       const nextQueue = localQueue.filter((item) => item.id !== id);
@@ -439,7 +477,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               {batches.map((b) => (
                 <button
                   key={b.id}
-                  onClick={() => setActiveBatchId(b.id)}
+                  onClick={() => navigate(`/refinery/${b.id}`)}
                   className="group p-8 bg-nexus-900 border border-nexus-800 rounded-[40px] text-left hover:border-nexus-accent hover:translate-y-[-4px] transition-all duration-500 shadow-xl"
                 >
                   <div className="flex items-center gap-3 mb-6">
@@ -470,7 +508,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
           <header className="h-16 border-b border-nexus-800 bg-nexus-900 flex items-center justify-between px-6 shrink-0 z-40">
             <div className="flex items-center gap-6">
               <button
-                onClick={() => setActiveBatchId(null)}
+                onClick={() => navigate('/refinery')}
                 className="text-nexus-muted hover:text-nexus-text flex items-center gap-3 font-display font-black text-[10px] uppercase tracking-widest transition-all"
               >
                 <ArrowLeft size={16} /> Back to Inbox
@@ -562,6 +600,8 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   onReifyLink={handleReifyLink}
                   onReifyNode={handleReifyNode}
                   onReifyNodeToLink={handleReifyNodeToLink}
+                  onReparent={handleReparent}
+                  onEstablishLink={handleEstablishLink}
                 />
               ) : (
                 <StructureVisualizer
