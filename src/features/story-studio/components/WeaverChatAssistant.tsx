@@ -105,7 +105,7 @@ export const WeaverChatAssistant: React.FC<WeaverChatAssistantProps> = ({
       const resultJson = await response.response;
       const result = JSON.parse(resultJson.text() || '{}');
       setMessages((prev) => [...prev, { role: 'assistant', ...result }]);
-    } catch (_err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {

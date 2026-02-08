@@ -173,12 +173,17 @@ export const LocalDataService: IDataService = {
     }
   },
 
-  listenToUniverses(callback: (universes: any[]) => void): () => void {
+  listenToUniverses(userId: string | null, callback: (universes: any[]) => void): () => void {
     const key = 'ekrixi_local_universes';
-    callback(_getData<any>(key));
+    const getFiltered = () => {
+      const all = _getData<any>(key);
+      return userId ? all.filter((u: any) => u.ownerId === userId) : all;
+    };
+
+    callback(getFiltered());
 
     const interval = setInterval(() => {
-      callback(_getData<any>(key));
+      callback(getFiltered());
     }, 1000);
 
     return () => clearInterval(interval);

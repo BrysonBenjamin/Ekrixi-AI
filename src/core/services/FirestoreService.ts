@@ -14,6 +14,7 @@ import {
   runTransaction,
   DocumentData,
   writeBatch,
+  QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -53,8 +54,13 @@ export const FirestoreService = {
   // --- NexusObject CRUD ---
 
   async createOrUpdateNexusObject(universeId: string, nexusObject: NexusObject): Promise<void> {
-    const docRef = getNexusObjectDocRef(universeId, nexusObject.id);
-    await setDoc(docRef, nexusObject, { merge: true });
+    try {
+      const docRef = getNexusObjectDocRef(universeId, nexusObject.id);
+      await setDoc(docRef, nexusObject, { merge: true });
+    } catch (err) {
+      console.error(`[FirestoreService] Failed to create/update object ${nexusObject.id}:`, err);
+      throw err;
+    }
   },
 
   async getNexusObject(universeId: string, nexusObjectId: string): Promise<NexusObject | null> {
@@ -73,13 +79,23 @@ export const FirestoreService = {
     nexusObjectId: string,
     updates: Partial<NexusObject>,
   ): Promise<void> {
-    const docRef = getNexusObjectDocRef(universeId, nexusObjectId);
-    await updateDoc(docRef, updates);
+    try {
+      const docRef = getNexusObjectDocRef(universeId, nexusObjectId);
+      await updateDoc(docRef, updates);
+    } catch (err) {
+      console.error(`[FirestoreService] Failed to update fields for ${nexusObjectId}:`, err);
+      throw err;
+    }
   },
 
   async deleteNexusObject(universeId: string, nexusObjectId: string): Promise<void> {
-    const docRef = getNexusObjectDocRef(universeId, nexusObjectId);
-    await deleteDoc(docRef);
+    try {
+      const docRef = getNexusObjectDocRef(universeId, nexusObjectId);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.error(`[FirestoreService] Failed to delete object ${nexusObjectId}:`, err);
+      throw err;
+    }
   },
 
   async getAllNexusObjects(universeId: string): Promise<NexusObject[]> {
@@ -91,12 +107,21 @@ export const FirestoreService = {
   // --- Batch Operations ---
 
   async batchCreateOrUpdate(universeId: string, objects: NexusObject[]): Promise<void> {
-    const batch = writeBatch(db);
-    objects.forEach((obj) => {
-      const docRef = getNexusObjectDocRef(universeId, obj.id);
-      batch.set(docRef, obj, { merge: true });
-    });
-    await batch.commit();
+    try {
+      const BATCH_LIMIT = 500;
+      for (let i = 0; i < objects.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        const chunk = objects.slice(i, i + BATCH_LIMIT);
+        chunk.forEach((obj) => {
+          const docRef = getNexusObjectDocRef(universeId, obj.id);
+          batch.set(docRef, obj, { merge: true });
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error(`[FirestoreService] Batch operation failed for universe ${universeId}:`, err);
+      throw err;
+    }
   },
 
   // --- Real-time Listeners ---
@@ -106,10 +131,16 @@ export const FirestoreService = {
     callback: (nexusObjects: NexusObject[]) => void,
   ): () => void {
     const q = query(getNexusObjectsCollectionRef(universeId));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const nexusObjects = querySnapshot.docs.map((doc) => doc.data() as NexusObject);
-      callback(nexusObjects);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const nexusObjects = querySnapshot.docs.map((doc) => doc.data() as NexusObject);
+        callback(nexusObjects);
+      },
+      (error) => {
+        console.error(`[FirestoreService] listenToAllNexusObjects error for ${universeId}:`, error);
+      },
+    );
     return unsubscribe;
   },
 
@@ -192,6 +223,7 @@ export const FirestoreService = {
       name,
       description,
       ownerId,
+      participants: [ownerId],
       createdAt: new Date().toISOString(),
       lastActive: new Date().toISOString(),
       nodeCount: 0,
@@ -218,9 +250,10 @@ export const FirestoreService = {
         name,
         description: description || '',
         ownerId: ownerId || '',
-        createdAt: snap.exists() ? snap.data().createdAt : new Date().toISOString(),
+        participants: [ownerId || ''],
+        createdAt: snap.exists() ? snap.data()?.createdAt : new Date().toISOString(),
         lastActive: new Date().toISOString(),
-        nodeCount: snap.exists() ? snap.data().nodeCount : 0,
+        nodeCount: snap.exists() ? snap.data()?.nodeCount : 0,
       },
       { merge: true },
     );
@@ -252,11 +285,33 @@ export const FirestoreService = {
     });
   },
 
-  listenToUniverses(callback: (universes: any[]) => void): () => void {
-    const q = query(getUniversesCollectionRef(), orderBy('lastActive', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map((doc) => doc.data()));
-    });
+  listenToUniverses(userId: string | null, callback: (universes: any[]) => void): () => void {
+    if (import.meta.env.DEV) {
+      console.log(
+        `[FirestoreService] listenToUniverses called with userId:`,
+        userId,
+        typeof userId,
+      );
+    }
+
+    const queryConstraints: QueryConstraint[] = [];
+
+    if (userId && typeof userId === 'string') {
+      queryConstraints.push(where('ownerId', '==', userId));
+    }
+
+    queryConstraints.push(orderBy('lastActive', 'desc'));
+
+    const q = query(getUniversesCollectionRef(), ...queryConstraints);
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.map((doc) => doc.data()));
+      },
+      (error) => {
+        console.error('[FirestoreService] listenToUniverses error:', error);
+      },
+    );
   },
 
   // --- Helpers ---
@@ -323,18 +378,22 @@ export const FirestoreService = {
     callback: (sessions: ChatSession[]) => void,
   ): () => void {
     const q = query(getChatsCollectionRef(universeId), orderBy('updatedAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const sessions = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        // Reconstitute a basic session object.
-        // messageMap will be empty until messages are loaded.
-        return {
-          ...data,
-          messageMap: {},
-        } as ChatSession;
-      });
-      callback(sessions);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const sessions = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            ...data,
+            messageMap: {},
+          } as ChatSession;
+        });
+        callback(sessions);
+      },
+      (error) => {
+        console.error(`[FirestoreService] listenToChatSessions error for ${universeId}:`, error);
+      },
+    );
   },
 
   // --- Message Management ---
@@ -345,10 +404,16 @@ export const FirestoreService = {
     callback: (messages: MessageNode[]) => void,
   ): () => void {
     const q = query(getMessagesCollectionRef(universeId, chatId));
-    return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map((doc) => doc.data() as MessageNode);
-      callback(messages);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const messages = snapshot.docs.map((doc) => doc.data() as MessageNode);
+        callback(messages);
+      },
+      (error) => {
+        console.error(`[FirestoreService] listenToChatMessages error for ${chatId}:`, error);
+      },
+    );
   },
 
   async addMessageToChat(

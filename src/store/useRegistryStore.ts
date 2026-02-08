@@ -11,11 +11,15 @@ interface RegistryState {
 
   // Actions
   loadUniverse: (universeId: string) => void;
-  setRegistry: (registry: Record<string, NexusObject>) => void; // Kept for legacy/import compatibility
+  setRegistry: (
+    registryOrUpdater:
+      | Record<string, NexusObject>
+      | ((prev: Record<string, NexusObject>) => Record<string, NexusObject>),
+  ) => Promise<void>;
   upsertObject: (id: string, updates: Partial<NexusObject>) => Promise<void>;
   addBatch: (objects: NexusObject[]) => Promise<void>;
   removeObject: (id: string) => Promise<void>;
-  clearRegistry: () => void;
+  resetUniverse: () => Promise<void>;
 
   // Cleanup
   cleanup: () => void;
@@ -49,7 +53,27 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
     set({ unsubscribeListener: unsubscribe });
   },
 
-  setRegistry: (registry) => set({ registry }),
+  setRegistry: async (registryOrUpdater) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) return;
+
+    const currentRegistry = get().registry;
+    const newRegistry =
+      typeof registryOrUpdater === 'function'
+        ? registryOrUpdater(currentRegistry)
+        : registryOrUpdater;
+
+    // Optimistic local update
+    set({ registry: newRegistry });
+
+    // Persist to database
+    // Note: For large registries, we might want to diff.
+    // For now, we'll batch create/update everything in the new registry.
+    const objects = Object.values(newRegistry) as NexusObject[];
+    if (objects.length > 0) {
+      await DataService.batchCreateOrUpdate(universeId, objects);
+    }
+  },
 
   upsertObject: async (id, updates) => {
     const universeId = get().activeUniverseId;
@@ -61,17 +85,9 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
     const currentRegistry = get().registry;
     const existingObject = currentRegistry[id];
 
-    // We construct the full object if it doesn't exist, or merge updates
-    // Note: Firestore merge will handle partials, but if we need a full object for creation
-    // we rely on the caller to provide enough data in `updates` if it's new.
-
     const objectToSave = existingObject
       ? ({ ...existingObject, ...updates } as NexusObject)
       : (updates as NexusObject);
-
-    // Optimistic update locally?
-    // Firestore listener calls back very fast, usually we can wait.
-    // If we want instant feedback, we can set state here too.
 
     await DataService.createOrUpdateNexusObject(universeId, objectToSave);
   },
@@ -94,7 +110,17 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
     await DataService.deleteNexusObject(universeId, id);
   },
 
-  clearRegistry: () => set({ registry: {} }),
+  resetUniverse: async () => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) return;
+
+    const objects = Object.values(get().registry);
+    // Delete one by one for now
+    for (const obj of objects) {
+      await DataService.deleteNexusObject(universeId, obj.id);
+    }
+    set({ registry: {} });
+  },
 
   cleanup: () => {
     const unsubscribe = get().unsubscribeListener;

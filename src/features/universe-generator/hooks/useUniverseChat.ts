@@ -4,12 +4,14 @@ import { generateId } from '../../../utils/ids';
 import { NexusObject, isLink, SimpleNote } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
 import { DataService } from '../../../core/services/DataService';
+import { useSessionStore } from '../../../store/useSessionStore';
 
 export const useUniverseChat = (
   registry: Record<string, NexusObject>,
   activeUniverseId?: string,
 ) => {
   const { generateText } = useLLM();
+  const { currentUser } = useSessionStore();
 
   // Local State for sessions (synced from listening)
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -119,6 +121,7 @@ export const useUniverseChat = (
         childrenIds: [],
         selectedChildId: null,
         createdAt: timestamp,
+        senderId: currentUser?.id || 'system',
         isStreaming: true,
       };
 
@@ -199,7 +202,7 @@ export const useUniverseChat = (
         setIsLoading(false);
       }
     },
-    [registry, generateText, activeUniverseId],
+    [registry, generateText, activeUniverseId, currentUser?.id],
   );
 
   const sendMessage = useCallback(
@@ -220,6 +223,7 @@ export const useUniverseChat = (
         childrenIds: [],
         selectedChildId: null,
         createdAt: timestamp,
+        senderId: currentUser?.id || 'system',
       };
 
       // Determine Root Updates
@@ -274,7 +278,15 @@ export const useUniverseChat = (
       const history = getThread(tempSession);
       triggerGeneration(currentSessionId, userMsgId, history);
     },
-    [currentSessionId, isLoading, activeUniverseId, currentSession, getThread, triggerGeneration],
+    [
+      currentSessionId,
+      isLoading,
+      activeUniverseId,
+      currentSession,
+      getThread,
+      triggerGeneration,
+      currentUser?.id,
+    ],
   );
 
   const editMessage = useCallback(
@@ -296,6 +308,7 @@ export const useUniverseChat = (
         childrenIds: [],
         selectedChildId: null,
         createdAt: timestamp,
+        senderId: currentUser?.id || 'system',
       };
 
       // Determine Root Updates
@@ -338,7 +351,15 @@ export const useUniverseChat = (
         triggerGeneration(currentSessionId, newBranchId, history);
       }
     },
-    [currentSessionId, isLoading, activeUniverseId, currentSession, triggerGeneration, getThread],
+    [
+      currentSessionId,
+      isLoading,
+      activeUniverseId,
+      currentSession,
+      triggerGeneration,
+      getThread,
+      currentUser?.id,
+    ],
   );
 
   const regenerate = useCallback(

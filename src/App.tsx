@@ -44,6 +44,7 @@ export default function App(): React.ReactNode {
     addBatch: addToRegistry,
     removeObject,
     loadUniverse,
+    resetUniverse,
   } = useRegistryStore();
   const {
     theme,
@@ -62,14 +63,18 @@ export default function App(): React.ReactNode {
     removeBatch: deleteRefineryBatch,
   } = useRefineryStore();
 
-  const { activeUniverseId, updateUniverseMeta, initializeUniversesListener } = useSessionStore();
+  const { activeUniverseId, updateUniverseMeta, initializeUniversesListener, currentUser } =
+    useSessionStore();
   const { requiresUserKey, hasKey } = useLLM();
 
   // Initialize Universes Listener
   useEffect(() => {
+    // We should only listen if we have an authenticated user with a valid ID
+    if (!currentUser?.id) return;
+
     const unsubscribe = initializeUniversesListener();
     return () => unsubscribe();
-  }, [initializeUniversesListener]);
+  }, [initializeUniversesListener, currentUser?.id]);
 
   // Global Overlay State
   const [showIntro, setShowIntro] = React.useState(() => {
@@ -387,7 +392,7 @@ export default function App(): React.ReactNode {
                   <SystemFeature
                     registry={registry}
                     onImport={(data) => setRegistry(data)}
-                    onClear={() => setRegistry({})}
+                    onClear={() => resetUniverse()}
                     theme={theme}
                     onThemeChange={setTheme}
                   />

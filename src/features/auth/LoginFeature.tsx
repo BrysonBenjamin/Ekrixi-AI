@@ -152,7 +152,7 @@ export const LoginFeature: React.FC = () => {
                     Browse as Guest
                   </button>
 
-                  {config.useLocalDatabase && (
+                  {import.meta.env.DEV && (
                     <button
                       onClick={handleSeedFixtures}
                       className="flex w-full items-center justify-center gap-3 rounded-lg border border-cyan-100 bg-cyan-50/30 px-4 py-3 text-sm font-semibold text-cyan-700 transition-all hover:bg-cyan-50 hover:border-cyan-200 active:scale-[0.98]"

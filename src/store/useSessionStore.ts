@@ -57,8 +57,14 @@ export const useSessionStore = create<SessionState>()(
       apiKeys: {},
 
       initializeUniversesListener: () => {
+        const userId = get().currentUser?.id;
+        if (!userId) {
+          console.warn('[SessionStore] Skipping universe listener: No user ID available.');
+          return () => {};
+        }
+
         set({ isLoadingUniverses: true });
-        const unsubscribe = DataService.listenToUniverses((universesData) => {
+        const unsubscribe = DataService.listenToUniverses(userId, (universesData) => {
           // Map Firestore data to UniverseMetadata
           const universes = universesData.map((u) => ({
             id: u.id,

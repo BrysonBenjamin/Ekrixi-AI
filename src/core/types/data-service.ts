@@ -34,7 +34,7 @@ export interface IDataService {
   importUniverse(id: string, name: string, description: string, ownerId: string): Promise<void>;
   deleteUniverse(universeId: string): Promise<void>;
   updateUniverseMeta(universeId: string, updates: any): Promise<void>;
-  listenToUniverses(callback: (universes: any[]) => void): () => void;
+  listenToUniverses(userId: string | null, callback: (universes: any[]) => void): () => void;
 
   // Chat Management
   createChatSession(universeId: string, session: ChatSession): Promise<void>;

@@ -108,7 +108,8 @@ const getSuggestions = (registry: Record<string, NexusObject>): Suggestion[] => 
   const suggestions: Suggestion[] = [];
   // Filter only objects that behave like Notes (have a title)
   const notes = Object.values(registry).filter(
-    (obj): obj is any => 'title' in obj && typeof (obj as any).title === 'string',
+    (obj): obj is NexusObject & { title: string } =>
+      'title' in obj && typeof (obj as { title?: unknown }).title === 'string',
   );
 
   if (notes.length === 0) {
@@ -155,7 +156,7 @@ const getSuggestions = (registry: Record<string, NexusObject>): Suggestion[] => 
   // 2. Interaction (if > 1 entity)
   if (notes.length > 1) {
     const entityA = notes[Math.floor(Math.random() * notes.length)];
-    const entityB = notes.find((e: any) => e.id !== entityA.id) || notes[0];
+    const entityB = notes.find((e) => e.id !== entityA.id) || notes[0];
     suggestions.push({
       icon: Users,
       label: 'Forge Connection',

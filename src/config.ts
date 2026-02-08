@@ -24,7 +24,7 @@ export const config = {
   // Database Configuration
   useLocalDatabase:
     import.meta.env.VITE_USE_LOCAL_DB === 'true' ||
-    (!import.meta.env.PROD && !import.meta.env.VITE_FIREBASE_API_KEY),
+    (!import.meta.env.VITE_FIREBASE_API_KEY && !import.meta.env.PROD),
 
   // Firebase Configuration
   firebase: {
@@ -35,5 +35,6 @@ export const config = {
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+    databaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)',
   },
 };
