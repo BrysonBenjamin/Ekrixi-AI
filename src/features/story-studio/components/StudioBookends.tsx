@@ -3,6 +3,7 @@ import React from 'react';
 import { StudioBlock } from '../types';
 import { ManifestoForge } from './manifesto/ManifestoForge';
 import { NexusObject } from '../../../types';
+import { Activity } from 'lucide-react';
 
 interface StudioBookendsProps {
   registry: Record<string, NexusObject>;
@@ -23,7 +24,24 @@ export const StudioBookends: React.FC<StudioBookendsProps> = ({
   onJumpToSpine,
   isSaving,
 }) => {
+  const [isSeeding, setIsSeeding] = React.useState(false);
   const canSynthesize = blocks.some((b) => b.type === 'THESIS' && b.data.text?.length > 10);
+
+  if (isSeeding) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center space-y-8 bg-nexus-950 p-20">
+        <div className="relative">
+          <div className="w-16 h-16 border-t-2 border-l-2 border-nexus-primary rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Activity className="w-6 h-6 text-nexus-primary animate-pulse" />
+          </div>
+        </div>
+        <p className="text-[10px] font-mono text-nexus-muted uppercase tracking-[0.4em]">
+          Generating Blueprint Blocks...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex bg-nexus-950 animate-in fade-in duration-700 overflow-hidden">
@@ -49,6 +67,8 @@ export const StudioBookends: React.FC<StudioBookendsProps> = ({
               onUpdateBlocks(tplBlocks);
             }}
             isSaving={isSaving}
+            isSeeding={isSeeding}
+            onSetSeeding={setIsSeeding}
           />
         </div>
       </div>

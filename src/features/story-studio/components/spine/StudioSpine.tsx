@@ -91,41 +91,41 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
     );
   }
 
-  if ((logic.chapters.length === 0 || isRegenerating) && !logic.isSynthesizing) {
+  if ((logic.isSynthesizing || logic.isSeeding) && !isRegenerating) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center space-y-8 bg-nexus-950 p-20">
+        <div className="relative">
+          <div className="w-16 h-16 border-t-2 border-l-2 border-nexus-primary rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Activity className="w-6 h-6 text-nexus-primary animate-pulse" />
+          </div>
+        </div>
+        <p className="text-[10px] font-mono text-nexus-muted uppercase tracking-[0.4em]">
+          {logic.synthStatus}
+        </p>
+      </div>
+    );
+  }
+
+  if (
+    (logic.chapters.length === 0 || isRegenerating) &&
+    !logic.isSynthesizing &&
+    !logic.isSeeding
+  ) {
     return (
       <SpineManifestation
-        blocks={blocks}
         handleManifestFromBlueprint={() => {
           logic.handleManifestFromBlueprint();
           setIsRegenerating(false);
         }}
-        onBackToManifesto={onBackToManifesto}
-        handleSmartSpineGeneration={logic.handleSmartSpineGeneration}
+        blocks={blocks}
         registry={registry}
+        handleSmartSpineGeneration={logic.handleSmartSpineGeneration}
         isRegeneration={logic.chapters.length > 0}
         onCancel={() => setIsRegenerating(false)}
+        isLoading={logic.isSeeding}
+        onBackToManifesto={onBackToManifesto}
       />
-    );
-  }
-
-  if (logic.isSynthesizing) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center space-y-8 bg-nexus-950 p-20">
-        <div className="relative">
-          <div className="w-32 h-32 rounded-full border-4 border-nexus-ruby/10 border-t-nexus-ruby animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Activity className="text-nexus-ruby animate-pulse" size={40} />
-          </div>
-        </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-2xl font-display font-black text-nexus-text uppercase tracking-widest">
-            Neural Synthesis Active
-          </h3>
-          <p className="text-[10px] font-mono text-nexus-muted uppercase tracking-[0.4em]">
-            {logic.synthStatus}
-          </p>
-        </div>
-      </div>
     );
   }
 
@@ -213,6 +213,8 @@ export const StudioSpine: React.FC<StudioSpineProps> = ({
           isFillingId={logic.isFillingId}
           zoomedNode={zoomedNode}
           isSaving={isSaving}
+          isSeeding={logic.isSeeding}
+          onSetSeeding={logic.setIsSeeding}
         />
       </div>
     );

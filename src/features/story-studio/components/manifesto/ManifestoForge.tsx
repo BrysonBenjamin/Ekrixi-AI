@@ -49,6 +49,8 @@ interface ManifestoForgeProps {
   onSeedTemplate?: (blocks: StudioBlock[]) => void;
   context?: 'GLOBAL' | 'CHAPTER' | 'SCENE';
   isSaving?: boolean;
+  isSeeding?: boolean;
+  onSetSeeding?: (val: boolean) => void;
 }
 
 export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
@@ -66,6 +68,8 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
   onSeedTemplate,
   context = 'GLOBAL',
   isSaving,
+  isSeeding: externalSeeding,
+  onSetSeeding: onSetExternalSeeding,
 }) => {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [activeSearchBlockId, setActiveSearchBlockId] = useState<string | null>(null);
@@ -79,6 +83,15 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
   } | null>(null);
   const [aiSeedInput, setAiSeedInput] = useState('');
   const [isSeedingAi, setIsSeedingAi] = useState(false);
+
+  const isActuallySeeding = externalSeeding ?? isSeedingAi;
+  const setActualSeeding = (val: boolean) => {
+    if (onSetExternalSeeding) {
+      onSetExternalSeeding(val);
+    } else {
+      setIsSeedingAi(val);
+    }
+  };
 
   const suggestions = useMemo(() => {
     const query = (atMenu ? atMenu.query : searchQuery).toLowerCase();
@@ -123,14 +136,14 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
 
   const handleAiBlueprintRequest = async (text: string) => {
     if (!text.trim()) return;
-    setIsSeedingAi(true);
+    setActualSeeding(true);
     try {
       const resultBlocks = await StudioSpineAgent.synthesizeManifestoBlocks(text, registry);
       onUpdateBlocks(resultBlocks);
     } catch (err) {
       console.error(err);
     } finally {
-      setIsSeedingAi(false);
+      setActualSeeding(false);
     }
   };
 

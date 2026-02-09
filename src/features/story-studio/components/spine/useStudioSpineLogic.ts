@@ -37,6 +37,7 @@ export const useStudioSpineLogic = (
   onSetChapterBlueprintMode: (val: boolean) => void,
 ) => {
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [synthStatus, setSynthStatus] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
@@ -525,17 +526,21 @@ export const useStudioSpineLogic = (
   };
 
   const handleSmartSpineGeneration = async (text: string) => {
-    setIsSynthesizing(true);
-    setSynthStatus('Generating Spine...');
+    setIsSeeding(true);
+    setSynthStatus('Generating Blueprint Blocks...');
     try {
       const newBlocks = await StudioSpineAgent.synthesizeManifestoBlocks(text, registry);
       onUpdateBlocks(newBlocks);
+
+      setIsSynthesizing(true);
+      setSynthStatus('Generating Spine...');
       const generatedChapters = await StudioSpineAgent.synthesizeChapters(newBlocks);
       // ... similar to manifest from blueprint logic
       // Simplification for now to keep size down
     } catch (err) {
       console.error(err);
     } finally {
+      setIsSeeding(false);
       setIsSynthesizing(false);
     }
   };
@@ -550,6 +555,7 @@ export const useStudioSpineLogic = (
 
   return {
     isSynthesizing,
+    isSeeding,
     synthStatus,
     chapters,
     scenesForZoomedChapter,
@@ -576,5 +582,6 @@ export const useStudioSpineLogic = (
     handleAddScene,
     handleSmartSpineGeneration,
     handleRunAudit,
+    setIsSeeding,
   };
 };
