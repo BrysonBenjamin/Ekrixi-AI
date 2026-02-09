@@ -138,6 +138,7 @@ export const useStudioSpineLogic = (
       }
 
       const finalItems: NexusObject[] = [book];
+      const authorNotesToLink: SimpleNote[] = [];
 
       // 1. Convert specific manifesto blocks immediately into Author Notes
       blocks.forEach((b) => {
@@ -167,16 +168,22 @@ export const useStudioSpineLogic = (
             link_ids: [],
           };
           finalItems.push(note);
+          authorNotesToLink.push(note);
         }
       });
 
-      // 2. Add AI synthesized protocols
-      generatedProtocols.forEach((p) => finalItems.push(p));
+      // 2. Add AI synthesized protocols to the notes to link
+      generatedProtocols.forEach((p) => {
+        finalItems.push(p);
+        authorNotesToLink.push(p);
+      });
 
-      // 3. Add Synthesized Chapters
+      // 3. Add Synthesized Chapters and create links to author's notes
+      const chapterIds: string[] = [];
       generatedChapters.forEach((ch, idx) => {
         const chNote = ch as StoryNote;
         const chId = generateId();
+        chapterIds.push(chId);
         const chapterNode: StoryNote = {
           ...chNote,
           id: chId,
@@ -201,6 +208,8 @@ export const useStudioSpineLogic = (
           children_ids: [],
         };
         finalItems.push(chapterNode);
+
+        // Link chapter to book
         const linkId = generateId();
         finalItems.push({
           id: linkId,
@@ -214,6 +223,39 @@ export const useStudioSpineLogic = (
           verb: 'contains',
           verb_inverse: 'part_of',
         } as any);
+      });
+
+      // 4. Distribute author's notes across chapters
+      // Blueprint-derived notes (THESIS, etc.) link to first chapter
+      // AI protocols distribute evenly across all chapters
+      authorNotesToLink.forEach((note, idx) => {
+        let targetChapterId: string;
+
+        if (note.tags?.includes('Manifesto')) {
+          // Blueprint notes go to first chapter (foundational)
+          targetChapterId = chapterIds[0];
+        } else {
+          // AI protocols distribute evenly
+          const chapterIndex = idx % chapterIds.length;
+          targetChapterId = chapterIds[chapterIndex];
+        }
+
+        if (targetChapterId) {
+          finalItems.push({
+            id: generateId(),
+            _type: NexusType.SEMANTIC_LINK,
+            source_id: note.id,
+            target_id: targetChapterId,
+            verb: 'governs',
+            verb_inverse: 'governed_by',
+            weight: 1.0,
+            created_at: now,
+            last_modified: now,
+            link_ids: [],
+            internal_weight: 0,
+            total_subtree_mass: 0,
+          } as unknown as SimpleLink);
+        }
       });
 
       console.log('[StudioSpineLogic] Committing Batch to Registry:', finalItems);

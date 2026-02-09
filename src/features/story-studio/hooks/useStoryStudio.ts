@@ -99,27 +99,30 @@ export const useStoryStudio = (
       if (!activeUniverseId) return;
 
       if (focusedBlocksId && focusedBlocksId !== id) {
-        saveBlocks(focusedBlocksId, blocksRef.current);
+        saveBlocks(focusedBlocksId, blocksRef.current, true);
       }
 
       setFocusedBlocksId(id);
       if (id) {
         const item = registry[id] as StoryNote;
-        if (item?.manifesto_data) {
+        // Load from registry as initial/fallback data
+        if (item?.manifesto_data && item.manifesto_data.length > 0) {
           setBlocks(item.manifesto_data);
         } else {
           setBlocks([]);
         }
 
+        // Try to load from database (more up-to-date)
         const dbBlocks = await DataService.getManifestoBlocks(activeUniverseId, id);
         if (dbBlocks && dbBlocks.length > 0) {
           setBlocks(dbBlocks);
         }
+        // If dbBlocks is empty but we had registry data, keep the registry data
       } else {
         setBlocks([]);
       }
     },
-    [focusedBlocksId, registry],
+    [focusedBlocksId, registry, saveBlocks],
   );
 
   const calculateTargetFocus = useCallback(
@@ -148,7 +151,11 @@ export const useStoryStudio = (
         isChapterBlueprintMode,
         activeBookId,
       );
-      if (target !== focusedBlocksId) handleFocusBlocks(target);
+
+      // Always reload blocks when switching to BLUEPRINT to ensure we show the latest data
+      if (s === 'BLUEPRINT' || target !== focusedBlocksId) {
+        handleFocusBlocks(target);
+      }
     },
     [
       _setStage,

@@ -1,5 +1,14 @@
 import React, { useMemo } from 'react';
-import { BookOpen, History, Library, Plus, PlusCircle, Activity, Trash2 } from 'lucide-react';
+import {
+  BookOpen,
+  History,
+  Library,
+  Plus,
+  PlusCircle,
+  Activity,
+  Trash2,
+  Check,
+} from 'lucide-react';
 import { NexusObject, NexusType, StoryType, StoryNote } from '../../../../../types';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../../../types';
@@ -9,6 +18,7 @@ interface ManuscriptGalleryProps {
   onLoadBook: (id: string) => void;
   onCreateNewBook: (blocks?: StudioBlock[]) => void;
   onDeleteBook: (id: string) => void;
+  activeBookId?: string | null;
 }
 
 export const ManuscriptGallery: React.FC<ManuscriptGalleryProps> = ({
@@ -16,6 +26,7 @@ export const ManuscriptGallery: React.FC<ManuscriptGalleryProps> = ({
   onLoadBook,
   onCreateNewBook,
   onDeleteBook,
+  activeBookId,
 }) => {
   const existingBooks = useMemo(() => {
     return (Object.values(registry) as NexusObject[]).filter(
@@ -77,12 +88,27 @@ export const ManuscriptGallery: React.FC<ManuscriptGalleryProps> = ({
               <button
                 key={sn.id}
                 onClick={() => onLoadBook(sn.id)}
-                className="w-full text-left p-4 rounded-2xl bg-nexus-950/40 border border-nexus-800 hover:border-nexus-ruby hover:bg-nexus-ruby/5 transition-all group"
+                className={`w-full text-left p-4 rounded-2xl border transition-all group relative ${
+                  activeBookId === sn.id
+                    ? 'bg-nexus-ruby/10 border-nexus-ruby shadow-lg shadow-nexus-ruby/10'
+                    : 'bg-nexus-950/40 border-nexus-800 hover:border-nexus-ruby hover:bg-nexus-ruby/5'
+                }`}
               >
+                {activeBookId === sn.id && (
+                  <div className="absolute top-3 right-3 p-1 bg-nexus-ruby rounded-full text-white animate-in zoom-in-95">
+                    <Check size={12} />
+                  </div>
+                )}
                 <div className="text-[8px] font-mono text-nexus-ruby uppercase tracking-widest mb-2 font-bold flex items-center gap-1.5">
                   <BookOpen size={10} /> Manuscript
                 </div>
-                <div className="text-xs font-display font-black text-nexus-text uppercase truncate mb-1 group-hover:text-nexus-ruby transition-colors">
+                <div
+                  className={`text-xs font-display font-black uppercase truncate mb-1 transition-colors ${
+                    activeBookId === sn.id
+                      ? 'text-nexus-ruby'
+                      : 'text-nexus-text group-hover:text-nexus-ruby'
+                  }`}
+                >
                   {sn.title}
                 </div>
                 <p className="text-[9px] text-nexus-muted italic line-clamp-1 font-serif">

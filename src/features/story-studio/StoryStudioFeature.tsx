@@ -93,6 +93,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
             onLoadBook={studio.handleLoadBook}
             onCreateNewBook={studio.handleCreateNewBook}
             onDeleteBook={studio.handleDeleteBook}
+            activeBookId={studio.activeBookId}
           />
         )}
 
@@ -159,6 +160,8 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
                 items={studio.studioItems}
                 onUpdate={studio.setStudioItems}
                 onClose={() => setActiveRightWidget(null)}
+                registry={registry}
+                contextId={studio.focusedBlocksId || studio.activeBookId}
               />
             )}
           </div>
