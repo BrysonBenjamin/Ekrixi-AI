@@ -15,6 +15,7 @@ interface WikiNavigationProps {
   selectedId: string | null;
   currentObject: NexusObject | null;
   onSelect: (id: string) => void;
+  onBack: () => void;
   handleScrollToSection: (id: string) => void;
 }
 
@@ -23,6 +24,7 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
   selectedId,
   currentObject,
   onSelect,
+  onBack,
   handleScrollToSection,
 }) => {
   const tableOfContents = useMemo(() => {
@@ -79,7 +81,7 @@ export const WikiNavigation: React.FC<WikiNavigationProps> = ({
   return (
     <aside className="hidden lg:flex w-80 xl:w-96 border-r border-nexus-800/30 bg-nexus-900/40 flex-col overflow-y-auto no-scrollbar p-10 shrink-0 z-30 backdrop-blur-md">
       <button
-        onClick={() => onSelect('')}
+        onClick={onBack}
         className="flex items-center gap-3 text-nexus-muted hover:text-nexus-accent transition-colors group text-[10px] font-display font-black uppercase tracking-widest mb-16"
       >
         <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />

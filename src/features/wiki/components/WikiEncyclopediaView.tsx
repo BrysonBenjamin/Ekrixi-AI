@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Save, RotateCw, Wand2 } from 'lucide-react';
+import { Sparkles, Save, RotateCw, Wand2, ArrowLeft } from 'lucide-react';
 import { Logo } from '../../../components/shared/Logo';
 import { WikiArtifact, NexusObject, SimpleNote } from '../../../types';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
@@ -12,6 +12,7 @@ interface WikiEncyclopediaViewProps {
   handleGenerateEncyclopedia: () => void;
   registry: Record<string, NexusObject>;
   onSelect: (id: string) => void;
+  onBack: () => void;
 }
 
 export const WikiEncyclopediaView: React.FC<WikiEncyclopediaViewProps> = ({
@@ -22,6 +23,7 @@ export const WikiEncyclopediaView: React.FC<WikiEncyclopediaViewProps> = ({
   handleGenerateEncyclopedia,
   registry,
   onSelect,
+  onBack,
 }) => {
   const note = currentObject as SimpleNote;
   const themeColor = note.theme_color;

@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
+import { NexusMarkdown } from '../../../../../components/shared/NexusMarkdown';
 import { X, Send, Sparkles, RotateCw, Activity, Type, Zap, Plus } from 'lucide-react';
 // Fix: Import StudioBlock from types
-import { StudioBlock } from '../types';
-import { generateId } from '../../../utils/ids';
-import { useLLM } from '../../system/hooks/useLLM';
-import { GEMINI_MODELS } from '../../../core/llm';
-import { NexusObject } from '../../../types';
-import { LITERARY_ARCHETYPES } from './ManifestoForge';
+import { StudioBlock } from '../../../types';
+import { generateId } from '../../../../../utils/ids';
+import { useLLM } from '../../../../system/hooks/useLLM';
+import { GEMINI_MODELS } from '../../../../../core/llm';
+import { NexusObject } from '../../../../../types';
+import { LITERARY_ARCHETYPES } from '../../manifesto/archetypes/data';
 
 interface ProposedBlock {
   type: StudioBlock['type'];

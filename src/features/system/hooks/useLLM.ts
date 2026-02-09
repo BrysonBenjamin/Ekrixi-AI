@@ -232,5 +232,30 @@ export const useLLM = () => {
     setKey: (key: string) => setApiKey('gemini', key),
     generateText,
     generateContent,
+    asyncClient: async () => {
+      const { apiKeys } = useSessionStore.getState();
+      const activeKey = apiKeys?.gemini;
+
+      if (config.useLocalLLM) {
+        // Return a mock object or handle local LLM differently if needed for agent usage
+        // For now, simpler agents expect GoogleGenerativeAI
+        throw new Error('Local LLM not supported in agent mode yet');
+      }
+
+      if (activeKey === 'USE_COMMUNITY_KEY' && config.useBackendProxy) {
+        // Can't return a GoogleGenerativeAI instance for proxy.
+        // Agents need to be refactored to use `useLLM` hook functions or a unified service.
+        // For now, throwing to encourage using the hook's generateContent
+        throw new Error(
+          'Cannot request direct client with Community Key. Use generateContent instead.',
+        );
+      }
+
+      if (activeKey) {
+        return new GoogleGenerativeAI(activeKey);
+      }
+
+      return null;
+    },
   };
 };

@@ -11,6 +11,7 @@ import {
   Save,
   PanelLeftClose,
   PanelLeft,
+  RotateCw,
 } from 'lucide-react';
 import { StudioStage, RightWidgetMode } from '../../types';
 
@@ -27,6 +28,8 @@ interface StudioHeaderProps {
   onExportBlueprint?: () => void;
   onImportBlueprint?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   spineContextLabel?: string;
+  isSaving?: boolean;
+  lastSaved?: string | null;
 }
 
 export const StudioHeader: React.FC<StudioHeaderProps> = ({
@@ -42,9 +45,14 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   onExportBlueprint,
   onImportBlueprint,
   spineContextLabel,
+  isSaving,
+  lastSaved,
 }) => {
   return (
-    <header className="h-16 border-b border-nexus-800 bg-nexus-900/50 backdrop-blur-xl flex items-center px-8 justify-between shrink-0 z-50 shadow-lg">
+    <header className="h-16 border-b border-nexus-800 bg-nexus-900/50 backdrop-blur-xl flex items-center px-8 justify-between shrink-0 z-50 shadow-lg relative overflow-hidden">
+      {isSaving && (
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-nexus-ruby to-transparent animate-shimmer" />
+      )}
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
           <button
@@ -57,13 +65,23 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
             <PenTool size={20} />
           </div>
           <div>
-            <h2 className="text-sm font-display font-black text-nexus-text uppercase tracking-[0.3em] leading-tight">
+            <h2 className="text-sm font-display font-black text-nexus-text uppercase tracking-[0.3em] leading-tight flex items-center gap-2">
               Story <span className="text-nexus-ruby">Studio</span>
+              {isSaving && (
+                <span className="flex h-1.5 w-1.5 rounded-full bg-nexus-ruby animate-pulse shadow-[0_0_8px_rgba(225,29,72,0.8)]" />
+              )}
             </h2>
             {activeBookTitle && (
-              <p className="text-[9px] font-mono text-nexus-muted uppercase tracking-widest truncate max-w-[120px]">
-                {activeBookTitle}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[9px] font-mono text-nexus-muted uppercase tracking-widest truncate max-w-[120px]">
+                  {activeBookTitle}
+                </p>
+                {lastSaved && !isSaving && (
+                  <span className="text-[8px] font-mono text-nexus-muted/40 uppercase tracking-tighter">
+                    • Last synced {lastSaved}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -125,9 +143,10 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         <button
           onClick={onSave}
           className={`px-6 py-2 rounded-full text-[10px] font-display font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-xl ${isSaveEnabled ? 'bg-nexus-ruby text-white hover:brightness-110' : 'bg-nexus-800 text-nexus-muted border border-nexus-700 cursor-not-allowed'}`}
-          disabled={!isSaveEnabled}
+          disabled={!isSaveEnabled || isSaving}
         >
-          <Save size={14} /> Save Manuscript
+          {isSaving ? <RotateCw size={14} className="animate-spin" /> : <Save size={14} />}
+          {isSaving ? 'Syncing...' : 'Save Manuscript'}
         </button>
       </div>
     </header>

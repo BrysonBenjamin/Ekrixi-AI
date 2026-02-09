@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
+import { NexusMarkdown } from '../../../../../components/shared/NexusMarkdown';
 import {
   Sparkles,
   RotateCw,
@@ -12,9 +12,9 @@ import {
   Layers,
   Zap,
 } from 'lucide-react';
-import { NexusObject, StoryType, SimpleNote, StoryNote } from '../../../types';
-import { useLLM } from '../../system/hooks/useLLM';
-import { GEMINI_MODELS } from '../../../core/llm';
+import { NexusObject, StoryType, SimpleNote, StoryNote } from '../../../../../types';
+import { useLLM } from '../../../../system/hooks/useLLM';
+import { GEMINI_MODELS } from '../../../../../core/llm';
 
 interface ChatMessage {
   role: 'user' | 'assistant';

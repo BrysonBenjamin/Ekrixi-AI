@@ -12,18 +12,20 @@ import {
   Quote,
   LayoutTemplate,
   Focus,
+  ChevronLeft,
 } from 'lucide-react';
 import {
   NexusObject,
   isLink,
-  NexusType,
   StoryType,
   StoryNote,
   SimpleNote,
   SimpleLink,
-} from '../../../types';
-import { LocalizedWorldWiki } from './LocalizedWorldWiki';
-import { WeaverChatAssistant } from './WeaverChatAssistant';
+} from '../../../../types';
+import { LocalizedWorldWiki } from '../widgets/spine/LocalizedWorldWiki';
+import { WeaverChatAssistant } from '../widgets/spine/WeaverChatAssistant';
+import { ManifestoForge } from '../manifesto/ManifestoForge';
+import { StudioBlock } from '../../types';
 
 interface StudioWeaverProps {
   activeId: string | null;
@@ -33,6 +35,9 @@ interface StudioWeaverProps {
   worldRegistry: Record<string, NexusObject>;
   onSetZoomedSceneId: (id: string | null) => void;
   onSetCompositeMode: (val: boolean) => void;
+  blocks: StudioBlock[];
+  onUpdateBlocks: (blocks: StudioBlock[]) => void;
+  isSaving?: boolean;
 }
 
 export const StudioWeaver: React.FC<StudioWeaverProps> = ({
@@ -43,7 +48,11 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
   worldRegistry,
   onSetZoomedSceneId,
   onSetCompositeMode,
+  blocks,
+  onUpdateBlocks,
+  isSaving,
 }) => {
+  const [weaverMode, setWeaverMode] = useState<'PROSE' | 'BLUEPRINT'>('PROSE');
   const [scannedMentions, setScannedMentions] = useState<Set<string>>(new Set());
   const [showContext, setShowContext] = useState(true);
   const [selectedText, setSelectedText] = useState<string>('');
@@ -146,7 +155,14 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
     }
   };
 
-  const handleToggleContext = (mode: 'SCENE' | 'CHAPTER') => {
+  const handleToggleContext = (mode: 'SCENE' | 'CHAPTER' | 'BLUEPRINT') => {
+    if (mode === 'BLUEPRINT') {
+      setWeaverMode('BLUEPRINT');
+      onSetCompositeMode(false);
+      return;
+    }
+
+    setWeaverMode('PROSE');
     if (mode === 'CHAPTER' && !isChapterMode) {
       onSetCompositeMode(true);
       onSetZoomedSceneId(null);
@@ -189,6 +205,16 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
         <header className="h-16 border-b border-nexus-800 bg-nexus-900/30 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => {
+                  onSetZoomedSceneId(null);
+                  onSetCompositeMode(false);
+                }}
+                className="p-2 bg-nexus-900 border border-nexus-800 rounded-xl text-nexus-muted hover:text-nexus-ruby mr-2 transition-all hover:scale-110 active:scale-95"
+                title="Back to Spine"
+              >
+                <ChevronLeft size={18} />
+              </button>
               <div
                 className={`p-2 rounded-lg ${isChapterMode ? 'bg-nexus-arcane/10 text-nexus-arcane' : 'bg-nexus-ruby/10 text-nexus-ruby'}`}
               >
@@ -203,9 +229,15 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
             <div className="flex bg-nexus-950 border border-nexus-800 rounded-full p-1 shadow-inner scale-90 origin-left">
               <button
                 onClick={() => handleToggleContext('SCENE')}
-                className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${!isChapterMode ? 'bg-nexus-ruby text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+                className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${!isChapterMode && weaverMode === 'PROSE' ? 'bg-nexus-ruby text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
               >
-                <PenTool size={10} /> Scene Focus
+                <PenTool size={10} /> Prose Weave
+              </button>
+              <button
+                onClick={() => handleToggleContext('BLUEPRINT')}
+                className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${weaverMode === 'BLUEPRINT' ? 'bg-indigo-500 text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+              >
+                <LayoutTemplate size={10} /> Blueprint
               </button>
               <button
                 onClick={() => handleToggleContext('CHAPTER')}
@@ -234,7 +266,20 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
 
         <div className="flex-1 overflow-y-auto no-scrollbar p-8 lg:p-12 relative bg-nexus-950">
           <div className="max-w-4xl mx-auto pb-40">
-            {isChapterMode ? (
+            {weaverMode === 'BLUEPRINT' ? (
+              <ManifestoForge
+                title="Scene Blueprint"
+                subtitle={`Logic for ${focusedNode?.title}`}
+                blocks={blocks}
+                onUpdateBlocks={onUpdateBlocks}
+                registry={worldRegistry}
+                onRunSynthesis={() => {}}
+                synthesisLabel="Synthesize Sequence"
+                canSynthesize={false}
+                context="SCENE"
+                isSaving={isSaving}
+              />
+            ) : isChapterMode ? (
               <div className="space-y-0">
                 {scenesInChapter.map((scene, idx: number) => (
                   <div
@@ -358,7 +403,7 @@ interface ContextTabsProps {
 const ContextTabs = ({
   chapter,
   isChapterMode,
-  registry,
+  registry: _registry,
   worldRegistry,
   mentions,
   notes,

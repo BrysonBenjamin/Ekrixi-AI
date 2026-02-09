@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Database, ChevronRight, Globe, Box, Share2, MapPin, Users } from 'lucide-react';
-import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../types';
+import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../../../types';
 import ReactMarkdown from 'react-markdown';
 
 interface LocalizedWorldWikiProps {
