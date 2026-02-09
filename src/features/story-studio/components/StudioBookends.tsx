@@ -1,7 +1,7 @@
 import React from 'react';
 // Fix: Import StudioBlock from types
 import { StudioBlock } from '../types';
-import { ManifestoForge } from './ManifestoForge';
+import { ManifestoForge } from './manifesto/ManifestoForge';
 import { NexusObject } from '../../../types';
 
 interface StudioBookendsProps {
@@ -11,6 +11,7 @@ interface StudioBookendsProps {
   onFinalize: (blocks: StudioBlock[]) => void;
   hasSpine?: boolean;
   onJumpToSpine?: () => void;
+  isSaving?: boolean;
 }
 
 export const StudioBookends: React.FC<StudioBookendsProps> = ({
@@ -20,6 +21,7 @@ export const StudioBookends: React.FC<StudioBookendsProps> = ({
   onFinalize,
   hasSpine,
   onJumpToSpine,
+  isSaving,
 }) => {
   const canSynthesize = blocks.some((b) => b.type === 'THESIS' && b.data.text?.length > 10);
 
@@ -46,6 +48,7 @@ export const StudioBookends: React.FC<StudioBookendsProps> = ({
             onSeedTemplate={(tplBlocks) => {
               onUpdateBlocks(tplBlocks);
             }}
+            isSaving={isSaving}
           />
         </div>
       </div>

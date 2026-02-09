@@ -11,24 +11,125 @@ import {
   StoryNote,
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
+import { config } from '../../../config';
+import { useSessionStore } from '../../../store/useSessionStore';
 
 // NOTE: Currently operating in RAW TEXT MODE for maximum structural stability.
 // Markdown symbols are treated as literal characters to prevent parsing drift during recursive search.
+
+const generate = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
+  const { apiKeys } = useSessionStore.getState();
+  const activeKey = apiKeys?.gemini;
+
+  // Mode 1: Local LLM
+  if (config.useLocalLLM) {
+    try {
+      const response = await fetch(config.localLLMUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: config.localLLMModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+      if (!response.ok) throw new Error(`Local LLM Error: ${response.statusText}`);
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || '';
+    } catch (err) {
+      console.error('Local LLM Agent Error', err);
+      throw err;
+    }
+  }
+
+  // Mode 2: Backend Proxy
+  if (config.useBackendProxy && activeKey === 'USE_COMMUNITY_KEY') {
+    try {
+      const result = await fetch(`${config.backendUrl}/api/generate-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          model: GEMINI_MODELS.PRO,
+        }),
+      });
+      if (!result.ok) {
+        const err = await result.json();
+        throw new Error(err.message || 'Backend Proxy Error');
+      }
+      const data = await result.json();
+      return data.text;
+    } catch (err) {
+      console.error('Backend Proxy Agent Error', err);
+      throw err;
+    }
+  }
+
+  // Mode 3: Direct API
+  let ai = getGeminiClient();
+  if (!ai && import.meta.env.VITE_GEMINI_API_KEY) {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    ai = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+  }
+
+  if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
+
+  const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
+  console.log(
+    '[StudioSpineAgent] Generating Content. Prompt length:',
+    prompt.length,
+    'JSON Mode:',
+    jsonMode,
+  );
+  // console.log('[StudioSpineAgent] Prompt:', prompt); // Optional: very verbose
+
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: jsonMode ? { responseMimeType: 'application/json' } : undefined,
+  });
+  const response = await result.response;
+  const text = response.text();
+  console.log('[StudioSpineAgent] Generation complete. Response length:', text.length);
+  return text;
+};
 
 export const StudioSpineAgent = {
   /**
    * Agent: Blueprint Synthesizer
    * Generates a full protocol block array from a simple seed.
    */
-  async synthesizeManifestoBlocks(seed: string): Promise<StudioBlock[]> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
+  async synthesizeManifestoBlocks(
+    seed: string,
+    registry?: Record<string, NexusObject>,
+  ): Promise<StudioBlock[]> {
+    let contextContext = '';
+
+    if (registry) {
+      const mentions = seed.match(/\[\[(.*?)\]\]/g);
+      if (mentions) {
+        const entities = mentions
+          .map((m) => {
+            const title = m.replace('[[', '').replace(']]', '');
+            return Object.values(registry).find((r) => (r as SimpleNote).title === title);
+          })
+          .filter(Boolean) as SimpleNote[];
+
+        if (entities.length > 0) {
+          contextContext = `
+             REFERENCED WORLD ENTITIES:
+             ${entities.map((e) => `- ${e.title} (${e.category_id}): ${e.gist}`).join('\n')}
+             `;
+        }
+      }
+    }
 
     const prompt = `
             ACT AS: The Ekrixi Blueprint Chat.
             TASK: Generate a high-fidelity narrative blueprint from the user's seed IDEA.
             
             SEED: "${seed}"
+            ${contextContext}
             
             GOAL: Produce 4-6 structural blocks that establish the narrative framework.
             OUTPUT: JSON ONLY list of objects with { "type": "THESIS" | "DELTA" | "LATENT_UNIT" | "LITERARY_APPROACH" | "ORACLE_PROMPT", "data": object }.
@@ -41,14 +142,8 @@ export const StudioSpineAgent = {
             - ORACLE_PROMPT: { "text": string }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
-    const response = await result.response;
-    const rawBlocks = JSON.parse(response.text() || '[]');
+    const text = await generate(prompt, true);
+    const rawBlocks = JSON.parse(text || '[]');
     return rawBlocks.map((b: { type: string; data: Record<string, unknown> }) => ({
       id: generateId(),
       type: b.type as BlockType,
@@ -72,9 +167,6 @@ export const StudioSpineAgent = {
     tags: string[];
     thematicWeight: string;
   }> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
-
     const thesis = manifesto.find((b) => b.type === 'THESIS')?.data as { text?: string };
     const thesisText = thesis?.text || '';
     const approach =
@@ -122,39 +214,33 @@ export const StudioSpineAgent = {
             }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
-    const response = await result.response;
-    return JSON.parse(response.text() || '{}');
+    const text = await generate(prompt, true);
+    return JSON.parse(text || '{}');
   },
 
   /**
    * Agent 1: The Chapter Architect
    */
   async synthesizeChapters(blocks: StudioBlock[]): Promise<NexusObject[]> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
-    const summary = blocks.map((b) => `${b.type}: ${JSON.stringify(b.data)}`).join('\n');
+    const summary = blocks.map((b) => `- ${b.type}: ${JSON.stringify(b.data)}`).join('\n');
 
     const prompt = `
             ACT AS: The Ekrixi AI Chapter Architect.
-            TASK: Generate a sequence of 5-10 logical Story Chapters from Blueprint.
-            ${summary}
+            TASK: Generate a sequence of 5-10 logical Story Chapters based on the provided Blueprint.
+            
+            BLUEPRINT PROTOCOLS:
+            ${summary || '(No specific protocols defined. Infer standard narrative structure.)'}
+            
+            REQUIREMENTS:
+            1. Create a coherent narrative arc.
+            2. Ensure tension fluctuates appropriately.
+            3. Return valid JSON only.
+
             OUTPUT: JSON ONLY: { "chapters": [ { "title": "string", "gist": "string", "tension_level": number } ] }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
-    const response = await result.response;
-    const resultJson = JSON.parse(response.text() || '{"chapters": []}');
+    const text = await generate(prompt, true);
+    const resultJson = JSON.parse(text || '{"chapters": []}');
     const now = new Date().toISOString();
 
     return (resultJson.chapters || []).map(
@@ -184,8 +270,6 @@ export const StudioSpineAgent = {
     chapterBlocks: StudioBlock[],
     globalBlocks: StudioBlock[],
   ): Promise<NexusObject[]> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
     const globalSummary = globalBlocks
       .map((b) => `${b.type}: ${JSON.stringify(b.data)}`)
       .join('\n');
@@ -203,14 +287,8 @@ export const StudioSpineAgent = {
             OUTPUT: JSON ONLY: { "scenes": [ { "title": "string", "gist": "string", "tension_level": number } ] }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
-    const response = await result.response;
-    const resultJson = JSON.parse(response.text() || '{"scenes": []}');
+    const text = await generate(prompt, true);
+    const resultJson = JSON.parse(text || '{"scenes": []}');
     const now = new Date().toISOString();
 
     return (resultJson.scenes || []).map(
@@ -242,8 +320,6 @@ export const StudioSpineAgent = {
     globalBlocks: StudioBlock[],
     userPrompt: string,
   ): Promise<{ title: string; gist: string }> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
     const thesis =
       (globalBlocks.find((b) => b.type === 'THESIS')?.data as { text?: string })?.text || '';
 
@@ -259,14 +335,8 @@ export const StudioSpineAgent = {
             OUTPUT: JSON ONLY: { "title": "string", "gist": "string" }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
-    const response = await result.response;
-    return JSON.parse(response.text() || '{ "title": "New Beat", "gist": "..." }');
+    const text = await generate(prompt, true);
+    return JSON.parse(text || '{ "title": "New Beat", "gist": "..." }');
   },
 
   async completeDraft(
@@ -275,8 +345,6 @@ export const StudioSpineAgent = {
     next: StoryNote | null,
     blocks: StudioBlock[],
   ): Promise<{ gist: string; content: string }> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
     const thesis = (blocks.find((b) => b.type === 'THESIS')?.data as { text?: string })?.text || '';
 
     const prompt = `
@@ -294,14 +362,8 @@ export const StudioSpineAgent = {
             OUTPUT: JSON ONLY: { "gist": "string", "content": "string" }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
-    const response = await result.response;
-    return JSON.parse(response.text() || '{ "gist": "", "content": "" }');
+    const text = await generate(prompt, true);
+    return JSON.parse(text || '{ "gist": "", "content": "" }');
   },
 
   async analyzeStructure(
@@ -312,8 +374,6 @@ export const StudioSpineAgent = {
     critique: string;
     alternatives: Array<{ name: string; rationale: string }>;
   }> {
-    const ai = getGeminiClient();
-    if (!ai) throw new Error('Gemini client not initialized. Check API key in settings.');
     const summary = blocks.map((b) => `${b.type}: ${JSON.stringify(b.data)}`).join('\n');
     const chapterList = chapters
       .map((c) => {
@@ -330,13 +390,61 @@ export const StudioSpineAgent = {
             OUTPUT: JSON ONLY: { "status": "SUITABLE" | "NEEDS_REFACTOR", "critique": "string", "alternatives": [ { "name": "string", "rationale": "string" } ] }
         `;
 
-    const model = ai.getGenerativeModel({ model: GEMINI_MODELS.PRO });
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    });
+    const text = await generate(prompt, true);
+    return JSON.parse(text || '{}');
+  },
 
-    const response = await result.response;
-    return JSON.parse(response.text() || '{}');
+  /**
+   * Agent: Protocol Synthesizer
+   * Extracts and expands Author's Notes (Protocols) from the Blueprint.
+   */
+  async synthesizeProtocols(
+    blocks: StudioBlock[],
+    registry: Record<string, NexusObject>,
+  ): Promise<SimpleNote[]> {
+    const summary = blocks.map((b) => `- ${b.type}: ${JSON.stringify(b.data)}`).join('\n');
+    const now = new Date().toISOString();
+
+    const prompt = `
+            ACT AS: The Ekrixi Neural Architect.
+            TASK: Generate a set of "Author's Notes" (Narrative Protocols) based on the provided Blueprint Blocks.
+            
+            BLUEPRINT PROTOCOLS:
+            ${summary}
+            
+            GOAL: Create 3-5 high-fidelity instructions for the writer. 
+            Focus on Voice, Thematic Consistency, and Structural Guardrails.
+            
+            OUTPUT: JSON ONLY: { "protocols": [ { "title": "string", "gist": "string", "prose_content": "Detailed instruction", "category": "CONCEPT" | "CHARACTER" | "STORY" } ] }
+        `;
+
+    try {
+      const text = await generate(prompt, true);
+      const resultJson = JSON.parse(text || '{"protocols": []}');
+
+      return (resultJson.protocols || []).map(
+        (p: any) =>
+          ({
+            id: generateId(),
+            _type: 'SIMPLE_NOTE',
+            title: p.title,
+            gist: p.gist,
+            prose_content: p.prose_content,
+            category_id: p.category || NexusCategory.CONCEPT,
+            is_author_note: true,
+            is_ghost: false,
+            aliases: [],
+            tags: ['Protocol'],
+            created_at: now,
+            last_modified: now,
+            internal_weight: 0.5,
+            total_subtree_mass: 0,
+            link_ids: [],
+          }) as SimpleNote,
+      );
+    } catch (err) {
+      console.error('Protocol Synthesis Failed', err);
+      return [];
+    }
   },
 };

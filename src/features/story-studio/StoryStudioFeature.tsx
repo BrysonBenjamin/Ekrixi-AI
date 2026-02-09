@@ -3,23 +3,25 @@ import { NexusObject } from '../../types';
 import { useStoryStudio } from './hooks/useStoryStudio';
 import { StudioHeader } from './components/layout/StudioHeader';
 import { StudioBookends } from './components/StudioBookends';
-import { StudioSpine } from './components/StudioSpine';
-import { LoreScryer } from './components/LoreScryer';
-import { ManifestoChatbot } from './components/ManifestoChatbot';
-import { AuthorsNotesWidget } from './components/AuthorsNotesWidget';
-import { ManuscriptGallery } from './components/ManuscriptGallery';
+import { StudioSpine } from './components/spine/StudioSpine';
+import { LoreScryer } from './components/widgets/shared/LoreScryer';
+import { ManifestoChatbot } from './components/widgets/manifesto/ManifestoChatbot';
+import { AuthorsNotesWidget } from './components/widgets/shared/AuthorsNotesWidget';
+import { ManuscriptGallery } from './components/widgets/shared/ManuscriptGallery';
 import { RightWidgetMode } from './types';
 
 interface StoryStudioFeatureProps {
   onCommitBatch: (items: NexusObject[]) => void;
+  onDeleteBatch: (ids: string[]) => void;
   registry: Record<string, NexusObject>;
 }
 
 export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
   onCommitBatch,
+  onDeleteBatch,
   registry,
 }) => {
-  const studio = useStoryStudio(registry, onCommitBatch);
+  const studio = useStoryStudio(registry, onCommitBatch, onDeleteBatch);
   const [isGalleryOpen, setIsGalleryOpen] = useState(true);
   const [activeRightWidget, setActiveRightWidget] = useState<RightWidgetMode>(null);
 
@@ -44,7 +46,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
     reader.onload = (ev) => {
       try {
         const imported = JSON.parse(ev.target?.result as string);
-        studio.setBlocks(imported);
+        studio.onUpdateBlocks(imported);
       } catch (_err) {
         alert('Invalid Blueprint format.');
       }
@@ -88,6 +90,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
             registry={registry}
             onLoadBook={studio.handleLoadBook}
             onCreateNewBook={studio.handleCreateNewBook}
+            onDeleteBook={studio.handleDeleteBook}
           />
         )}
 
@@ -96,13 +99,15 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
             <StudioBookends
               registry={registry}
               blocks={studio.blocks}
-              onUpdateBlocks={studio.setBlocks}
+              onUpdateBlocks={studio.onUpdateBlocks}
               onFinalize={(b) => {
-                studio.setBlocks(b);
+                console.log('[StoryStudio] Finalizing Blueprint. Switching to SPINE stage...', b);
+                studio.onUpdateBlocks(b);
                 studio.setStage('SPINE');
               }}
               hasSpine={studio.studioItems.length > 1}
               onJumpToSpine={() => studio.setStage('SPINE')}
+              isSaving={studio.isSaving}
             />
           ) : (
             <StudioSpine
@@ -110,8 +115,9 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
               onUpdate={studio.setStudioItems}
               registry={registry}
               blocks={studio.blocks}
-              onUpdateBlocks={studio.setBlocks}
+              onUpdateBlocks={studio.onUpdateBlocks}
               onCommitBatch={onCommitBatch}
+              onDeleteBatch={onDeleteBatch}
               onBackToManifesto={() => studio.setStage('BLUEPRINT')}
               zoomedChapterId={studio.zoomedChapterId}
               onSetZoomedChapterId={studio.setZoomedChapterId}
@@ -121,6 +127,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
               onSetCompositeMode={studio.setIsCompositeMode}
               isChapterBlueprintMode={studio.isChapterBlueprintMode}
               onSetChapterBlueprintMode={studio.setIsChapterBlueprintMode}
+              isSaving={studio.isSaving}
             />
           )}
         </div>
@@ -132,7 +139,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
             {activeRightWidget === 'CHAT' && (
               <ManifestoChatbot
                 blocks={studio.blocks}
-                onUpdateBlocks={studio.setBlocks}
+                onUpdateBlocks={studio.onUpdateBlocks}
                 registry={registry}
                 onClose={() => setActiveRightWidget(null)}
               />

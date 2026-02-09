@@ -73,6 +73,14 @@ export interface StoryNote extends ContainerNote {
   status: NarrativeStatus;
   pov_id?: string;
   manifesto_data?: StudioBlock[]; // Stored drafting state
+  block_ids?: string[]; // IDs of ManifestoBlock nodes
+}
+
+export interface ManifestoBlock extends NexusElement {
+  _type: NexusType.MANIFESTO_BLOCK;
+  block_type: string; // The type from StudioBlock ('THESIS', etc.)
+  data: Record<string, any>;
+  parent_id: string; // ID of the MANUSCRIPT/BOOK note
 }
 
 export interface SimpleLink extends NexusElement, TraitLink {
@@ -113,4 +121,5 @@ export type NexusObject =
   | SemanticLink
   | HierarchicalLink
   | AggregatedSemanticLink
-  | AggregatedHierarchicalLink;
+  | AggregatedHierarchicalLink
+  | ManifestoBlock;

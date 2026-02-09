@@ -40,6 +40,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
   const [artifacts, setArtifacts] = useState<Record<string, WikiArtifact>>({});
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
   const [editData, setEditData] = useState<WikiEditData>({});
   const articleRef = useRef<HTMLDivElement>(null);
 
@@ -193,8 +194,30 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
     }
   };
 
+  const handleSelect = (id: string) => {
+    if (selectedId) {
+      setHistory((prev) => [...prev, selectedId]);
+    }
+    onSelect(id);
+  };
+
+  const handleGoBack = () => {
+    if (history.length > 0) {
+      const prev = history[history.length - 1];
+      setHistory((p) => p.slice(0, -1));
+      onSelect(prev);
+    } else {
+      onSelect('');
+    }
+  };
+
+  const handleBackToDirectory = () => {
+    setHistory([]);
+    onSelect('');
+  };
+
   if (!selectedId || !currentObject) {
-    return <WikiRegistryView registry={registry} onSelect={onSelect} />;
+    return <WikiRegistryView registry={registry} onSelect={handleSelect} />;
   }
 
   const isL = isLink(currentObject) && !isReified(currentObject);
@@ -219,7 +242,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
         registry={registry}
         selectedId={selectedId}
         currentObject={currentObject}
-        onSelect={onSelect}
+        onSelect={handleSelect}
+        onBack={handleGoBack}
         handleScrollToSection={handleScrollToSection}
       />
 
@@ -235,6 +259,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
             onUpdateObject={onUpdateObject}
             handleGenerateBg={handleGenerateBg}
             isGeneratingBg={isGeneratingBg}
+            onBack={handleGoBack}
+            onBackToDirectory={handleBackToDirectory}
           />
 
           {isL ? (
@@ -246,7 +272,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
               editingNodeId={editingNodeId}
               editData={editData}
               currentObject={currentObject}
-              onSelect={onSelect}
+              onSelect={handleSelect}
               handleStartEdit={handleStartEdit}
               handleSaveEdit={handleSaveEdit}
               setEditData={setEditData}
@@ -267,7 +293,7 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
                 editingNodeId={editingNodeId}
                 editData={editData}
                 currentObject={currentObject}
-                onSelect={onSelect}
+                onSelect={handleSelect}
                 handleStartEdit={handleStartEdit}
                 handleSaveEdit={handleSaveEdit}
                 setEditData={setEditData}
@@ -282,7 +308,8 @@ export const WikiFeature: React.FC<WikiFeatureProps> = ({
               handleCommitToRegistry={handleCommitToRegistry}
               handleGenerateEncyclopedia={handleGenerateEncyclopedia}
               registry={registry}
-              onSelect={onSelect}
+              onSelect={handleSelect}
+              onBack={handleGoBack}
             />
           )}
         </div>

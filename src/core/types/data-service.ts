@@ -28,6 +28,7 @@ export interface IDataService {
 
   // Batch Operations
   batchCreateOrUpdate(universeId: string, objects: NexusObject[]): Promise<void>;
+  batchDelete(universeId: string, ids: string[]): Promise<void>;
 
   // Real-time Listeners
   listenToAllNexusObjects(
@@ -79,4 +80,9 @@ export interface IDataService {
     messageId: string,
     updates: Partial<MessageNode>,
   ): Promise<void>;
+
+  // Manifesto Block Management
+  saveManifestoBlocks(universeId: string, manuscriptId: string, blocks: any[]): Promise<void>;
+  getManifestoBlocks(universeId: string, manuscriptId: string): Promise<any[]>;
+  deleteManuscript(universeId: string, manuscriptId: string): Promise<void>;
 }

@@ -80,6 +80,15 @@ export const LocalDataService: IDataService = {
     }
   },
 
+  async batchDelete(universeId: string, ids: string[]): Promise<void> {
+    const key = _getStorageKey(universeId, 'objects');
+    const objects = _getData<NexusObject>(key);
+    _saveData(
+      key,
+      objects.filter((o) => !ids.includes(o.id)),
+    );
+  },
+
   // --- Real-time Listeners (Simulated) ---
   listenToAllNexusObjects(
     universeId: string,
@@ -330,5 +339,34 @@ export const LocalDataService: IDataService = {
       messages[index] = { ...messages[index], ...updates };
       _saveData(key, messages);
     }
+  },
+
+  // --- Manifesto Block Management ---
+  async saveManifestoBlocks(
+    universeId: string,
+    manuscriptId: string,
+    blocks: any[],
+  ): Promise<void> {
+    const key = `ekrixi_local_${universeId}_manuscript_${manuscriptId}_blocks`;
+    localStorage.setItem(key, JSON.stringify(blocks));
+  },
+
+  async getManifestoBlocks(universeId: string, manuscriptId: string): Promise<any[]> {
+    const key = `ekrixi_local_${universeId}_manuscript_${manuscriptId}_blocks`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  },
+
+  async deleteManuscript(universeId: string, manuscriptId: string): Promise<void> {
+    // For local, we just delete the objects from the main pool and the subcollection
+    const key = _getStorageKey(universeId, 'objects');
+    const objects = _getData<NexusObject>(key);
+    // Note: Recursive deletion locally is simplified as it's dev-only and
+    // registry-based, but we'll filter out the manuscript and its blocks key
+    _saveData(
+      key,
+      objects.filter((o) => o.id !== manuscriptId),
+    );
+    localStorage.removeItem(`ekrixi_local_${universeId}_manuscript_${manuscriptId}_blocks`);
   },
 };

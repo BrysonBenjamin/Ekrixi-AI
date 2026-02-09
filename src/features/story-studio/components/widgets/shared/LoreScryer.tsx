@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, X, MapPin, Users, Box, Ghost, Share2 } from 'lucide-react';
-import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../types';
+import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../../../types';
 
 interface LoreScryerProps {
   isOpen: boolean;

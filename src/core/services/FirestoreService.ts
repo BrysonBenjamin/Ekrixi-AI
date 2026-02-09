@@ -26,6 +26,7 @@ import {
   NexusCategory,
   ContainmentType,
   DefaultLayout,
+  isLink,
 } from '../../types';
 import { Universe, UniverseUpdates } from '../types/data-service';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
@@ -51,6 +52,12 @@ const getMessagesCollectionRef = (universeId: string, chatId: string) =>
 
 const getMessageDocRef = (universeId: string, chatId: string, messageId: string) =>
   doc(db, 'universes', universeId, 'chats', chatId, 'messages', messageId);
+
+const getManifestoBlocksCollectionRef = (universeId: string, parentId: string) =>
+  collection(db, 'universes', universeId, 'nexusObjects', parentId, 'manifestoBlocks');
+
+const getManifestoBlockDocRef = (universeId: string, parentId: string, blockId: string) =>
+  doc(db, 'universes', universeId, 'nexusObjects', parentId, 'manifestoBlocks', blockId);
 
 export const FirestoreService = {
   // --- NexusObject CRUD ---
@@ -122,6 +129,23 @@ export const FirestoreService = {
       }
     } catch (err) {
       console.error(`[FirestoreService] Batch operation failed for universe ${universeId}:`, err);
+      throw err;
+    }
+  },
+
+  async batchDelete(universeId: string, ids: string[]): Promise<void> {
+    try {
+      const BATCH_LIMIT = 500;
+      for (let i = 0; i < ids.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        const chunk = ids.slice(i, i + BATCH_LIMIT);
+        chunk.forEach((id) => {
+          batch.delete(getNexusObjectDocRef(universeId, id));
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error(`[FirestoreService] Batch delete failed for universe ${universeId}:`, err);
       throw err;
     }
   },
@@ -556,5 +580,92 @@ export const FirestoreService = {
   ): Promise<void> {
     const docRef = getMessageDocRef(universeId, chatId, messageId);
     await updateDoc(docRef, updates);
+  },
+
+  // --- Manifesto Block Management ---
+
+  async saveManifestoBlocks(universeId: string, parentId: string, blocks: any[]): Promise<void> {
+    try {
+      const batch = writeBatch(db);
+      blocks.forEach((block) => {
+        const docRef = getManifestoBlockDocRef(universeId, parentId, block.id);
+        batch.set(docRef, block, { merge: true });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error(`[FirestoreService] Failed to save manifesto blocks for ${parentId}:`, err);
+      throw err;
+    }
+  },
+
+  async getManifestoBlocks(universeId: string, parentId: string): Promise<any[]> {
+    const q = query(getManifestoBlocksCollectionRef(universeId, parentId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => doc.data());
+  },
+
+  async deleteManuscript(universeId: string, manuscriptId: string): Promise<void> {
+    try {
+      const allObjects = await this.getAllNexusObjects(universeId);
+      const toDelete = new Set<string>();
+      toDelete.add(manuscriptId);
+
+      // Recursive search for children and links
+      const findChildren = (parentId: string) => {
+        allObjects.forEach((obj) => {
+          if (isLink(obj)) {
+            if (obj.source_id === parentId || obj.target_id === parentId) {
+              if (!toDelete.has(obj.id)) {
+                toDelete.add(obj.id);
+                const peerId = obj.source_id === parentId ? obj.target_id : obj.source_id;
+                // Only descend if it's a hierarchical link suggesting ownership or child relationship
+                if (obj._type === NexusType.HIERARCHICAL_LINK && obj.source_id === parentId) {
+                  if (!toDelete.has(peerId)) {
+                    toDelete.add(peerId);
+                    findChildren(peerId);
+                  }
+                }
+              }
+            }
+          }
+        });
+      };
+
+      findChildren(manuscriptId);
+
+      // Also find Author Notes linked to any of these nodes
+      const allAffectedIds = Array.from(toDelete);
+      allObjects.forEach((obj) => {
+        if (isLink(obj) && !toDelete.has(obj.id)) {
+          const isSourceAffected = allAffectedIds.includes(obj.source_id);
+          const isTargetAffected = allAffectedIds.includes(obj.target_id);
+          if (isSourceAffected || isTargetAffected) {
+            const peerId = isSourceAffected ? obj.target_id : obj.source_id;
+            const peer = allObjects.find((o) => o.id === peerId);
+            if (peer && (peer as SimpleNote).is_author_note) {
+              toDelete.add(obj.id);
+              toDelete.add(peer.id);
+            }
+          }
+        }
+      });
+
+      // Batch delete from nexusObjects
+      const idsArray = Array.from(toDelete);
+      for (let i = 0; i < idsArray.length; i += 500) {
+        const batch = writeBatch(db);
+        const chunk = idsArray.slice(i, i + 500);
+        chunk.forEach((id) => {
+          batch.delete(getNexusObjectDocRef(universeId, id));
+        });
+        await batch.commit();
+      }
+
+      // Delete Manifesto Blocks subcollection
+      await this.deleteCollection(getManifestoBlocksCollectionRef(universeId, manuscriptId));
+    } catch (err) {
+      console.error(`[FirestoreService] Failed to delete manuscript ${manuscriptId}:`, err);
+      throw err;
+    }
   },
 };
