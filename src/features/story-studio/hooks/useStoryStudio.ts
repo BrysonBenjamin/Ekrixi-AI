@@ -32,28 +32,61 @@ export const useStoryStudio = (
   const [isCompositeMode, setIsCompositeMode] = useState(false);
   const [isChapterBlueprintMode, _setIsChapterBlueprintMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [focusedBlocksId, setFocusedBlocksId] = useState<string | null>(null);
   const blockSaveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const itemsSaveTimeout = useRef<NodeJS.Timeout | null>(null);
   const blocksRef = useRef(blocks);
+  const studioItemsRef = useRef(studioItems);
 
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
 
-  const saveBlocks = useCallback(async (targetId: string | null, data: StudioBlock[]) => {
-    if (!targetId || data.length === 0) return;
-    const activeUniverseId = useSessionStore.getState().activeUniverseId;
-    if (!activeUniverseId) return;
+  useEffect(() => {
+    studioItemsRef.current = studioItems;
+  }, [studioItems]);
 
-    setIsSaving(true);
-    try {
-      await DataService.saveManifestoBlocks(activeUniverseId, targetId, data);
-    } catch (err) {
-      console.error('[StoryStudio] Save failed:', err);
-    } finally {
-      setIsSaving(false);
-    }
-  }, []);
+  const saveBlocks = useCallback(
+    async (targetId: string | null, data: StudioBlock[], commitToRegistry = false) => {
+      if (!targetId || data.length === 0) return;
+      const activeUniverseId = useSessionStore.getState().activeUniverseId;
+      if (!activeUniverseId) return;
+
+      setIsSaving(true);
+      try {
+        // 1. Save to sub-collection (The more granular data)
+        await DataService.saveManifestoBlocks(activeUniverseId, targetId, data);
+
+        // 2. If requested (or for main book), sync to main registry object
+        if (commitToRegistry || targetId === activeBookId) {
+          const item = registry[targetId] as StoryNote;
+          if (item) {
+            onCommitBatch([
+              {
+                ...item,
+                manifesto_data: data,
+                last_modified: new Date().toISOString(),
+              },
+            ]);
+          }
+        }
+
+        setLastSaved(
+          new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+        );
+      } catch (err) {
+        console.error('[StoryStudio] Save failed:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [activeBookId, registry, onCommitBatch],
+  );
 
   const activeBook = useMemo(
     () => (activeBookId ? (registry[activeBookId] as StoryNote) : null),
@@ -307,74 +340,104 @@ export const useStoryStudio = (
     [onCommitBatch],
   );
   const handleSave = useCallback(() => {
-    if (stage === 'BLUEPRINT') {
-      if (!activeBookId) {
-        handleCreateNewBook(blocks);
-      } else {
-        const book = registry[activeBookId] as StoryNote;
-        if (book) {
-          onCommitBatch([
-            { ...book, manifesto_data: blocks, last_modified: new Date().toISOString() },
-          ]);
-        }
-      }
-    } else {
-      const finalItems = [...studioItems];
-      const bookIdx = finalItems.findIndex(
-        (i) => (i as StoryNote).story_type === StoryType.MANUSCRIPT,
-      );
-      if (bookIdx !== -1) {
-        finalItems[bookIdx] = { ...finalItems[bookIdx], manifesto_data: blocks } as StoryNote;
-      }
-      onCommitBatch(finalItems);
-    }
-
-    // Persist blocks to subcollection
     const saveId = focusedBlocksId || activeBookId;
-    if (saveId) {
-      saveBlocks(saveId, blocks);
-    }
-  }, [
-    stage,
-    activeBookId,
-    focusedBlocksId,
-    blocks,
-    studioItems,
-    registry,
-    onCommitBatch,
-    handleCreateNewBook,
-    saveBlocks,
-  ]);
+    if (!saveId) return;
 
-  // Periodic and Debounced auto-save
+    if (stage === 'BLUEPRINT' && !activeBookId) {
+      handleCreateNewBook(blocks);
+    } else {
+      // Use consolidated save logic which handles both sub-collection and registry commit
+      saveBlocks(saveId, blocks, true);
+    }
+  }, [stage, activeBookId, focusedBlocksId, blocks, handleCreateNewBook, saveBlocks]);
+
+  // Periodic auto-save (doesn't reset on typing)
   useEffect(() => {
     const saveId = focusedBlocksId || activeBookId;
     if (!saveId) return;
 
-    // Periodic Save (Every 5s)
     const interval = setInterval(() => {
       saveBlocks(saveId, blocksRef.current);
-    }, 5000);
+    }, 10000); // 10s for periodic to avoid too much noise
 
-    // Debounced Save (1s after stop)
-    if (blockSaveTimeout.current) clearTimeout(blockSaveTimeout.current);
-    blockSaveTimeout.current = setTimeout(() => {
-      saveBlocks(saveId, blocksRef.current);
-    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeBookId, focusedBlocksId, saveBlocks]);
+
+  // Debounced auto-save (triggers 2s after typing stops)
+  // Debounced save is now handled in handleUpdateBlocks to ensure distinct trigger events and immediate ref updates
+
+  // Auto-save for studioItems (scene prose, chapter content) - 2s debounce
+  useEffect(() => {
+    if (stage !== 'SPINE') return; // Only auto-save items in SPINE stage
+    if (studioItems.length === 0) return;
+
+    if (itemsSaveTimeout.current) clearTimeout(itemsSaveTimeout.current);
+
+    itemsSaveTimeout.current = setTimeout(() => {
+      // Save all studio items to registry
+      onCommitBatch(studioItemsRef.current);
+      setLastSaved(
+        new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+      );
+    }, 2000);
 
     return () => {
-      clearInterval(interval);
-      if (blockSaveTimeout.current) clearTimeout(blockSaveTimeout.current);
+      if (itemsSaveTimeout.current) clearTimeout(itemsSaveTimeout.current);
     };
-  }, [blocks, activeBookId, focusedBlocksId, saveBlocks]);
+  }, [studioItems, stage, onCommitBatch]);
+
+  // Save on exit / visibility change
+  useEffect(() => {
+    const handleExit = () => {
+      // Save blocks if any exist
+      const saveId = focusedBlocksId || activeBookId;
+      if (saveId && blocksRef.current.length > 0) {
+        saveBlocks(saveId, blocksRef.current, true);
+      }
+
+      // Save studio items (scenes/chapters) if in SPINE stage
+      if (stage === 'SPINE' && studioItemsRef.current.length > 0) {
+        onCommitBatch(studioItemsRef.current);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleExit);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleExit();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleExit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeBookId, focusedBlocksId, saveBlocks, stage, onCommitBatch]);
 
   const handleUpdateBlocks = useCallback(
     (newBlocks: StudioBlock[]) => {
       setBlocks(newBlocks);
+      blocksRef.current = newBlocks; // Immediate ref update for safety
+
       const saveId = focusedBlocksId || activeBookId;
-      if (saveId && newBlocks.length > blocks.length) {
-        // Immediate save on create
-        saveBlocks(saveId, newBlocks);
+      if (!saveId) return;
+
+      if (newBlocks.length !== blocks.length) {
+        // Immediate save on structural change (add/remove block)
+        if (blockSaveTimeout.current) clearTimeout(blockSaveTimeout.current);
+        saveBlocks(saveId, newBlocks, true);
+      } else {
+        // Debounced save for content edits
+        if (blockSaveTimeout.current) clearTimeout(blockSaveTimeout.current);
+        blockSaveTimeout.current = setTimeout(() => {
+          saveBlocks(saveId, newBlocks, true);
+        }, 2000);
       }
     },
     [blocks.length, focusedBlocksId, activeBookId, saveBlocks],
@@ -425,6 +488,7 @@ export const useStoryStudio = (
     handleSave,
     handleDeleteBook,
     isSaving,
+    lastSaved,
     focusedBlocksId,
     handleFocusBlocks,
     onUpdateBlocks: handleUpdateBlocks,

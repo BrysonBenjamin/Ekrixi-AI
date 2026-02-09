@@ -82,6 +82,8 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
         onExportBlueprint={handleExportBlueprint}
         onImportBlueprint={handleImportBlueprint}
         spineContextLabel={spineContextLabel}
+        isSaving={studio.isSaving}
+        lastSaved={studio.lastSaved}
       />
 
       <main className="flex-1 relative overflow-hidden flex">
