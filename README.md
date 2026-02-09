@@ -97,5 +97,5 @@ Ekrixi-AI implements a **Dual-Mode Security** system to protect your Gemini API 
 ---
 
 <div align="center">
-View the live app: [Ekrixi AI Studio](https://ai.studio/apps/drive/1zx_eLA_1BaARWuImBFQBbgEC6EMX38El)
+View the live app: [Ekrixi AI]([https://ai.studio/apps/drive/1zx_eLA_1BaARWuImBFQBbgEC6EMX38El](https://ekrixi-ai-412518375747.us-central1.run.app/nexus))
 </div>
