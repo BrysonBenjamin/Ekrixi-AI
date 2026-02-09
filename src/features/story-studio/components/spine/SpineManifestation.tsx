@@ -20,6 +20,7 @@ interface SpineManifestationProps {
   registry: Record<string, NexusObject>;
   isRegeneration?: boolean;
   onCancel?: () => void;
+  isLoading?: boolean;
 }
 
 export const SpineManifestation: React.FC<SpineManifestationProps> = ({
@@ -30,6 +31,7 @@ export const SpineManifestation: React.FC<SpineManifestationProps> = ({
   registry,
   isRegeneration,
   onCancel,
+  isLoading,
 }) => {
   // If we have blocks but no spine items, offer to manifest from blueprint
   if (blocks.length > 0) {
@@ -133,10 +135,10 @@ export const SpineManifestation: React.FC<SpineManifestationProps> = ({
 
         <div className="w-full max-w-3xl">
           <StoryInput
-            isLoading={false}
+            placeholder="A hardboiled detective story set on a lunar colony where oxygen is the only currency..."
             onSend={handleSmartSpineGeneration}
             registry={registry}
-            placeholder="Manifest your narrative... Use @ to link Characters or Lore."
+            isLoading={!!isLoading}
           />
         </div>
 

@@ -45,6 +45,8 @@ interface ChapterListProps {
   isFillingId: string | null;
   zoomedNode: StoryNote | null;
   isSaving?: boolean;
+  isSeeding?: boolean;
+  onSetSeeding?: (val: boolean) => void;
 }
 
 const TensionIndicator = ({ value }: { value: number }) => (
@@ -87,6 +89,8 @@ export const ChapterList: React.FC<ChapterListProps> = ({
   isFillingId,
   zoomedNode,
   isSaving,
+  isSeeding,
+  onSetSeeding,
 }) => {
   // If we're zoomed in, we might be showing the ManifestForge for the chapter
   // Or we might be showing the list of scenes.
@@ -164,6 +168,8 @@ export const ChapterList: React.FC<ChapterListProps> = ({
             }}
             context="CHAPTER"
             isSaving={isSaving}
+            isSeeding={isSeeding}
+            onSetSeeding={onSetSeeding}
           />
           <div className="flex justify-center mt-8">
             <button
