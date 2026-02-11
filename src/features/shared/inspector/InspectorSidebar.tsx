@@ -10,24 +10,25 @@ import {
   Compass,
   ShieldCheck,
   Activity,
-  // Fix: Added missing PenTool import
   PenTool,
 } from 'lucide-react';
 import { NexusObject, isLink, isReified, NexusCategory, NexusType } from '../../../types';
 import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
 
-interface RefineryInspectorProps {
+interface InspectorSidebarProps {
   object: NexusObject;
   registry: Record<string, NexusObject>;
   onUpdate: (updates: Partial<NexusObject>) => void;
   onClose: () => void;
+  onOpenWiki?: (id: string) => void;
 }
 
-export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
+export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   object,
   registry,
   onUpdate,
   onClose,
+  onOpenWiki,
 }) => {
   const isL = isLink(object);
   const reified = isReified(object);
@@ -75,7 +76,7 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-8 pb-32">
+      <main className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-8 pb-48">
         <div className="p-6 bg-nexus-950 border border-nexus-800 rounded-[32px] shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none">
             <Activity size={100} />
@@ -241,13 +242,31 @@ export const RefineryInspector: React.FC<RefineryInspectorProps> = ({
 
       <footer className="absolute inset-x-0 bottom-0 p-8 border-t border-nexus-800 bg-nexus-950 z-30 flex flex-col gap-6">
         <button
-          onClick={onClose}
+          onClick={() => {
+            if (onOpenWiki && object.id) {
+              onOpenWiki(object.id);
+            } else {
+              onClose();
+            }
+          }}
           className={`
                         w-full py-4 rounded-2xl text-[10px] font-display font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-[0.98]
-                        ${isL ? 'bg-nexus-arcane text-white shadow-nexus-arcane/20' : isStory ? 'bg-nexus-ruby text-white shadow-nexus-ruby/20' : 'bg-nexus-accent text-white shadow-nexus-accent/20'}
+                        ${
+                          onOpenWiki
+                            ? 'bg-nexus-accent text-white shadow-nexus-accent/20 hover:bg-nexus-accent/90'
+                            : 'bg-nexus-800 text-nexus-muted hover:text-nexus-text hover:bg-nexus-700'
+                        }
                     `}
         >
-          <Save size={16} /> Commit Manifest
+          {onOpenWiki ? (
+            <>
+              <ArrowRight size={16} /> Open Full Entry
+            </>
+          ) : (
+            <>
+              <X size={16} /> Close Inspector
+            </>
+          )}
         </button>
 
         <div className="flex items-center gap-4 opacity-70">

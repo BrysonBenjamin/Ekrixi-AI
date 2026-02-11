@@ -18,6 +18,7 @@ import { DrilldownCanvas } from './components/DrilldownCanvas';
 import { ChevronRight, Home, Orbit, Compass, UserCircle2, Zap, ShieldAlert } from 'lucide-react';
 import { useTutorial, TutorialStep } from '../../components/shared/tutorial/TutorialSystem';
 import { IntegrityAssistant } from '../integrity/components/IntegrityAssistant';
+import { InspectorPanel } from '../shared/inspector/InspectorPanel';
 
 interface DrilldownFeatureProps {
   registry: Record<string, NexusObject>;
@@ -47,10 +48,35 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
   const [navStack, setNavStack] = useState<string[]>([]);
   const [showAuthorNotes, setShowAuthorNotes] = useState(false);
   const [isIntegrityOpen, setIsIntegrityOpen] = useState(false);
+  const [showInspector, setShowInspector] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { startTutorial } = useTutorial();
   const currentContainerId = navStack[navStack.length - 1];
   const currentContainer = currentContainerId ? registry[currentContainerId] : null;
+
+  const selectedObject = useMemo(() => {
+    return selectedId ? registry[selectedId] : null;
+  }, [selectedId, registry]);
+
+  const handleUpdateItem = useCallback(
+    (updates: Partial<NexusObject>) => {
+      if (!selectedId || !onRegistryUpdate) return;
+      onRegistryUpdate((prev) => {
+        const item = prev[selectedId];
+        if (!item) return prev;
+        return {
+          ...prev,
+          [selectedId]: {
+            ...item,
+            ...updates,
+            last_modified: new Date().toISOString(),
+          } as NexusObject,
+        };
+      });
+    },
+    [selectedId, onRegistryUpdate],
+  );
 
   useEffect(() => {
     if (integrityFocus && integrityFocus.mode === 'DRILL' && registry[integrityFocus.linkId]) {
@@ -486,7 +512,12 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           registry={visibleNodesRegistry}
           fullRegistry={registry}
           onDrilldown={handleDrilldown}
-          onInspect={onSelectNote}
+          onDrilldown={handleDrilldown}
+          onInspect={(id) => {
+            setSelectedId(id);
+            setShowInspector(true);
+            // Removed onSelectNote(id) to prevent immediate navigation
+          }}
           focusId={currentContainerId}
           onDelete={handleDelete}
           onReifyLink={handleReifyLink}
@@ -495,6 +526,14 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           onEstablishLink={handleEstablishLink}
           onReparent={handleReparent}
           integrityFocus={integrityFocus}
+        />
+        <InspectorPanel
+          isOpen={showInspector}
+          selectedObject={selectedObject}
+          registry={registry}
+          onUpdate={handleUpdateItem}
+          onClose={() => setShowInspector(false)}
+          onOpenWiki={onSelectNote}
         />
       </main>
       <footer className="absolute bottom-8 left-8 right-8 pointer-events-none flex justify-between items-end z-20">

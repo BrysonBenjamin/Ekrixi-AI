@@ -22,6 +22,7 @@ interface RefineryDrilldownProps {
     isReference?: boolean,
   ) => void;
   onEstablishLink?: (sourceId: string, targetId: string, verb?: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
@@ -37,6 +38,7 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
   onReifyNodeToLink,
   onReparent,
   onEstablishLink,
+  onDelete,
 }) => {
   // Logic to calculate visible nodes based on local registry
   const visibleNodesRegistry = useMemo(() => {
@@ -186,6 +188,7 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
           onReifyNodeToLink={onReifyNodeToLink}
           onReparent={onReparent}
           onEstablishLink={onEstablishLink}
+          onDelete={onDelete}
           focusId={focusId || undefined}
         />
       </main>
