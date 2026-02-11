@@ -81,7 +81,6 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
     query: string;
     pos: number;
   } | null>(null);
-  const [aiSeedInput, setAiSeedInput] = useState('');
   const [isSeedingAi, setIsSeedingAi] = useState(false);
 
   const isActuallySeeding = externalSeeding ?? isSeedingAi;
@@ -265,7 +264,7 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="relative group flex-1">
                   <StoryInputComponent
-                    isLoading={isSeedingAi}
+                    isLoading={isActuallySeeding}
                     onSend={handleAiBlueprintRequest}
                     registry={registry}
                     placeholder={

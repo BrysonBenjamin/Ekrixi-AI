@@ -1,6 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Database, ChevronRight, Globe, Box, Share2, MapPin, Users } from 'lucide-react';
-import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../../../types';
+import {
+  NexusObject,
+  NexusCategory,
+  isLink,
+  isReified,
+  NexusType,
+  SimpleNote,
+} from '../../../../../types';
 import ReactMarkdown from 'react-markdown';
 
 interface LocalizedWorldWikiProps {
@@ -19,8 +26,8 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
         if (isLink(o) && !isReified(o)) return false;
         if (o._type === NexusType.STORY_NOTE) return false;
 
-        const title = 'title' in o ? (o as any).title : '';
-        const gist = 'gist' in o ? (o as any).gist : '';
+        const title = 'title' in o ? (o as SimpleNote).title : '';
+        const gist = 'gist' in o ? (o as SimpleNote).gist : '';
 
         return (
           title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -49,23 +56,25 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
             <Globe size={14} /> Back to Library
           </button>
           <div className="px-3 py-1 bg-nexus-accent/10 border border-nexus-accent/30 rounded-full text-[9px] font-black text-nexus-accent uppercase">
-            {'category_id' in focusedNode ? (focusedNode as any).category_id : 'CONCEPT'}
+            {'category_id' in focusedNode ? (focusedNode as SimpleNote).category_id : 'CONCEPT'}
           </div>
         </header>
         <div className="flex-1 overflow-y-auto no-scrollbar p-8 space-y-8">
           <div className="space-y-4">
             <h2 className="text-3xl font-display font-black text-nexus-text uppercase tracking-tight leading-none">
-              {'title' in focusedNode ? (focusedNode as any).title : 'Unit'}
+              {'title' in focusedNode ? (focusedNode as SimpleNote).title : 'Unit'}
             </h2>
             <div className="pl-6 border-l-2 border-nexus-accent/30 py-1">
               <p className="text-base font-serif italic text-nexus-muted leading-relaxed">
-                "{'gist' in focusedNode ? (focusedNode as any).gist : ''}"
+                "{'gist' in focusedNode ? (focusedNode as SimpleNote).gist : ''}"
               </p>
             </div>
           </div>
           <div className="prose prose-sm prose-invert max-w-none wiki-content border-t border-nexus-800 pt-8">
             <ReactMarkdown>
-              {'prose_content' in focusedNode ? (focusedNode as any).prose_content || '' : ''}
+              {'prose_content' in focusedNode
+                ? (focusedNode as SimpleNote).prose_content || ''
+                : ''}
             </ReactMarkdown>
           </div>
         </div>
@@ -96,10 +105,10 @@ export const LocalizedWorldWiki: React.FC<LocalizedWorldWikiProps> = ({ registry
         ) : (
           nodes.map((node) => {
             const isMentioned = mentions.has(node.id);
-            const title = 'title' in node ? (node as any).title : 'Unit';
-            const gist = 'gist' in node ? (node as any).gist : '';
+            const title = 'title' in node ? (node as SimpleNote).title : 'Unit';
+            const gist = 'gist' in node ? (node as SimpleNote).gist : '';
             const categoryId =
-              'category_id' in node ? (node as any).category_id : NexusCategory.CONCEPT;
+              'category_id' in node ? (node as SimpleNote).category_id : NexusCategory.CONCEPT;
             return (
               <button
                 key={node.id}

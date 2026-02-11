@@ -16,9 +16,10 @@ import {
   X,
   LucideIcon,
 } from 'lucide-react';
+// ... imports ...
 import { useSessionStore } from '../../store/useSessionStore';
 import { useGoogleDrive } from '../../features/system/hooks/useGoogleDrive';
-import { Logo } from '../shared/Logo';
+// Removed unused Logo import
 import { BrandLogo } from '../shared/BrandLogo';
 import { config } from '../../config';
 
@@ -28,7 +29,7 @@ type ThemeMode = string; // Simplified for import issues, or import from store i
 
 interface AppShellProps {
   children: React.ReactNode;
-  theme: ThemeMode;
+  _theme?: ThemeMode; // Renamed to indicate unused
 }
 
 interface NavItemProps {
@@ -73,7 +74,7 @@ const NavItem: React.FC<NavItemProps> = ({ path, icon: Icon, label, isActive, on
   );
 };
 
-export const AppShell: React.FC<AppShellProps> = ({ children, theme }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser } = useSessionStore();

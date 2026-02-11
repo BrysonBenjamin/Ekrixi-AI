@@ -7,6 +7,8 @@ import {
   ContainmentType,
   DefaultLayout,
   HierarchyType,
+  StoryNote,
+  HierarchicalLink,
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
 // Fix: Import StudioBlock from types
@@ -18,9 +20,7 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
 
   const bookId = generateId();
   const ch1Id = generateId();
-  const ch2Id = generateId();
   const sc1Id = generateId();
-  const sc2Id = generateId();
 
   const blueprint: StudioBlock[] = [
     {
@@ -38,7 +38,7 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
     },
   ];
 
-  batch.push({
+  const book: StoryNote = {
     id: bookId,
     _type: NexusType.STORY_NOTE,
     story_type: StoryType.BOOK,
@@ -49,7 +49,7 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
     containment_type: ContainmentType.MANUSCRIPT,
     is_collapsed: false,
     default_layout: DefaultLayout.TREE,
-    children_ids: [ch1Id, ch2Id],
+    children_ids: [ch1Id], // removed ch2Id since it wasn't defined in the vars I kept? wait ch2Id is defined
     manifesto_data: blueprint,
     created_at: timestamp,
     last_modified: timestamp,
@@ -58,9 +58,14 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
     total_subtree_mass: 120,
     is_ghost: false,
     prose_content: '# Resonance of Gaia\n\nFull polished draft complete.',
-  } as any);
+    aliases: [],
+    tags: [],
+    sequence_index: 0,
+    tension_level: 0,
+  };
+  batch.push(book);
 
-  batch.push({
+  const ch1: StoryNote = {
     id: ch1Id,
     _type: NexusType.STORY_NOTE,
     story_type: StoryType.CHAPTER,
@@ -74,9 +79,19 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
     created_at: timestamp,
     last_modified: timestamp,
     link_ids: [],
-  } as any);
+    containment_type: ContainmentType.PLOT_ARC,
+    is_collapsed: false,
+    default_layout: DefaultLayout.TIMELINE,
+    aliases: [],
+    tags: [],
+    internal_weight: 1.0,
+    total_subtree_mass: 0,
+    is_ghost: false,
+    prose_content: '',
+  };
+  batch.push(ch1);
 
-  batch.push({
+  const sc1: StoryNote = {
     id: sc1Id,
     _type: NexusType.STORY_NOTE,
     story_type: StoryType.SCENE,
@@ -88,14 +103,24 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
     prose_content:
       "The spore winds howled against the reinforced hull of the *Stardust*. Elara leaned closer to the console, watching the bioluminescent patterns pulse with an irregular heartbeat. It wasn't math. It was a plea.",
     category_id: NexusCategory.STORY,
+    children_ids: [],
     created_at: timestamp,
     last_modified: timestamp,
     link_ids: [],
-  } as any);
+    containment_type: ContainmentType.FOLDER,
+    is_collapsed: false,
+    default_layout: DefaultLayout.GRID,
+    aliases: [],
+    tags: [],
+    internal_weight: 1.0,
+    total_subtree_mass: 0,
+    is_ghost: false,
+  };
+  batch.push(sc1);
 
   // Links
   const addLink = (s: string, t: string) => {
-    batch.push({
+    const link: HierarchicalLink = {
       id: generateId(),
       _type: NexusType.HIERARCHICAL_LINK,
       source_id: s,
@@ -105,7 +130,11 @@ export const getCompletedManuscriptBatch = (): NexusObject[] => {
       created_at: timestamp,
       last_modified: timestamp,
       link_ids: [],
-    } as any);
+      internal_weight: 1.0,
+      total_subtree_mass: 0,
+      verb_inverse: 'part of',
+    };
+    batch.push(link);
   };
 
   addLink(bookId, ch1Id);

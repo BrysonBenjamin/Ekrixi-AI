@@ -1,5 +1,6 @@
 export interface MessageNode {
   id: string;
+  senderId: string;
   role: 'user' | 'model';
   text: string;
 
@@ -9,13 +10,14 @@ export interface MessageNode {
   selectedChildId: string | null; // Remembers which branch was last active
 
   createdAt: string;
-  senderId: string; // Required for security rules
+
   isStreaming?: boolean;
   isError?: boolean;
 }
 
 export interface ChatSession {
   id: string;
+  senderId: string;
   universeId?: string; // Optional for backward compatibility
   title: string;
 

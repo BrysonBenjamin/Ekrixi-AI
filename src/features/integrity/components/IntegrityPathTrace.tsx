@@ -1,6 +1,6 @@
 import React from 'react';
 import { GitBranch, ArrowRight } from 'lucide-react';
-import { NexusObject } from '../../../types';
+import { NexusObject, SimpleNote, SemanticLink } from '../../../types';
 
 interface IntegrityPathTraceProps {
   path: string[];
@@ -24,7 +24,12 @@ export const IntegrityPathTrace: React.FC<IntegrityPathTraceProps> = ({
       <div className="flex items-center gap-1.5">
         {path.map((nodeId, idx) => {
           const node = registry[nodeId];
-          const label = (node as any)?.title || (node as any)?.verb || nodeId.slice(0, 4);
+          const label =
+            node && 'title' in node
+              ? (node as SimpleNote).title
+              : node && 'verb' in node
+                ? (node as SemanticLink).verb
+                : nodeId.slice(0, 4);
           return (
             <React.Fragment key={`${nodeId}-${idx}`}>
               <div

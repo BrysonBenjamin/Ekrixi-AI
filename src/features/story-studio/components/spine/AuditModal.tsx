@@ -9,11 +9,13 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
+import { AuditResult } from './useStudioSpineLogic';
+
 interface AuditModalProps {
   show: boolean;
   onClose: () => void;
   isAuditing: boolean;
-  auditResult: any;
+  auditResult: AuditResult | null;
 }
 
 export const AuditModal: React.FC<AuditModalProps> = ({
@@ -80,7 +82,7 @@ export const AuditModal: React.FC<AuditModalProps> = ({
                   </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {auditResult.alternatives.map((alt: any, i: number) => (
+                  {auditResult.alternatives.map((alt, i: number) => (
                     <div
                       key={i}
                       className="p-8 bg-nexus-950 border border-nexus-800 rounded-[32px] hover:border-nexus-ruby/50 transition-all group"

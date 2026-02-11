@@ -16,7 +16,7 @@ import { StudioSpineAgent } from '../StudioSpineAgent';
 import { generateId } from '../../../../utils/ids';
 import { SimpleLink } from '../../../../types';
 
-interface AuditResult {
+export interface AuditResult {
   status: 'SUITABLE' | 'NEEDS_REFACTOR';
   critique: string;
   alternatives: Array<{ name: string; rationale: string }>;
@@ -84,7 +84,7 @@ export const useStudioSpineLogic = (
     try {
       const [generatedChapters, generatedProtocols] = await Promise.all([
         StudioSpineAgent.synthesizeChapters(blocks),
-        StudioSpineAgent.synthesizeProtocols(blocks, registry),
+        StudioSpineAgent.synthesizeProtocols(blocks),
       ]);
 
       console.log('[StudioSpineLogic] Synthesis Complete:', {
@@ -144,7 +144,7 @@ export const useStudioSpineLogic = (
       // 1. Convert specific manifesto blocks immediately into Author Notes
       blocks.forEach((b) => {
         if (b.type === 'THESIS' || b.type === 'LITERARY_APPROACH' || b.type === 'ORACLE_PROMPT') {
-          const data = b.data as any;
+          const data = b.data as Record<string, string>;
           const noteId = generateId();
           const note: SimpleNote = {
             id: noteId,
@@ -223,7 +223,7 @@ export const useStudioSpineLogic = (
           last_modified: now,
           verb: 'contains',
           verb_inverse: 'part_of',
-        } as any);
+        } as unknown as SimpleLink);
       });
 
       // 4. Distribute author's notes across chapters
@@ -351,7 +351,7 @@ export const useStudioSpineLogic = (
           last_modified: now,
           verb: 'contains',
           verb_inverse: 'part_of',
-        } as any);
+        } as unknown as SimpleLink);
       });
 
       onCommitBatch([...items, ...finalItems]);
@@ -373,7 +373,7 @@ export const useStudioSpineLogic = (
     a.click();
   };
 
-  const handleImportChapterBlueprint = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
+  const handleImportChapterBlueprint = (e: React.ChangeEvent<HTMLInputElement>, _id: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -392,7 +392,11 @@ export const useStudioSpineLogic = (
     if (confirm('Delete this beat and all its narrative mass?')) {
       onUpdate(
         items.filter(
-          (i) => i.id !== id && (i as any).source_id !== id && (i as any).target_id !== id,
+          (i) =>
+            i.id !== id &&
+            (!isLink(i) ||
+              ((i as unknown as SimpleLink).source_id !== id &&
+                (i as unknown as SimpleLink).target_id !== id)),
         ),
       );
     }
@@ -521,7 +525,7 @@ export const useStudioSpineLogic = (
       last_modified: now,
       verb: 'contains',
       verb_inverse: 'part_of',
-    } as any;
+    } as unknown as SimpleLink;
     onUpdate([...items, newScene, link]);
   };
 
@@ -534,7 +538,7 @@ export const useStudioSpineLogic = (
 
       setIsSynthesizing(true);
       setSynthStatus('Generating Spine...');
-      const generatedChapters = await StudioSpineAgent.synthesizeChapters(newBlocks);
+      await StudioSpineAgent.synthesizeChapters(newBlocks);
       // ... similar to manifest from blueprint logic
       // Simplification for now to keep size down
     } catch (err) {

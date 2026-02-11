@@ -22,7 +22,6 @@ export const IntegrityBadge: React.FC<IntegrityBadgeProps> = ({
   if (status === 'APPROVED' && !isCycle) return null;
 
   const isRedundant = status === 'REDUNDANT' || isCycle;
-  const isImplied = status === 'IMPLIED';
 
   if (variant === 'minimal') {
     return (

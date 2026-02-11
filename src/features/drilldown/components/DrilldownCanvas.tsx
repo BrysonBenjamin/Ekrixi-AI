@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { Link2, X } from 'lucide-react';
-import { NexusObject, isContainer, NexusObject as NexusObjectBase } from '../../../types';
+import { NexusObject, isContainer, SimpleNote } from '../../../types';
 import { VisibleNode } from '../DrilldownFeature';
 import { DrilldownContextMenu } from './DrilldownContextMenu';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
@@ -56,7 +56,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
     [fullRegistry],
   );
 
-  const { nodes, links, simulationRef } = useDrilldownSimulation({
+  const { nodes, links } = useDrilldownSimulation({
     registry,
     fullRegistry,
     focusId,
@@ -68,10 +68,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
       .scaleExtent([0.005, 5])
       .on('zoom', (event) => setZoomTransform(event.transform));
     zoomRef.current = zoom;
-    if (canvasRef.current)
-      d3.select(canvasRef.current)
-        .call(zoom as any)
-        .on('dblclick.zoom', null);
+    if (canvasRef.current) d3.select(canvasRef.current).call(zoom).on('dblclick.zoom', null);
   }, []);
 
   const activeFilterId = lockedId || hoveredId;
@@ -137,7 +134,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 duration-500">
           <div className="px-6 py-3 bg-nexus-accent text-white rounded-full font-display font-black text-[10px] uppercase tracking-[0.4em] shadow-2xl flex items-center gap-4">
             <Link2 size={16} /> Establish Connection Origin:{' '}
-            {(registry[linkingSourceId] as any).title}
+            {(registry[linkingSourceId] as SimpleNote).title}
             <button
               onClick={() => setLinkingSourceId(null)}
               className="p-1 hover:bg-white/20 rounded-full transition-colors"

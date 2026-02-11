@@ -13,7 +13,14 @@ import {
   ArrowDownLeft,
   Repeat,
 } from 'lucide-react';
-import { NexusObject, isLink, isContainer, isReified } from '../../../../types';
+import {
+  NexusObject,
+  isLink,
+  isContainer,
+  isReified,
+  SemanticLink,
+  SimpleNote,
+} from '../../../../types';
 
 interface QuickActionMenuProps {
   object: NexusObject;
@@ -42,7 +49,12 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   const isC = isContainer(object);
   const reified = isReified(object);
 
-  const title = (object as any).title || (object as any).verb || 'Untitled';
+  const title =
+    'title' in object
+      ? (object as SimpleNote).title
+      : 'verb' in object
+        ? (object as SemanticLink).verb
+        : 'Untitled';
   const type = object._type.replace(/_/g, ' ');
 
   // Resolve connection titles for links
@@ -51,8 +63,8 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   if (isL) {
     const s = registry[object.source_id];
     const t = registry[object.target_id];
-    sourceTitle = s ? (s as any).title || 'Untitled' : 'Unknown';
-    targetTitle = t ? (t as any).title || 'Untitled' : 'Unknown';
+    sourceTitle = s && 'title' in s ? (s as SimpleNote).title || 'Untitled' : 'Unknown';
+    targetTitle = t && 'title' in t ? (t as SimpleNote).title || 'Untitled' : 'Unknown';
   }
 
   const getHeaderIcon = () => {
@@ -89,7 +101,7 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
                 </span>
               </div>
               <h3 className="text-lg font-bold text-white tracking-tight px-4 capitalize italic">
-                "{(object as any).verb}"
+                "{(object as SemanticLink).verb}"
               </h3>
             </div>
           ) : (
@@ -205,7 +217,21 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   );
 };
 
-const ActionButton = ({ icon: Icon, label, desc, onClick, color = 'text-nexus-500' }: any) => (
+interface ActionButtonProps {
+  icon: React.ElementType;
+  label: string;
+  desc: string;
+  onClick: () => void;
+  color?: string;
+}
+
+const ActionButton: React.FC<ActionButtonProps> = ({
+  icon: Icon,
+  label,
+  desc,
+  onClick,
+  color = 'text-nexus-500',
+}) => (
   <button
     onClick={onClick}
     className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-black/20 hover:bg-white/[0.03] border border-transparent hover:border-nexus-800 transition-all group active:scale-[0.98]"

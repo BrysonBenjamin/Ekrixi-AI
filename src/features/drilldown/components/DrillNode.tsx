@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { NexusObject, isContainer, isReified, isLink } from '../../../types';
+import { NexusObject, isContainer, isReified } from '../../../types';
 import {
   getCategoryColor,
   getCategoryIconSvg,
 } from '../../refinery/components/visualizer/NodeTemplates';
-import { Layers, Target, Hash, ShieldAlert, ArrowRight, Activity } from 'lucide-react';
+import { Layers, Hash, ArrowRight, Activity } from 'lucide-react';
 import { VisibleNode } from '../DrilldownFeature';
 import { IntegrityBadge } from '../../integrity/components/IntegrityBadge';
 import { IntegrityReport } from '../../integrity/GraphIntegrityService';
@@ -33,7 +33,7 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
   const isLODMicro = zoomScale < 0.15 && !isHovered && !isFocus;
 
   const nexusObj = object as NexusObject;
-  const depth = object.depth;
+  // const depth = object.depth; // unused
   const reified = isReified(nexusObj);
   const category = (object as any).category_id || 'CONCEPT';
   const isParentPath = object.pathType === 'ancestor';

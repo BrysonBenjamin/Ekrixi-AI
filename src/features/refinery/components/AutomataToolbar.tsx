@@ -73,9 +73,7 @@ export const AutomataToolbar: React.FC<AutomataToolbarProps> = ({
             </div>
             <div className="flex justify-between text-[9px] font-mono">
               <span className="text-slate-600 uppercase">Complexity:</span>
-              <span className="text-nexus-500">
-                {(selectedObject as any).total_subtree_mass || 0}
-              </span>
+              <span className="text-nexus-500">{selectedObject.total_subtree_mass || 0}</span>
             </div>
             <div className="flex justify-between text-[9px] font-mono">
               <span className="text-slate-600 uppercase">Integrity:</span>
@@ -88,7 +86,14 @@ export const AutomataToolbar: React.FC<AutomataToolbarProps> = ({
   );
 };
 
-const AutomataButton = ({ icon: Icon, title, desc, onClick }: any) => (
+interface AutomataButtonProps {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+  onClick: () => void;
+}
+
+const AutomataButton: React.FC<AutomataButtonProps> = ({ icon: Icon, title, desc, onClick }) => (
   <button
     onClick={onClick}
     className="w-full flex items-start gap-3 p-3 rounded-xl bg-nexus-950/50 border border-nexus-800 hover:border-nexus-600 hover:bg-nexus-900 transition-all text-left group"

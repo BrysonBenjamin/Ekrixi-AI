@@ -5,7 +5,6 @@ import { useLLM } from '../system/hooks/useLLM';
 import {
   Zap,
   Shield,
-  Key,
   ArrowRight,
   Sparkles,
   CheckCircle2,

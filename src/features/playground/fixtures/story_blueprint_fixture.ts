@@ -7,6 +7,10 @@ import {
   ContainmentType,
   DefaultLayout,
   HierarchyType,
+  StoryNote,
+  SimpleNote,
+  SemanticLink,
+  HierarchicalLink,
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
 
@@ -46,7 +50,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       is_ghost: false,
       prose_content:
         '# The Neon Dirge\n\nThis manuscript follows the collapse of the *Ekrixi Core*.',
-    } as any,
+    } as StoryNote,
 
     // 2. Chapter 1
     {
@@ -71,7 +75,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       internal_weight: 0.8,
       total_subtree_mass: 40,
       is_ghost: false,
-    } as any,
+    } as StoryNote,
 
     // 3. Scene 1.1
     {
@@ -97,7 +101,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       internal_weight: 0.5,
       total_subtree_mass: 0,
       is_ghost: false,
-    } as any,
+    } as StoryNote,
 
     // 4. Chapter 2
     {
@@ -122,7 +126,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       internal_weight: 0.8,
       total_subtree_mass: 20,
       is_ghost: false,
-    } as any,
+    } as StoryNote,
 
     // 5. Protagonist (Character node to show cross-type linking)
     {
@@ -140,7 +144,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       aliases: ['The Watcher'],
       tags: ['protagonist'],
       prose_content: "Elara doesn't just see the stars; she hears the math behind them.",
-    } as any,
+    } as SimpleNote,
 
     // Hierarchical Links
     {
@@ -155,7 +159,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       link_ids: [],
       internal_weight: 1.0,
       total_subtree_mass: 0,
-    } as any,
+    } as HierarchicalLink,
     {
       id: generateId(),
       _type: NexusType.HIERARCHICAL_LINK,
@@ -168,7 +172,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       link_ids: [],
       internal_weight: 1.0,
       total_subtree_mass: 0,
-    } as any,
+    } as HierarchicalLink,
     {
       id: generateId(),
       _type: NexusType.HIERARCHICAL_LINK,
@@ -181,7 +185,7 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       link_ids: [],
       internal_weight: 1.0,
       total_subtree_mass: 0,
-    } as any,
+    } as HierarchicalLink,
 
     // Semantic POV Link
     {
@@ -196,6 +200,6 @@ export const getStoryBlueprintBatch = (): NexusObject[] => {
       link_ids: [],
       internal_weight: 1.0,
       total_subtree_mass: 0,
-    } as any,
+    } as SemanticLink,
   ];
 };

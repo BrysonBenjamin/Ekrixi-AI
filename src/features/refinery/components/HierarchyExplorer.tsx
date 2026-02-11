@@ -16,7 +16,15 @@ import {
   Trash2,
   Scissors,
 } from 'lucide-react';
-import { NexusObject, isContainer, isLink, isReified } from '../../../types';
+import {
+  NexusObject,
+  isContainer,
+  isLink,
+  isReified,
+  SemanticLink,
+  SimpleNote,
+  AggregatedSemanticLink,
+} from '../../../types';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 
 interface HierarchyExplorerProps {
@@ -76,7 +84,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
     items.forEach((item) => {
       reg[item.id] = item;
       if (isReified(item)) {
-        const sourceId = (item as any).source_id;
+        const sourceId = (item as AggregatedSemanticLink).source_id;
         if (!byOrigin[sourceId]) byOrigin[sourceId] = [];
         byOrigin[sourceId].push(item.id);
       }
@@ -91,14 +99,17 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
 
     const rootNodes = items.filter((item) => {
       const isExplicitChild = childIds.has(item.id);
-      const isManualRoot = (item as any).tags?.includes('__is_root__');
+      const isManualRoot = 'tags' in item && (item as SimpleNote).tags?.includes('__is_root__');
       const isRelLink = isLink(item) && !isReified(item);
 
       if (isRelLink) return false;
 
       // Reified items are only roots if not explicitly parented AND not implicitly parented by their source
       if (isReified(item)) {
-        const hasSourceParent = (item as any).source_id && reg[(item as any).source_id];
+        const hasSourceParent =
+          'source_id' in item &&
+          (item as AggregatedSemanticLink).source_id &&
+          reg[(item as AggregatedSemanticLink).source_id];
         return !isExplicitChild && !hasSourceParent;
       }
 
@@ -169,11 +180,16 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
     const { parentId, isShadowAttachment = false } = context;
     const isFolder = isContainer(node);
     const reified = isReified(node);
-    const isAuthorNote = (node as any).is_author_note;
+    const isAuthorNote = 'is_author_note' in node && (node as SimpleNote).is_author_note;
     const isOpen = expandedFolders.has(node.id);
     const isActive = selectedId === node.id;
     const isDraggingOver = dragOverId === node.id;
-    const title = (node as any).title || (isLink(node) ? (node as any).verb : 'Untitled Unit');
+    const title =
+      'title' in node
+        ? (node as SimpleNote).title
+        : isLink(node)
+          ? (node as SemanticLink).verb
+          : 'Untitled Unit';
 
     const incomingReifiedIds = !isShadowAttachment ? reifiedLinksByOrigin[node.id] || [] : [];
 
@@ -352,10 +368,10 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
                 Link Protocol
               </div>
               <div className="text-sm font-display font-bold text-white truncate">
-                {(registry[pendingDrop.sourceId] as any)?.title} →{' '}
+                {(registry[pendingDrop.sourceId] as SimpleNote)?.title} →{' '}
                 {pendingDrop.targetId === 'root'
                   ? 'Origin'
-                  : (registry[pendingDrop.targetId] as any)?.title}
+                  : (registry[pendingDrop.targetId] as SimpleNote)?.title}
               </div>
             </div>
             {isCycle ? (
@@ -427,7 +443,7 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
                 Delete Protocol
               </div>
               <div className="text-sm font-display font-bold text-white truncate">
-                {(registry[pendingDelete.id] as any)?.title}
+                {(registry[pendingDelete.id] as SimpleNote)?.title}
               </div>
             </div>
             <div className="p-3 space-y-2">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Database, BrainCircuit } from 'lucide-react';
 import { safeParseJson } from '../../utils/json';
 import {
@@ -12,6 +12,8 @@ import {
   DefaultLayout,
   HierarchyType,
   ConflictStatus,
+  HierarchicalLink,
+  ContainerNote,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { generateId } from '../../utils/ids';
@@ -261,7 +263,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
           } as ExtractedItem;
 
           if (isHierarchical) {
-            (newLink as any).hierarchy_type = HierarchyType.PARENT_OF;
+            (newLink as HierarchicalLink).hierarchy_type = HierarchyType.PARENT_OF;
             // Also update parent's child list
             const parent = finalBatch.find((i) => i.id === sId);
             // Fixed: Correctly using isContainer type guard to narrow ExtractedItem and allow children_ids access
@@ -269,11 +271,11 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
               parent.children_ids = Array.from(new Set([...parent.children_ids, tId]));
             } else if (parent && !isLink(parent)) {
               // Upgrade to container
-              (parent as any)._type = NexusType.CONTAINER_NOTE;
-              (parent as any).children_ids = [tId];
-              (parent as any).containment_type = ContainmentType.FOLDER;
-              (parent as any).is_collapsed = false;
-              (parent as any).default_layout = DefaultLayout.GRID;
+              (parent as NexusObject as ContainerNote)._type = NexusType.CONTAINER_NOTE;
+              (parent as NexusObject as ContainerNote).children_ids = [tId];
+              (parent as NexusObject as ContainerNote).containment_type = ContainmentType.FOLDER;
+              (parent as NexusObject as ContainerNote).is_collapsed = false;
+              (parent as NexusObject as ContainerNote).default_layout = DefaultLayout.GRID;
             }
           }
 

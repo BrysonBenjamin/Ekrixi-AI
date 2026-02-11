@@ -1,6 +1,14 @@
 import React, { useMemo } from 'react';
 import { DrilldownCanvas } from '../../drilldown/components/DrilldownCanvas';
-import { NexusObject, isContainer, isLink, isReified, NexusType } from '../../../types';
+import {
+  NexusObject,
+  isContainer,
+  isLink,
+  isReified,
+  NexusType,
+  SimpleNote,
+  AggregatedSemanticLink,
+} from '../../../types';
 import { VisibleNode } from '../../drilldown/DrilldownFeature';
 import { ChevronRight, Home, Compass } from 'lucide-react';
 
@@ -87,8 +95,8 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
       }
 
       if (isReified(obj)) {
-        const sId = (obj as any).source_id;
-        const tId = (obj as any).target_id;
+        const sId = (obj as AggregatedSemanticLink).source_id;
+        const tId = (obj as AggregatedSemanticLink).target_id;
         if (sId)
           queue.push({
             id: sId,
@@ -162,7 +170,7 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
                 onClick={() => onNavigateStack(id)}
                 className={`px-3 py-1.5 rounded-lg text-[10px] font-display font-black uppercase tracking-widest transition-all whitespace-nowrap border ${idx === navStack.length - 1 ? 'bg-nexus-accent/5 border-nexus-accent/20 text-nexus-accent' : 'border-transparent text-nexus-muted hover:text-nexus-text'}`}
               >
-                {(registry[id] as any)?.title}
+                {(registry[id] as SimpleNote)?.title}
               </button>
             </React.Fragment>
           ))}

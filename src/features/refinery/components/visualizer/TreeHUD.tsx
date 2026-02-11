@@ -1,5 +1,4 @@
-import React from 'react';
-import { Target, ZoomIn, ZoomOut, LayoutGrid, ArrowDown, ArrowRight } from 'lucide-react';
+import { Target, ZoomIn, ZoomOut, ArrowDown, ArrowRight } from 'lucide-react';
 
 interface TreeHUDProps {
   nodeCount: number;
@@ -57,7 +56,7 @@ export const TreeHUD: React.FC<TreeHUDProps> = ({
           <div className="w-px h-6 bg-nexus-800 mx-1" />
           <button
             onClick={onToggleOrientation}
-            className={`p-2 rounded-lg transition-all flex items-center gap-2 ${orientation === 'VERTICAL' ? 'bg-nexus-500/10 text-nexus-accent' : 'text-slate-400 hover:bg-nexus-800 hover:text-white'}`}
+            className={`p - 2 rounded - lg transition - all flex items - center gap - 2 ${orientation === 'VERTICAL' ? 'bg-nexus-500/10 text-nexus-accent' : 'text-slate-400 hover:bg-nexus-800 hover:text-white'} `}
             title={orientation === 'VERTICAL' ? 'Switch to Horizontal' : 'Switch to Vertical'}
           >
             {orientation === 'VERTICAL' ? <ArrowRight size={18} /> : <ArrowDown size={18} />}

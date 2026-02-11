@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { isLink, isReified, isContainer, NexusObject } from '../../../../types';
+import {
+  isLink,
+  isReified,
+  isContainer,
+  NexusObject,
+  SimpleNote,
+  AggregatedSemanticLink,
+} from '../../../../types';
 import { createNodeHTML, createLinkPillHTML } from './NodeTemplates';
 
 interface TreeData {
@@ -77,9 +84,15 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       );
 
       // Implicit parenting for reified units: if it has a source node, it will be rendered as a child of that source
-      if (isReified(o) && (o as any).source_id && !inContainer) return false;
+      if (
+        isReified(o) &&
+        'source_id' in o &&
+        (o as AggregatedSemanticLink).source_id &&
+        !inContainer
+      )
+        return false;
 
-      const isManualRoot = 'tags' in o && (o as any).tags?.includes('__is_root__');
+      const isManualRoot = 'tags' in o && ((o as SimpleNote).tags || []).includes('__is_root__');
       return !inContainer || isManualRoot;
     });
 
@@ -95,7 +108,8 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
       const implicitLogicChildren = allObjects.filter((o) => {
         return (
           isReified(o) &&
-          (o as any).source_id === node.id &&
+          'source_id' in o &&
+          (o as AggregatedSemanticLink).source_id === node.id &&
           !allObjects.some((p) => isContainer(p) && p.children_ids.includes(o.id))
         );
       });
@@ -104,10 +118,10 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
 
       return {
         id: node.id,
-        name: 'title' in node ? (node as any).title || 'Untitled' : 'Untitled',
-        category: 'category_id' in node ? (node as any).category_id : undefined,
+        name: 'title' in node ? (node as SimpleNote).title || 'Untitled' : 'Untitled',
+        category: 'category_id' in node ? (node as SimpleNote).category_id : undefined,
         reified: isReified(node),
-        gist: 'gist' in node ? (node as any).gist || '' : 'No summary available.',
+        gist: 'gist' in node ? (node as SimpleNote).gist || '' : 'No summary available.',
         children: allMergedChildren
           .map((c) => buildTree(c, new Set(visited)))
           .filter((n): n is TreeData => !!n),
@@ -125,7 +139,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-    svg.call(zoomBehavior as any).on('dblclick.zoom', null);
+    svg.call(zoomBehavior).on('dblclick.zoom', null);
 
     const mainG = svg
       .append('g')
@@ -158,9 +172,15 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         const s = d.source;
         const t = d.target;
         if (isVertical) {
-          return d3.linkVertical()({ source: [s.x, s.y], target: [t.x, t.y] } as any);
+          return d3.linkVertical()({ source: [s.x, s.y], target: [t.x, t.y] } as {
+            source: [number, number];
+            target: [number, number];
+          });
         } else {
-          return d3.linkHorizontal()({ source: [s.y, s.x], target: [t.y, t.x] } as any);
+          return d3.linkHorizontal()({ source: [s.y, s.x], target: [t.y, t.x] } as {
+            source: [number, number];
+            target: [number, number];
+          });
         }
       })
       .attr('fill', 'none')
@@ -245,7 +265,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
         .style('overflow', 'visible')
         .html(() =>
           createNodeHTML(
-            d as any,
+            d,
             selectedId === d.data.id,
             hoveredId === d.data.id || isDraggingOver,
             isExpanded,

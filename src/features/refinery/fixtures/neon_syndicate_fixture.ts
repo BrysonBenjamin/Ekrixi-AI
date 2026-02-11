@@ -9,7 +9,6 @@ export const getNeonSyndicateBatch = (): NexusObject[] => {
   const techId = generateId();
   const locationId = generateId();
   const orgId = generateId();
-  const eventId = generateId();
 
   return [
     {
@@ -92,7 +91,7 @@ export const getNeonSyndicateBatch = (): NexusObject[] => {
       internal_weight: 1.0,
       total_subtree_mass: 0,
       link_ids: [],
-    } as any,
+    },
     {
       id: generateId(),
       _type: NexusType.SEMANTIC_LINK,
@@ -105,7 +104,7 @@ export const getNeonSyndicateBatch = (): NexusObject[] => {
       internal_weight: 1.0,
       total_subtree_mass: 0,
       link_ids: [],
-    } as any,
+    },
     {
       id: generateId(),
       _type: NexusType.SEMANTIC_LINK,
@@ -118,6 +117,6 @@ export const getNeonSyndicateBatch = (): NexusObject[] => {
       internal_weight: 1.0,
       total_subtree_mass: 0,
       link_ids: [],
-    } as any,
+    },
   ];
 };

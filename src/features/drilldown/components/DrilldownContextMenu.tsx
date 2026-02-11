@@ -12,8 +12,17 @@ import {
   Compass,
   GitBranch,
   ChevronRight,
+  LucideIcon,
 } from 'lucide-react';
-import { NexusObject, isLink, isReified, isContainer } from '../../../types';
+import {
+  NexusObject,
+  isLink,
+  isReified,
+  isContainer,
+  SimpleNote,
+  SemanticLink,
+  HierarchicalLink,
+} from '../../../types';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 
 interface DrilldownContextMenuProps {
@@ -58,7 +67,12 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
 
   const reified = isReified(object);
   const isL = isLink(object) && !reified;
-  const title = (object as any).title || (object as any).verb || 'Untitled Unit';
+  const title =
+    'title' in object
+      ? (object as SimpleNote).title
+      : 'verb' in object
+        ? (object as SemanticLink).verb
+        : 'Untitled Unit';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -79,8 +93,8 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         return l.source_id === object.id || l.target_id === object.id;
       })
       .map((l) => {
-        const neighborId =
-          (l as any).source_id === object.id ? (l as any).target_id : (l as any).source_id;
+        const link = l as SemanticLink | HierarchicalLink;
+        const neighborId = link.source_id === object.id ? link.target_id : link.source_id;
         return registry[neighborId];
       })
       .filter(Boolean);
@@ -94,7 +108,12 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         (n) =>
           (!isLink(n) || isReified(n)) &&
           n.id !== object.id &&
-          ((n as any).title || (n as any).verb).toLowerCase().includes(q),
+          (
+            ('title' in n ? (n as SimpleNote).title : '') ||
+            ('verb' in n ? (n as SemanticLink).verb : '')
+          )
+            .toLowerCase()
+            .includes(q),
       )
       .slice(0, 5);
   }, [searchQuery, registry, object.id, menuState]);
@@ -267,25 +286,36 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
               />
             </div>
             <div className="space-y-1 overflow-y-auto max-h-[160px] no-scrollbar">
-              {suggestions.map((node: any) => (
-                <button
-                  key={node.id}
-                  onClick={() => handleEstablishLinkWithTarget(node.id)}
-                  className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-nexus-900 border border-transparent hover:border-nexus-accent/40 transition-all text-left group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[9px] font-black text-nexus-accent group-hover:bg-nexus-accent group-hover:text-white transition-all">
-                    {node.category_id?.charAt(0) || 'U'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-bold truncate text-nexus-text">
-                      {node.title || node.verb}
+              {suggestions.map((node) => {
+                const nodeTitle =
+                  'title' in node
+                    ? (node as SimpleNote).title
+                    : 'verb' in node
+                      ? (node as SemanticLink).verb
+                      : 'Unknown';
+                const category =
+                  'category_id' in node ? (node as SimpleNote).category_id : 'REIFIED';
+
+                return (
+                  <button
+                    key={node.id}
+                    onClick={() => handleEstablishLinkWithTarget(node.id)}
+                    className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-nexus-900 border border-transparent hover:border-nexus-accent/40 transition-all text-left group"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[9px] font-black text-nexus-accent group-hover:bg-nexus-accent group-hover:text-white transition-all">
+                      {category?.charAt(0) || 'U'}
                     </div>
-                    <div className="text-[7px] opacity-40 uppercase font-mono">
-                      {node.category_id || 'REIFIED'}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-bold truncate text-nexus-text">
+                        {nodeTitle}
+                      </div>
+                      <div className="text-[7px] opacity-40 uppercase font-mono">
+                        {category || 'REIFIED'}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -307,31 +337,42 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
             <div className="space-y-1.5 overflow-y-auto max-h-[200px] no-scrollbar">
               {neighbors
                 .filter((n) => n.id !== reifySelection.sourceId)
-                .map((node: any) => (
-                  <button
-                    key={node.id}
-                    onClick={() => handleReifyChoice(node.id)}
-                    className="w-full flex items-center gap-3 p-3 rounded-2xl bg-nexus-950/40 border border-nexus-800 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all text-left group"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-nexus-900 border border-nexus-800 flex items-center justify-center shrink-0 group-hover:border-amber-500/30">
-                      <div className="text-[10px] font-black text-nexus-muted group-hover:text-amber-500">
-                        {node.category_id?.charAt(0)}
+                .map((node) => {
+                  const nodeTitle =
+                    'title' in node
+                      ? (node as SimpleNote).title
+                      : 'verb' in node
+                        ? (node as SemanticLink).verb
+                        : 'Unknown';
+                  const category =
+                    'category_id' in node ? (node as SimpleNote).category_id : 'REIFIED';
+
+                  return (
+                    <button
+                      key={node.id}
+                      onClick={() => handleReifyChoice(node.id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-nexus-950/40 border border-nexus-800 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all text-left group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-nexus-900 border border-nexus-800 flex items-center justify-center shrink-0 group-hover:border-amber-500/30">
+                        <div className="text-[10px] font-black text-nexus-muted group-hover:text-amber-500">
+                          {category?.charAt(0)}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-bold text-nexus-text group-hover:text-white truncate">
-                        {node.title}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-bold text-nexus-text group-hover:text-white truncate">
+                          {nodeTitle}
+                        </div>
+                        <div className="text-[7px] opacity-40 uppercase tracking-widest">
+                          {category}
+                        </div>
                       </div>
-                      <div className="text-[7px] opacity-40 uppercase tracking-widest">
-                        {node.category_id}
-                      </div>
-                    </div>
-                    <ChevronRight
-                      size={12}
-                      className="text-nexus-muted group-hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all"
-                    />
-                  </button>
-                ))}
+                      <ChevronRight
+                        size={12}
+                        className="text-nexus-muted group-hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all"
+                      />
+                    </button>
+                  );
+                })}
             </div>
             <button
               onClick={() => setMenuState('DEFAULT')}
@@ -346,7 +387,21 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
   );
 };
 
-const MenuItem = ({ icon: Icon, label, desc, onClick, color = 'text-nexus-muted' }: any) => (
+interface MenuItemProps {
+  icon: LucideIcon;
+  label: string;
+  desc?: string;
+  onClick: () => void;
+  color?: string;
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({
+  icon: Icon,
+  label,
+  desc,
+  onClick,
+  color = 'text-nexus-muted',
+}) => (
   <button
     onClick={(e) => {
       e.stopPropagation();

@@ -45,7 +45,6 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [isMobile, setIsMobile] = useState(false);
   const [orientation, setOrientation] = useState<'HORIZONTAL' | 'VERTICAL'>('HORIZONTAL');
 
   // Traditional Context Menu state
@@ -58,7 +57,6 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
     const handleResize = () => {
       if (containerRef.current) {
         const mobile = containerRef.current.clientWidth < 768;
-        setIsMobile(mobile);
         if (mobile) setOrientation('VERTICAL');
       }
     };

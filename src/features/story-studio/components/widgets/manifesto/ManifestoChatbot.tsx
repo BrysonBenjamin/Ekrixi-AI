@@ -11,7 +11,7 @@ import { LITERARY_ARCHETYPES } from '../../manifesto/archetypes/data';
 
 interface ProposedBlock {
   type: StudioBlock['type'];
-  data: any; // Data depends on type
+  data: Record<string, unknown>; // Data depends on type
 }
 
 interface Message {

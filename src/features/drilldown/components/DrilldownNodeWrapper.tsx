@@ -1,6 +1,6 @@
 import React from 'react';
 import { SimulationNode } from '../hooks/useDrilldownSimulation';
-import { NexusObject, isContainer } from '../../../types';
+import { NexusObject, SemanticLink } from '../../../types';
 import { DrillNode } from './DrillNode';
 import { IntegrityReport } from '../../integrity/GraphIntegrityService';
 
@@ -49,8 +49,9 @@ export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
 }) => {
   const isPartOfAnomaly =
     integrityFocus?.path?.includes(node.id) ||
-    (integrityFocus && (fullRegistry[integrityFocus.linkId] as any).source_id === node.id) ||
-    (integrityFocus && (fullRegistry[integrityFocus.linkId] as any).target_id === node.id);
+    (integrityFocus &&
+      (fullRegistry[integrityFocus.linkId] as SemanticLink).source_id === node.id) ||
+    (integrityFocus && (fullRegistry[integrityFocus.linkId] as SemanticLink).target_id === node.id);
 
   const isNodeFocus =
     node.id === focusId || linkingSourceId === node.id || lockedId === node.id || isPartOfAnomaly;
@@ -71,6 +72,7 @@ export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, node.id)}
     >
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <g {...({ draggable: 'true' } as any)} onDragStart={(e) => onDragStart(e, node.id)}>
         <DrillNode
           object={node.object}

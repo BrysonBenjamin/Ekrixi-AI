@@ -8,6 +8,7 @@ const map: Record<string, MessageNode> = {};
 
 map[id1] = {
   id: id1,
+  senderId: 'user',
   role: 'user',
   text: "Let's build a cyberpunk city built on top of the ruins of an eldritch temple.",
   parentId: null,
@@ -18,6 +19,7 @@ map[id1] = {
 
 map[id2] = {
   id: id2,
+  senderId: 'model',
   role: 'model',
   text: "**City: Neo-R'lyeh (Colloquial: 'The Sink')**\n\nThe mega-structure is anchored to the ocean floor, extending miles above sea level. The lower levels (The Dregs) are literally carved into the ancient, non-euclidean stone of the temple ruins.\n\n**The Hook:**\nCorporate AIs have started glitching, speaking in dead tongues. They aren't malfunctioning; they are *interpreting* the signals coming from the abyss below.",
   parentId: id1,
@@ -27,9 +29,10 @@ map[id2] = {
 };
 
 // Fix: Updated to match ChatSession interface (rootNodeIds as array and adding selectedRootId)
-export const sessionNeonVeins: ChatSession = {
-  id: 'fixture-neon-veins',
-  title: 'Neon Veins & Old Gods',
+export const SESSION_NEON_VEINS: ChatSession = {
+  id: 'fixture_neon_veins',
+  senderId: 'system',
+  title: 'Neon Veins & Eldritch Roots',
   messageMap: map,
   rootNodeIds: [id1],
   selectedRootId: id1,

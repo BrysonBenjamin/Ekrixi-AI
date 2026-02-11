@@ -12,11 +12,10 @@ import {
   SimpleNote,
   SimpleLink,
   ContainerNote,
-  StoryNote,
 } from '../../types';
 import { DrilldownCanvas } from './components/DrilldownCanvas';
-import { ChevronRight, Home, Orbit, Compass, UserCircle2, Zap, ShieldAlert } from 'lucide-react';
-import { useTutorial, TutorialStep } from '../../components/shared/tutorial/TutorialSystem';
+import { ChevronRight, Home, Compass, UserCircle2, Zap, ShieldAlert } from 'lucide-react';
+// import { useTutorial } from '../../components/shared/tutorial/TutorialSystem';
 import { IntegrityAssistant } from '../integrity/components/IntegrityAssistant';
 import { InspectorPanel } from '../shared/inspector/InspectorPanel';
 
@@ -51,7 +50,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
   const [showInspector, setShowInspector] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { startTutorial } = useTutorial();
+  // const { startTutorial } = useTutorial();
   const currentContainerId = navStack[navStack.length - 1];
   const currentContainer = currentContainerId ? registry[currentContainerId] : null;
 
@@ -215,19 +214,16 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
     return subRegistry;
   }, [registry, currentContainerId, showAuthorNotes]);
 
-  const handleDrilldown = useCallback(
-    (id: string) => {
-      // Allow drilling into ANY node to focus the graph on it
-      setNavStack((prev) => {
-        if (prev.includes(id)) {
-          const idx = prev.indexOf(id);
-          return prev.slice(0, idx + 1);
-        }
-        return [...prev, id];
-      });
-    },
-    [registry],
-  );
+  const handleDrilldown = useCallback((id: string) => {
+    // Allow drilling into ANY node to focus the graph on it
+    setNavStack((prev) => {
+      if (prev.includes(id)) {
+        const idx = prev.indexOf(id);
+        return prev.slice(0, idx + 1);
+      }
+      return [...prev, id];
+    });
+  }, []);
 
   const handleReifyLink = useCallback(
     (linkId: string) => {
@@ -277,7 +273,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           is_collapsed: false,
           default_layout: DefaultLayout.GRID,
           children_ids: [],
-          tags: [...(node.tags || []), 'promoted-logic'],
+          tags: [...((node as SimpleNote).tags || []), 'promoted-logic'],
         } as NexusObject;
         return { ...prev, [nodeId]: updatedNode };
       });
@@ -511,7 +507,6 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
         <DrilldownCanvas
           registry={visibleNodesRegistry}
           fullRegistry={registry}
-          onDrilldown={handleDrilldown}
           onDrilldown={handleDrilldown}
           onInspect={(id) => {
             setSelectedId(id);

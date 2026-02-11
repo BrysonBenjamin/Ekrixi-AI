@@ -5,6 +5,8 @@ import {
   ContainmentType,
   DefaultLayout,
   HierarchyType,
+  ContainerNote,
+  SimpleNote,
 } from '../../../types';
 import { generateId } from '../../../utils/ids';
 
@@ -12,7 +14,7 @@ export const getGaiaPrimeExpandedBatch = (): NexusObject[] => {
   const timestamp = new Date().toISOString();
   const batch: NexusObject[] = [];
 
-  const createNode = (data: any): string => {
+  const createNode = (data: Partial<NexusObject>): string => {
     const node = {
       ...data,
       created_at: timestamp,
@@ -21,8 +23,8 @@ export const getGaiaPrimeExpandedBatch = (): NexusObject[] => {
       internal_weight: 1.0,
       total_subtree_mass: 0,
       is_ghost: false,
-    };
-    batch.push(node as any);
+    } as NexusObject;
+    batch.push(node);
     return node.id;
   };
 
@@ -39,10 +41,9 @@ export const getGaiaPrimeExpandedBatch = (): NexusObject[] => {
       link_ids: [] as string[],
       internal_weight: 1.0,
       total_subtree_mass: 0,
-    };
-    if (type === NexusType.HIERARCHICAL_LINK)
-      (link as any).hierarchy_type = HierarchyType.PARENT_OF;
-    batch.push(link as any);
+      hierarchy_type: type === NexusType.HIERARCHICAL_LINK ? HierarchyType.PARENT_OF : undefined,
+    } as NexusObject;
+    batch.push(link);
   };
 
   // 1. Root: GAIA PRIME
@@ -101,7 +102,10 @@ export const getGaiaPrimeExpandedBatch = (): NexusObject[] => {
       tags: [],
     });
     createLink(gaiaId, id, NexusType.HIERARCHICAL_LINK, 'contains');
-    (batch.find((n) => n.id === gaiaId) as any).children_ids.push(id);
+    const gaia = batch.find((n) => n.id === gaiaId);
+    if (gaia && 'children_ids' in gaia) {
+      (gaia as ContainerNote).children_ids.push(id);
+    }
   });
 
   // 3. Factions & Characters
@@ -119,10 +123,12 @@ export const getGaiaPrimeExpandedBatch = (): NexusObject[] => {
     tags: ['authority'],
   });
 
-  const aetheria = batch.find((n) => (n as any).title === 'Aetheria');
+  const aetheria = batch.find((n) => 'title' in n && (n as SimpleNote).title === 'Aetheria');
   if (aetheria) {
     createLink(aetheria.id, councilId, NexusType.HIERARCHICAL_LINK, 'governs');
-    (aetheria as any).children_ids.push(councilId);
+    if ('children_ids' in aetheria) {
+      (aetheria as ContainerNote).children_ids.push(councilId);
+    }
   }
 
   createNode({

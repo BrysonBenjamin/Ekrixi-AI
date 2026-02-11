@@ -3,12 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Package,
   ArrowLeft,
-  Edit3,
-  Orbit,
   AlertCircle,
   FlaskConical,
   ChevronRight,
-  X,
   Compass,
   ListTree,
 } from 'lucide-react';
@@ -25,7 +22,6 @@ import {
   HierarchyType,
   NexusGraphUtils,
   SimpleNote,
-  SimpleLink,
   HierarchicalLink,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
@@ -131,7 +127,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
 
       // Upgrade parent to container if it isn't one
       const updatedParent: NexusObject = isContainer(parent)
-        ? ({ ...parent, children_ids: [...(parent as any).children_ids, newNode.id] } as any)
+        ? ({ ...parent, children_ids: [...parent.children_ids, newNode.id] } as ContainerNote)
         : ({
             ...parent,
             _type:
@@ -142,7 +138,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
             containment_type: ContainmentType.FOLDER,
             is_collapsed: false,
             default_layout: DefaultLayout.GRID,
-          } as NexusObject);
+          } as ContainerNote);
 
       const hierarchyLink: HierarchicalLink = {
         id: generateId(),
@@ -283,7 +279,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               ? NexusType.AGGREGATED_HIERARCHICAL_LINK
               : NexusType.AGGREGATED_SEMANTIC_LINK,
           is_reified: true,
-          title: `${('title' in (source || {}) ? (source as any).title : 'Origin') || 'Origin'} → ${('title' in (target || {}) ? (target as any).title : 'Terminal') || 'Terminal'}`,
+          title: `${('title' in (source || {}) ? (source as SimpleNote).title : 'Origin') || 'Origin'} → ${('title' in (target || {}) ? (target as SimpleNote).title : 'Terminal') || 'Terminal'}`,
           gist: `Logic: ${item.verb}`,
           category_id: NexusCategory.META,
           children_ids: [],

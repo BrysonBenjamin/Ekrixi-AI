@@ -1,13 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
 
-export interface TutorialStep {
-  target: string;
-  title: string;
-  content: string;
-  position: 'top' | 'bottom' | 'left' | 'right';
-  isInteraction?: boolean;
-}
+import { TutorialStep } from './types';
 
 interface TutorialContextType {
   activeTutorial: string | null;

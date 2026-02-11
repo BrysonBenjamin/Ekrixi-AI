@@ -3,9 +3,9 @@ import {
   NexusType,
   isLink,
   isContainer,
-  isReified,
   isStrictHierarchy,
   ConflictStatus,
+  ContainerNote,
 } from '../../types';
 
 export interface IntegrityReport {
@@ -218,7 +218,7 @@ export const GraphIntegrityService = {
         tempRegistry[link.source_id] = {
           ...source,
           children_ids: source.children_ids.filter((cid) => cid !== link.target_id),
-        } as any;
+        } as ContainerNote;
       }
 
       map[link.id] = GraphIntegrityService.analyzeLinkIntegrity(

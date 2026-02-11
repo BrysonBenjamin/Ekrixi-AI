@@ -301,7 +301,7 @@ export const useStoryStudio = (
         });
       }
     },
-    [registry],
+    [registry, setStage, setZoomedChapterId, setZoomedSceneId, setIsChapterBlueprintMode],
   );
 
   const handleCreateNewBook = useCallback(
@@ -344,7 +344,7 @@ export const useStoryStudio = (
         setFocusedBlocksId(id);
       }
     },
-    [onCommitBatch],
+    [onCommitBatch, setStage, setBlocks, setStudioItems, setActiveBookId, setFocusedBlocksId],
   );
   const handleSave = useCallback(() => {
     const saveId = focusedBlocksId || activeBookId;
@@ -469,7 +469,7 @@ export const useStoryStudio = (
         }
       }
     },
-    [activeBookId],
+    [activeBookId, setActiveBookId, setBlocks, setStudioItems, setStage],
   );
 
   return {

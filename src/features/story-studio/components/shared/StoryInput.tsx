@@ -5,12 +5,11 @@ import {
   Maximize2,
   Minimize2,
   StickyNote,
-  Plus,
   Database,
   X,
   Sparkles,
 } from 'lucide-react';
-import { NexusObject, isLink, isContainer, SimpleNote } from '../../../../types';
+import { NexusObject, isLink, SimpleNote } from '../../../../types';
 
 interface StoryInputProps {
   isLoading: boolean;

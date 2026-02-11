@@ -1,16 +1,6 @@
 import React from 'react';
-import {
-  CheckCircle,
-  Trash2,
-  Box,
-  Link2,
-  ChevronRight,
-  Share2,
-  GitBranch,
-  ArrowRight,
-  ShieldAlert,
-} from 'lucide-react';
-import { NexusObject, isLink } from '../../../types';
+import { CheckCircle, Trash2, Box, Link2, ChevronRight, Share2, ShieldAlert } from 'lucide-react';
+import { NexusObject, isLink, SimpleNote } from '../../../types';
 import { ExtractedItem } from '../ScannerFeature';
 import { IntegrityBadge } from '../../integrity/components/IntegrityBadge';
 import { IntegrityPathTrace } from '../../integrity/components/IntegrityPathTrace';
@@ -104,9 +94,9 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
             {nodes.map((node) => (
               <ReviewCard
                 key={node.id}
-                title={(node as any).title}
-                category={(node as any).category_id}
-                gist={(node as any).gist}
+                title={(node as SimpleNote).title}
+                category={(node as SimpleNote).category_id}
+                gist={(node as SimpleNote).gist}
                 onRemove={() => handleRemove(node.id)}
               />
             ))}
@@ -123,7 +113,7 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
             {links.map((link) => (
               <ReviewCard
                 key={link.id}
-                title={(link as any).verb}
+                title={link.verb}
                 category="ASSOCIATION"
                 isLink
                 conflict={link.conflict}
@@ -138,7 +128,25 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
   );
 };
 
-const ReviewCard = ({ title, category, gist, isLink, conflict, localRegistry, onRemove }: any) => {
+interface ReviewCardProps {
+  title: string;
+  category?: string;
+  gist?: string;
+  isLink?: boolean;
+  conflict?: ExtractedItem['conflict'];
+  localRegistry?: Record<string, NexusObject>;
+  onRemove: () => void;
+}
+
+const ReviewCard: React.FC<ReviewCardProps> = ({
+  title,
+  category,
+  gist,
+  isLink,
+  conflict,
+  localRegistry,
+  onRemove,
+}) => {
   const isRedundant = conflict?.status === 'REDUNDANT';
   const isImplied = conflict?.status === 'IMPLIED';
 

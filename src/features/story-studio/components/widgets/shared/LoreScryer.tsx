@@ -1,6 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Search, X, MapPin, Users, Box, Ghost, Share2 } from 'lucide-react';
-import { NexusObject, NexusCategory, isLink, isReified, NexusType } from '../../../../../types';
+import {
+  NexusObject,
+  NexusCategory,
+  isLink,
+  isReified,
+  NexusType,
+  SimpleNote,
+} from '../../../../../types';
 
 interface LoreScryerProps {
   isOpen: boolean;
@@ -18,8 +25,8 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
       if (isLink(o) && !isReified(o)) return false;
       if (o._type === NexusType.STORY_NOTE) return false;
 
-      const title = 'title' in o ? (o as any).title : '';
-      const gist = 'gist' in o ? (o as any).gist : '';
+      const title = 'title' in o ? (o as SimpleNote).title : '';
+      const gist = 'gist' in o ? (o as SimpleNote).gist : '';
 
       return (
         title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -30,7 +37,7 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
   }, [registry, search]);
 
   const handleDragStart = (e: React.DragEvent, item: NexusObject) => {
-    const title = 'title' in item ? (item as any).title : 'Unit';
+    const title = 'title' in item ? (item as SimpleNote).title : 'Unit';
     e.dataTransfer.setData('application/nexus-scry-title', title);
     e.dataTransfer.setData('application/nexus-scry-id', item.id);
   };
@@ -80,10 +87,10 @@ export const LoreScryer: React.FC<LoreScryerProps> = ({ isOpen, registry, onClos
           </div>
         ) : (
           items.map((item) => {
-            const title = 'title' in item ? (item as any).title : 'Unit';
-            const gist = 'gist' in item ? (item as any).gist : '';
+            const title = 'title' in item ? (item as SimpleNote).title : 'Unit';
+            const gist = 'gist' in item ? (item as SimpleNote).gist : '';
             const categoryId =
-              'category_id' in item ? (item as any).category_id : NexusCategory.CONCEPT;
+              'category_id' in item ? (item as SimpleNote).category_id : NexusCategory.CONCEPT;
 
             return (
               <div

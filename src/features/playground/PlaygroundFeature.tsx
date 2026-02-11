@@ -18,11 +18,12 @@ import { getGaiaPrimeExpandedBatch } from './fixtures/gaia_prime_expanded_fixtur
 import { getCompletedManuscriptBatch } from './fixtures/completed_manuscript_fixture';
 import { getSeedStoryManifesto } from './fixtures/story_manifesto_fixture';
 import { NexusObject } from '../../types';
+import { StudioBlock } from '../story-studio/types';
 
 interface PlaygroundFeatureProps {
   onSeedRefinery: (items: NexusObject[], name: string) => void;
   onSeedRegistry: (items: NexusObject[]) => void;
-  onSeedManifesto?: (blocks: any[]) => void;
+  onSeedManifesto?: (blocks: StudioBlock[]) => void;
 }
 
 export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
@@ -153,7 +154,21 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
   );
 };
 
-const FixtureCard = ({
+import { LucideIcon } from 'lucide-react';
+
+interface FixtureCardProps {
+  title: string;
+  desc: string;
+  itemsCount: number;
+  category: string;
+  onSeed: () => void;
+  actionLabel?: string;
+  variant?: 'refinery' | 'registry';
+  icon?: LucideIcon;
+  theme?: 'cyan' | 'ruby';
+}
+
+const FixtureCard: React.FC<FixtureCardProps> = ({
   title,
   desc,
   itemsCount,
@@ -163,12 +178,8 @@ const FixtureCard = ({
   variant = 'refinery',
   icon: Icon = Sparkles,
   theme = 'cyan',
-}: any) => {
+}) => {
   const accentClass = theme === 'ruby' ? 'text-nexus-ruby' : 'text-nexus-accent';
-  const borderAccent =
-    theme === 'ruby'
-      ? 'border-nexus-ruby/30 hover:border-nexus-ruby'
-      : 'border-nexus-accent/30 hover:border-nexus-accent';
   const bgAccent = theme === 'ruby' ? 'bg-nexus-ruby/10' : 'bg-nexus-accent/10';
 
   return (

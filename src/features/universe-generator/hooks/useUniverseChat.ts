@@ -231,7 +231,7 @@ export const useUniverseChat = (
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          await DataService.createChatSession(activeUniverseId, initial);
+          await DataService.createChatSession(activeUniverseId, { ...initial, senderId: 'system' });
           sessionId = newSessionId;
           setCurrentSessionId(newSessionId); // Select it locally
         }
@@ -319,7 +319,7 @@ export const useUniverseChat = (
           currentLeafId: userMsgId,
         };
 
-        const history = getThread(tempSession);
+        const history = getThread({ ...tempSession, senderId: 'system' });
         triggerGeneration(sessionId, userMsgId, history);
       } catch (error) {
         console.error('[useUniverseChat] Failed to send message:', error);
@@ -510,6 +510,7 @@ export const useUniverseChat = (
       const newId = generateId();
       const initial: ChatSession = {
         id: newId,
+        senderId: 'system',
         universeId: activeUniverseId,
         title: 'New Project',
         messageMap: {},

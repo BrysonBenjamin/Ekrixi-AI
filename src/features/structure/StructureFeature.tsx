@@ -108,7 +108,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
 
         // Omni-container logic: Promote any leaf node to container status upon child addition
         const updatedParent: NexusObject = isContainer(parent)
-          ? ({ ...parent, children_ids: [...(parent as any).children_ids, newNode.id] } as any)
+          ? ({ ...parent, children_ids: [...parent.children_ids, newNode.id] } as ContainerNote)
           : ({
               ...parent,
               _type:
@@ -184,13 +184,13 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         const node = prev[nodeId];
         if (!node || isLink(node) || isContainer(node)) return prev;
         const updatedNode: NexusObject = {
-          ...node,
+          ...(node as SimpleNote),
           _type: NexusType.CONTAINER_NOTE,
           containment_type: ContainmentType.FOLDER,
           is_collapsed: false,
           default_layout: DefaultLayout.GRID,
           children_ids: [],
-          tags: [...(node.tags || []), 'promoted-logic'],
+          tags: [...((node as SimpleNote).tags || []), 'promoted-logic'],
         };
         return { ...prev, [nodeId]: updatedNode };
       });
@@ -220,7 +220,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           }
         });
         const reifiedUnit: NexusObject = {
-          ...node,
+          ...(node as SimpleNote),
           _type: NexusType.AGGREGATED_SEMANTIC_LINK,
           is_reified: true,
           source_id: sourceId,

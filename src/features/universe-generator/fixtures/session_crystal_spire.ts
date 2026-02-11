@@ -17,6 +17,7 @@ const map: Record<string, MessageNode> = {};
 // 1. Root User Message
 map[id1] = {
   id: id1,
+  senderId: 'user',
   role: 'user',
   text: 'I want to design a world where magic is a finite resource that grows in crystalline structures.',
   parentId: null,
@@ -28,6 +29,7 @@ map[id1] = {
 // 2. Bot Response
 map[id2] = {
   id: id2,
+  senderId: 'model',
   role: 'model',
   text: "**World Concept: The Prism Lands**\n\nIn this reality, magic does not flow; it grows. Known as 'Aether-Quartz', these crystals sprout from ley lines deep within the crust. \n\n**Core Rules:**\n1. **Extraction:** Mages are effectively miners and geologists.\n2. **Depletion:** Using magic shatters the crystal, turning it into useless dust.\n3. **Economy:** Wars are fought over geologically active fault lines where crystals grow fastest.",
   parentId: id1,
@@ -39,6 +41,7 @@ map[id2] = {
 // --- BRANCH A (The older path) ---
 map[id3a] = {
   id: id3a,
+  senderId: 'user',
   role: 'user',
   text: 'Who are the antagonists?',
   parentId: id2,
@@ -49,6 +52,7 @@ map[id3a] = {
 
 map[id4a] = {
   id: id4a,
+  senderId: 'model',
   role: 'model',
   text: '**The Silica Ascendancy**\n\nA religious technocratic order that believes consuming the crystals allows one to become a being of pure light.',
   parentId: id3a,
@@ -60,6 +64,7 @@ map[id4a] = {
 // --- BRANCH B (The newer/current path) ---
 map[id3b] = {
   id: id3b,
+  senderId: 'user',
   role: 'user',
   text: 'Tell me more about the economy. How do they trade this?',
   parentId: id2,
@@ -70,6 +75,7 @@ map[id3b] = {
 
 map[id4b] = {
   id: id4b,
+  senderId: 'model',
   role: 'model',
   text: "**The Shard Standard**\n\nCurrency is literally weight-based magic. \n\n1. **Raw Cuts:** Unrefined geodes used for bulk trade between nations.\n2. **Dust-Scripts:** Paper money backed by a reserve of crystal dust (used by commoners who can't use magic).\n3. **Pure-Lumen:** Flawless gems used exclusively by the elite mages.",
   parentId: id3b,
@@ -79,9 +85,10 @@ map[id4b] = {
 };
 
 // Fix: Updated to match ChatSession interface (rootNodeIds as array and adding selectedRootId)
-export const sessionCrystalSpire: ChatSession = {
-  id: 'fixture-crystal-spire',
-  title: 'The Crystal Spire',
+export const SESSION_CRYSTAL_SPIRE: ChatSession = {
+  id: 'fixture_crystal_spire',
+  senderId: 'system',
+  title: 'The Crystalline Spire',
   messageMap: map,
   rootNodeIds: [id1],
   selectedRootId: id1,

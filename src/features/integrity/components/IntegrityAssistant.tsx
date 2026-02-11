@@ -5,20 +5,19 @@ import {
   ChevronRight,
   Trash2,
   Share2,
-  Sparkles,
   Info,
   Eye,
   Zap,
   BrainCircuit,
   History,
   CheckCircle2,
-  AlertTriangle,
   Fingerprint,
   Target,
   Compass,
   ArrowLeft,
+  LucideIcon,
 } from 'lucide-react';
-import { NexusObject, isLink, isReified, NexusType, ConflictStatus } from '../../../types';
+import { NexusObject, SimpleNote, SemanticLink, HierarchicalLink } from '../../../types';
 import { GraphIntegrityService, IntegrityReport } from '../GraphIntegrityService';
 
 interface IntegrityAssistantProps {
@@ -41,11 +40,12 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
   const [selectedAnomalyId, setSelectedAnomalyId] = useState<string | null>(null);
 
   const anomalies = useMemo(() => {
-    const report = GraphIntegrityService.getRegistryIntegrityMap(registry);
+    const report: Record<string, IntegrityReport> =
+      GraphIntegrityService.getRegistryIntegrityMap(registry);
     return Object.entries(report)
       .filter(([_, info]) => info.status !== 'APPROVED')
       .map(([id, info]) => ({
-        link: registry[id] as any,
+        link: registry[id] as SemanticLink | HierarchicalLink,
         info,
       }));
   }, [registry]);
@@ -240,9 +240,14 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                     />
                   </div>
                   <div className="text-xs font-display font-bold text-nexus-text uppercase truncate">
-                    {/* Fix: Cast to any to access 'title' which may not exist on all NexusObject union types (specifically links) */}
-                    {(registry[link.source_id] as any)?.title || '?'} →{' '}
-                    {(registry[link.target_id] as any)?.title || '?'}
+                    {/* Fix: Access 'title' via SimpleNote cast or fallback */}
+                    {'title' in (registry[link.source_id] || {})
+                      ? (registry[link.source_id] as SimpleNote).title
+                      : '?'}
+                    {' → '}
+                    {'title' in (registry[link.target_id] || {})
+                      ? (registry[link.target_id] as SimpleNote).title
+                      : '?'}
                   </div>
                   <div className="text-[10px] text-nexus-muted mt-1 italic">
                     Logic: "{link.verb}"
@@ -272,7 +277,23 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
   );
 };
 
-const DecisionButton = ({ icon: Icon, label, desc, color, bg, onClick }: any) => (
+interface DecisionButtonProps {
+  icon: LucideIcon;
+  label: string;
+  desc: string;
+  color: string;
+  bg: string;
+  onClick: () => void;
+}
+
+const DecisionButton: React.FC<DecisionButtonProps> = ({
+  icon: Icon,
+  label,
+  desc,
+  color,
+  bg,
+  onClick,
+}) => (
   <button
     onClick={onClick}
     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-nexus-900/40 border border-nexus-800 hover:border-nexus-700 hover:bg-nexus-900 transition-all group text-left"

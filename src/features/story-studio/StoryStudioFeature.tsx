@@ -12,7 +12,7 @@ import { RightWidgetMode } from './types';
 
 interface StoryStudioFeatureProps {
   onCommitBatch: (items: NexusObject[]) => void;
-  onDeleteBatch: (ids: string[]) => void;
+  onDeleteBatch?: (ids: string[]) => void;
   registry: Record<string, NexusObject>;
 }
 
@@ -21,7 +21,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
   onDeleteBatch,
   registry,
 }) => {
-  const studio = useStoryStudio(registry, onCommitBatch, onDeleteBatch);
+  const studio = useStoryStudio(registry, onCommitBatch, onDeleteBatch || (() => {}));
   const [isGalleryOpen, setIsGalleryOpen] = useState(true);
   const [activeRightWidget, setActiveRightWidget] = useState<RightWidgetMode>(null);
 
@@ -47,7 +47,7 @@ export const StoryStudioFeature: React.FC<StoryStudioFeatureProps> = ({
       try {
         const imported = JSON.parse(ev.target?.result as string);
         studio.onUpdateBlocks(imported);
-      } catch (_err) {
+      } catch {
         alert('Invalid Blueprint format.');
       }
     };

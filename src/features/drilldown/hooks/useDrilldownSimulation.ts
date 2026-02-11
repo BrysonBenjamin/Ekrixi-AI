@@ -1,8 +1,14 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { NexusObject, isLink, isReified, NexusType, isContainer } from '../../../types';
+import {
+  NexusObject,
+  isLink,
+  isReified,
+  NexusType,
+  SemanticLink,
+  HierarchicalLink,
+} from '../../../types';
 import { VisibleNode } from '../DrilldownFeature';
-import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 
 export interface SimulationNode extends d3.SimulationNodeDatum {
   id: string;
@@ -50,15 +56,16 @@ export const useDrilldownSimulation = ({
     const activeLinks: SimulationLink[] = [];
     (Object.values(fullRegistry) as NexusObject[]).forEach((obj) => {
       if (!isLink(obj)) return;
-      const sId = (obj as any).source_id;
-      const tId = (obj as any).target_id;
+      const link = obj as SemanticLink | HierarchicalLink;
+      const sId = link.source_id;
+      const tId = link.target_id;
 
       if (isReified(obj) && registry[obj.id] && registry[sId] && registry[tId]) {
         activeLinks.push({
           id: `${obj.id}-structural-s`,
           source: sId,
           target: obj.id,
-          verb: obj.verb,
+          verb: (obj as SemanticLink).verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
@@ -67,7 +74,7 @@ export const useDrilldownSimulation = ({
           id: `${obj.id}-structural-t`,
           source: obj.id,
           target: tId,
-          verb: obj.verb,
+          verb: (obj as SemanticLink).verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
@@ -77,8 +84,8 @@ export const useDrilldownSimulation = ({
           id: obj.id,
           source: sId,
           target: tId,
-          verb: (obj as any).verb || 'bound to',
-          verbInverse: (obj as any).verb_inverse || 'part of',
+          verb: (obj as SemanticLink | HierarchicalLink).verb || 'bound to',
+          verbInverse: (obj as SemanticLink | HierarchicalLink).verb_inverse || 'part of',
           isReified: false,
           isStructuralLine: false,
           type: obj._type as NexusType,

@@ -1,5 +1,15 @@
 import React from 'react';
-import { Bold, Italic, Heading1, Heading2, List, Quote, Link2, CaseSensitive } from 'lucide-react';
+import {
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
+  List,
+  Quote,
+  Link2,
+  CaseSensitive,
+  LucideIcon,
+} from 'lucide-react';
 
 interface MarkdownToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -12,7 +22,7 @@ const ToolbarButton = ({
   label,
   onClick,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
 }) => (

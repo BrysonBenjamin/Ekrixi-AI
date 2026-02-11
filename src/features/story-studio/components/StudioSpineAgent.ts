@@ -398,10 +398,7 @@ export const StudioSpineAgent = {
    * Agent: Protocol Synthesizer
    * Extracts and expands Author's Notes (Protocols) from the Blueprint.
    */
-  async synthesizeProtocols(
-    blocks: StudioBlock[],
-    registry: Record<string, NexusObject>,
-  ): Promise<SimpleNote[]> {
+  async synthesizeProtocols(blocks: StudioBlock[]): Promise<SimpleNote[]> {
     const summary = blocks.map((b) => `- ${b.type}: ${JSON.stringify(b.data)}`).join('\n');
     const now = new Date().toISOString();
 
@@ -423,7 +420,7 @@ export const StudioSpineAgent = {
       const resultJson = JSON.parse(text || '{"protocols": []}');
 
       return (resultJson.protocols || []).map(
-        (p: any) =>
+        (p: { title: string; gist: string; prose_content: string; category?: NexusCategory }) =>
           ({
             id: generateId(),
             _type: 'SIMPLE_NOTE',

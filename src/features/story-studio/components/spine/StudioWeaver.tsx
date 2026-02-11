@@ -1,11 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
-  PenTool,
-  Compass,
   Sparkles,
-  Layers,
-  Database,
-  Activity,
   X,
   ScrollText,
   ShieldCheck,
@@ -13,6 +8,11 @@ import {
   LayoutTemplate,
   Focus,
   ChevronLeft,
+  PenTool,
+  Compass,
+  Layers,
+  Database,
+  Activity,
 } from 'lucide-react';
 import {
   NexusObject,
@@ -200,7 +200,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
 
       {/* Left: Writing Area */}
       <div
-        className={`flex-1 flex flex-col border-r border-nexus-800 transition-all duration-700 ${showContext ? 'md:w-3/5' : 'md:w-full'}`}
+        className={`flex - 1 flex flex - col border - r border - nexus - 800 transition - all duration - 700 ${showContext ? 'md:w-3/5' : 'md:w-full'} `}
       >
         <header className="h-16 border-b border-nexus-800 bg-nexus-900/30 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-6">
@@ -216,12 +216,12 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
                 <ChevronLeft size={18} />
               </button>
               <div
-                className={`p-2 rounded-lg ${isChapterMode ? 'bg-nexus-arcane/10 text-nexus-arcane' : 'bg-nexus-ruby/10 text-nexus-ruby'}`}
+                className={`p - 2 rounded - lg ${isChapterMode ? 'bg-nexus-arcane/10 text-nexus-arcane' : 'bg-nexus-ruby/10 text-nexus-ruby'} `}
               >
                 {isChapterMode ? <Layers size={16} /> : <Focus size={16} />}
               </div>
               <h3 className="text-xs font-display font-black text-nexus-text uppercase tracking-widest truncate max-w-[200px]">
-                {isChapterMode ? `Chapter Weave: ${focusedNode?.title}` : focusedNode?.title}
+                {isChapterMode ? `Chapter Weave: ${focusedNode?.title} ` : focusedNode?.title}
               </h3>
             </div>
 
@@ -229,19 +229,19 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
             <div className="flex bg-nexus-950 border border-nexus-800 rounded-full p-1 shadow-inner scale-90 origin-left">
               <button
                 onClick={() => handleToggleContext('SCENE')}
-                className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${!isChapterMode && weaverMode === 'PROSE' ? 'bg-nexus-ruby text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+                className={`px - 4 py - 1.5 rounded - full text - [8px] font - black uppercase tracking - widest transition - all flex items - center gap - 2 ${!isChapterMode && weaverMode === 'PROSE' ? 'bg-nexus-ruby text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'} `}
               >
                 <PenTool size={10} /> Prose Weave
               </button>
               <button
                 onClick={() => handleToggleContext('BLUEPRINT')}
-                className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${weaverMode === 'BLUEPRINT' ? 'bg-indigo-500 text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+                className={`px - 4 py - 1.5 rounded - full text - [8px] font - black uppercase tracking - widest transition - all flex items - center gap - 2 ${weaverMode === 'BLUEPRINT' ? 'bg-indigo-500 text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'} `}
               >
                 <LayoutTemplate size={10} /> Blueprint
               </button>
               <button
                 onClick={() => handleToggleContext('CHAPTER')}
-                className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${isChapterMode ? 'bg-nexus-arcane text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
+                className={`px - 4 py - 1.5 rounded - full text - [8px] font - black uppercase tracking - widest transition - all flex items - center gap - 2 ${isChapterMode ? 'bg-nexus-arcane text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'} `}
               >
                 <Layers size={10} /> Chapter Stack
               </button>
@@ -256,7 +256,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
             )}
             <button
               onClick={() => setShowContext(!showContext)}
-              className={`p-2 rounded-xl transition-all ${showContext ? 'bg-nexus-accent text-white shadow-lg shadow-nexus-accent/20' : 'text-nexus-muted hover:text-nexus-text'}`}
+              className={`p - 2 rounded - xl transition - all ${showContext ? 'bg-nexus-accent text-white shadow-lg shadow-nexus-accent/20' : 'text-nexus-muted hover:text-nexus-text'} `}
               title="Context Chat"
             >
               <Compass size={18} />
@@ -285,7 +285,7 @@ export const StudioWeaver: React.FC<StudioWeaverProps> = ({
                   <div
                     key={scene.id}
                     className="group/weave relative pb-20 animate-in fade-in slide-in-from-bottom-4"
-                    style={{ animationDelay: `${idx * 100}ms` }}
+                    style={{ animationDelay: `${idx * 100} ms` }}
                   >
                     {/* Scene Boundary Label */}
                     <div className="flex items-center gap-4 mb-10">
@@ -500,7 +500,7 @@ interface TabButtonProps {
 const TabButton = ({ active, icon: Icon, label, onClick }: TabButtonProps) => (
   <button
     onClick={onClick}
-    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[9px] font-display font-black uppercase tracking-widest transition-all ${active ? 'bg-nexus-accent text-white shadow-lg shadow-nexus-accent/20' : 'text-nexus-muted hover:text-nexus-text hover:bg-nexus-800/40'}`}
+    className={`flex - 1 flex items - center justify - center gap - 2 py - 2 rounded - xl text - [9px] font - display font - black uppercase tracking - widest transition - all ${active ? 'bg-nexus-accent text-white shadow-lg shadow-nexus-accent/20' : 'text-nexus-muted hover:text-nexus-text hover:bg-nexus-800/40'} `}
   >
     <Icon size={14} /> {label}
   </button>

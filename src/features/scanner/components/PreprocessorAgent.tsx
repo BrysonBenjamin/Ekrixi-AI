@@ -1,30 +1,23 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Zap,
   Sparkles,
   Plus,
   X,
   List,
   ChevronRight,
   AtSign,
-  Edit3,
   Target,
   MousePointer2,
   Wand2,
   Database,
   Hash,
-  ArrowRight,
   UserCircle2,
   Trash2,
   RotateCw,
-  Link,
-  Info,
   Repeat,
-  MousePointerSquareDashed,
   Check,
   MousePointerClick,
   ArrowLeft,
-  Save,
 } from 'lucide-react';
 import { EntitySeed } from '../ScannerFeature';
 import { NexusCategory } from '../../../types';
@@ -92,7 +85,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
       }
     };
     detectInitial();
-  }, [text, isReady]);
+  }, [text, isReady, generateContent]);
 
   const activeSeed = useMemo(() => seeds.find((s) => s.id === activeSeedId), [seeds, activeSeedId]);
 
@@ -209,11 +202,18 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
         const result = await response.response;
         const suggestions = safeParseJson(result.text() || '[]', []);
         if (Array.isArray(suggestions)) {
-          const sanitized = suggestions.map((s: any) => ({
-            ...s,
-            category: s.category || NexusCategory.CONCEPT,
-            isAuthorNote: !!s.isAuthorNote,
-          }));
+          const sanitized = suggestions.map(
+            (s: {
+              title: string;
+              category?: NexusCategory;
+              gist: string;
+              isAuthorNote?: boolean;
+            }) => ({
+              ...s,
+              category: s.category || NexusCategory.CONCEPT,
+              isAuthorNote: !!s.isAuthorNote,
+            }),
+          );
           setSeeds((prev) =>
             prev.map((s) => (s.id === seedId ? { ...s, suggestedChildren: sanitized } : s)),
           );

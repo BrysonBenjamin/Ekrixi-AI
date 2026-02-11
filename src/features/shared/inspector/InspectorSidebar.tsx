@@ -2,9 +2,8 @@ import React, { useRef } from 'react';
 import {
   X,
   Box,
-  Save,
   ArrowRight,
-  History,
+  History as HistoryIcon,
   Fingerprint,
   Target,
   Compass,
@@ -12,7 +11,15 @@ import {
   Activity,
   PenTool,
 } from 'lucide-react';
-import { NexusObject, isLink, isReified, NexusCategory, NexusType } from '../../../types';
+import {
+  NexusObject,
+  isLink,
+  isReified,
+  NexusCategory,
+  NexusType,
+  SimpleNote,
+  SemanticLink,
+} from '../../../types';
 import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
 
 interface InspectorSidebarProps {
@@ -34,8 +41,8 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   const reified = isReified(object);
   const isStory = object._type === NexusType.STORY_NOTE;
   const title =
-    ('title' in object ? (object as any).title : null) ||
-    (isL && 'verb' in object ? (object as any).verb : 'Untitled');
+    ('title' in object ? (object as SimpleNote).title : null) ||
+    (isL && 'verb' in object ? (object as SemanticLink).verb : 'Untitled');
   const proseRef = useRef<HTMLTextAreaElement>(null);
 
   return (
@@ -100,7 +107,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                   Designation
                 </label>
                 <input
-                  value={'title' in object ? (object as any).title : ''}
+                  value={'title' in object ? (object as SimpleNote).title : ''}
                   onChange={(e) => onUpdate({ title: e.target.value } as Partial<NexusObject>)}
                   className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-xs font-bold text-nexus-text focus:border-nexus-accent outline-none shadow-inner"
                 />
@@ -110,7 +117,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                   Category Signature
                 </label>
                 <select
-                  value={'category_id' in object ? (object as any).category_id : ''}
+                  value={'category_id' in object ? (object as SimpleNote).category_id : ''}
                   disabled={isStory}
                   onChange={(e) =>
                     onUpdate({
@@ -141,7 +148,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                   </div>
                   <div className="text-[9px] font-bold text-nexus-text truncate px-2">
                     {isLink(object) && 'title' in (registry[object.source_id] || {})
-                      ? (registry[object.source_id] as any).title
+                      ? (registry[object.source_id] as SimpleNote).title
                       : 'Unknown'}
                   </div>
                 </div>
@@ -152,7 +159,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                   </div>
                   <div className="text-[9px] font-bold text-nexus-text truncate px-2">
                     {isLink(object) && 'title' in (registry[object.target_id] || {})
-                      ? (registry[object.target_id] as any).title
+                      ? (registry[object.target_id] as SimpleNote).title
                       : 'Unknown'}
                   </div>
                 </div>
@@ -164,7 +171,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                     Active Verb
                   </label>
                   <input
-                    value={isLink(object) && 'verb' in object ? (object as any).verb : ''}
+                    value={isLink(object) && 'verb' in object ? (object as SemanticLink).verb : ''}
                     onChange={(e) => onUpdate({ verb: e.target.value } as Partial<NexusObject>)}
                     className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-xs font-bold text-nexus-text focus:border-nexus-accent outline-none"
                     placeholder="Logic..."
@@ -176,7 +183,9 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                   </label>
                   <input
                     value={
-                      isLink(object) && 'verb_inverse' in object ? (object as any).verb_inverse : ''
+                      isLink(object) && 'verb_inverse' in object
+                        ? (object as SemanticLink).verb_inverse
+                        : ''
                     }
                     onChange={(e) =>
                       onUpdate({ verb_inverse: e.target.value } as Partial<NexusObject>)
@@ -200,7 +209,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
             </h3>
           </div>
           <textarea
-            value={'gist' in object ? (object as any).gist : ''}
+            value={'gist' in object ? (object as SimpleNote).gist : ''}
             onChange={(e) => onUpdate({ gist: e.target.value } as Partial<NexusObject>)}
             className="w-full h-28 bg-nexus-900 border border-nexus-800 rounded-2xl p-4 text-[13px] text-nexus-text/90 font-serif italic outline-none focus:border-nexus-accent resize-none no-scrollbar leading-relaxed"
             placeholder="Establish the core essence..."
@@ -225,12 +234,12 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
           <div className="space-y-3">
             <MarkdownToolbar
               textareaRef={proseRef}
-              content={'prose_content' in object ? (object as any).prose_content || '' : ''}
+              content={'prose_content' in object ? (object as SimpleNote).prose_content || '' : ''}
               onUpdate={(val) => onUpdate({ prose_content: val } as Partial<NexusObject>)}
             />
             <textarea
               ref={proseRef}
-              value={'prose_content' in object ? (object as any).prose_content || '' : ''}
+              value={'prose_content' in object ? (object as SimpleNote).prose_content || '' : ''}
               onChange={(e) => onUpdate({ prose_content: e.target.value } as Partial<NexusObject>)}
               spellCheck={false}
               className="w-full h-80 bg-nexus-900 border border-nexus-800 rounded-2xl p-6 text-[13px] text-nexus-text font-mono outline-none focus:border-nexus-accent resize-none no-scrollbar leading-[1.8] shadow-inner selection:bg-nexus-accent/30 tracking-tight"
@@ -271,7 +280,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
 
         <div className="flex items-center gap-4 opacity-70">
           <div className="w-10 h-10 rounded-full bg-nexus-900 border border-nexus-800 flex items-center justify-center text-nexus-accent shrink-0 shadow-lg">
-            <History size={20} />
+            <HistoryIcon size={20} />
           </div>
           <div>
             <div className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">
