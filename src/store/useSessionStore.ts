@@ -6,6 +6,7 @@ export interface UniverseMetadata {
   id: string;
   name: string;
   description?: string;
+  type?: 'CREATIVE' | 'ACADEMIC' | 'CONSULTING';
   nodeCount: number;
   chatCount: number;
   lastActive: string;

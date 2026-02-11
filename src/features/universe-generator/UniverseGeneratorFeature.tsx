@@ -126,7 +126,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
             <button
               onClick={createSession}
               className="hidden sm:flex p-2 text-nexus-muted hover:text-nexus-accent hover:bg-nexus-800 rounded-xl transition-all"
-              title="New Universe"
+              title="New Nexus Chat"
             >
               <Plus size={20} />
             </button>
@@ -166,7 +166,7 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
                 title="Click to rename"
               >
                 <span className="font-display font-semibold text-nexus-text text-sm truncate">
-                  {currentSession?.title || 'New Project'}
+                  {currentSession?.title || 'New Session'}
                 </span>
                 <Edit2
                   size={12}

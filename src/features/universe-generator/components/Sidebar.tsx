@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onCreate}
           className="p-1.5 rounded-lg bg-nexus-800 hover:bg-nexus-accent hover:text-white text-nexus-muted transition-all"
-          title="New Universe"
+          title="Create New Timeline"
         >
           <Plus size={18} />
         </button>
