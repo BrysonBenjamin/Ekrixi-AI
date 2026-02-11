@@ -103,11 +103,12 @@ export const UniverseSwitcher = () => {
       <h2 className="text-lg font-display font-bold text-nexus-text mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Globe size={20} className="text-nexus-accent" />
-          Universe Selector
+          Nexus Selector
         </div>
         <button
           onClick={() => setIsCreating(true)}
           className="p-2 bg-nexus-950 hover:bg-nexus-accent hover:text-white rounded-xl border border-nexus-800 transition-all text-nexus-muted"
+          title="Create New Nexus"
         >
           <Plus size={16} />
         </button>
@@ -119,27 +120,64 @@ export const UniverseSwitcher = () => {
             e.preventDefault();
             handleCreate();
           }}
-          className="mb-6 animate-in slide-in-from-top-2"
+          className="mb-6 animate-in slide-in-from-top-2 p-4 bg-nexus-950/50 rounded-2xl border border-nexus-800"
         >
-          <div className="flex gap-2">
+          <div className="text-[10px] uppercase font-bold text-nexus-muted tracking-widest mb-3">
+            Initialize New Nexus
+          </div>
+
+          <div className="space-y-3">
             <input
               autoFocus
               type="text"
               value={newUniverseName}
               onChange={(e) => setNewUniverseName(e.target.value)}
-              placeholder="Designation..."
-              className="flex-1 bg-nexus-950 border border-nexus-800 rounded-xl px-4 py-2 text-sm text-nexus-text focus:outline-none focus:border-nexus-accent"
+              placeholder="Nexus Designation..."
+              className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-2.5 text-sm text-nexus-text focus:outline-none focus:border-nexus-accent placeholder:text-nexus-muted/50"
             />
-            <button type="submit" className="p-2 bg-nexus-accent text-white rounded-xl">
-              <ArrowRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsCreating(false)}
-              className="p-2 bg-nexus-950 text-nexus-muted rounded-xl hover:text-red-500"
-            >
-              <X size={16} />
-            </button>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                className="p-2 rounded-lg border border-nexus-800 bg-nexus-900/50 text-nexus-muted hover:bg-nexus-800 hover:text-nexus-text hover:border-nexus-700 transition-all text-xs font-medium flex flex-col items-center gap-1.5"
+              >
+                <Globe size={16} className="text-nexus-accent" />
+                <span>Creative</span>
+              </button>
+              <button
+                type="button"
+                className="p-2 rounded-lg border border-nexus-800 bg-nexus-900/50 text-nexus-muted hover:bg-nexus-800 hover:text-nexus-text hover:border-nexus-700 transition-all text-xs font-medium flex flex-col items-center gap-1.5 opacity-50 cursor-not-allowed"
+                title="Coming Soon: Academic Suite"
+              >
+                <div className="w-4 h-4 rounded-sm border border-current" />
+                <span>Academic</span>
+              </button>
+              <button
+                type="button"
+                className="p-2 rounded-lg border border-nexus-800 bg-nexus-900/50 text-nexus-muted hover:bg-nexus-800 hover:text-nexus-text hover:border-nexus-700 transition-all text-xs font-medium flex flex-col items-center gap-1.5 opacity-50 cursor-not-allowed"
+                title="Coming Soon: Consulting Suite"
+              >
+                <div className="w-4 h-4 rounded-full border border-current" />
+                <span>Consultant</span>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsCreating(false)}
+                className="px-3 py-2 text-xs font-bold text-nexus-muted hover:text-red-400 transition-all uppercase tracking-wider"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-nexus-accent text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-nexus-accent/90 transition-all flex items-center gap-2"
+              >
+                <span>Initialize</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
           </div>
         </form>
       )}
