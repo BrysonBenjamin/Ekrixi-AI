@@ -12,6 +12,7 @@ import { StoryStudioFeature } from './features/story-studio/StoryStudioFeature';
 import { PlaygroundFeature } from './features/playground/PlaygroundFeature';
 import { useAuth } from './core/auth/AuthContext';
 import { LoginFeature } from './features/auth/LoginFeature';
+import { SurveyPopup } from './features/survey/components/SurveyPopup';
 import {
   NexusObject,
   isLink,
@@ -239,6 +240,7 @@ export default function App(): React.ReactNode {
   return (
     <div className="relative h-full w-full">
       {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
+      <SurveyPopup />
       <AppShell theme={theme}>
         <Routes>
           <Route path="/login" element={<LoginFeature />} />
