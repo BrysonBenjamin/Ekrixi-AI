@@ -31,8 +31,8 @@ import {
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { HierarchyExplorer } from './components/HierarchyExplorer';
 import { StructureVisualizer } from './components/StructureVisualizer';
-import { RefineryInspector } from './components/RefineryInspector';
 import { RefineryDrilldown } from './components/RefineryDrilldown';
+import { InspectorPanel } from '../shared/inspector/InspectorPanel';
 import { generateId } from '../../utils/ids';
 
 export interface RefineryBatch {
@@ -602,6 +602,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   onReifyNodeToLink={handleReifyNodeToLink}
                   onReparent={handleReparent}
                   onEstablishLink={handleEstablishLink}
+                  onDelete={handleDeleteItem}
                 />
               ) : (
                 <StructureVisualizer
@@ -622,22 +623,13 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                 />
               )}
 
-              <div
-                className={`
-                                fixed inset-0 md:inset-y-0 md:left-auto md:right-0 md:w-[420px] bg-nexus-900 md:border-l border-nexus-800 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] z-[500]
-                                transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)
-                                ${showInspector && selectedId ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'}
-                             `}
-              >
-                {selectedObject && (
-                  <RefineryInspector
-                    object={selectedObject}
-                    registry={registry}
-                    onUpdate={(updates) => handleUpdateItem(selectedId!, updates)}
-                    onClose={() => setShowInspector(false)}
-                  />
-                )}
-              </div>
+              <InspectorPanel
+                isOpen={showInspector}
+                selectedObject={selectedObject}
+                registry={registry}
+                onUpdate={(updates) => handleUpdateItem(selectedId!, updates)}
+                onClose={() => setShowInspector(false)}
+              />
             </main>
           </div>
         </div>

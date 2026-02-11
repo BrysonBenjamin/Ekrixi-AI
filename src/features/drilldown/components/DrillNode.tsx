@@ -90,7 +90,7 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
         className="overflow-visible pointer-events-none"
       >
         <div
-          className={`w-20 h-20 rounded-full border-[5px] flex items-center justify-center transition-all duration-700 shadow-[0_10px_30px_rgba(0,0,0,0.8)] ${isAuthorNote ? 'bg-nexus-900 border-amber-500' : reified ? 'bg-nexus-900 border-nexus-accent shadow-[0_0_20px_var(--accent-color)]' : 'bg-nexus-900'}`}
+          className={`w-20 h-20 rounded-full border-[5px] flex items-center justify-center transition-transform duration-700 shadow-[0_10px_30px_rgba(0,0,0,0.8)] ${isAuthorNote ? 'bg-nexus-900 border-amber-500' : reified ? 'bg-nexus-900 border-nexus-accent shadow-[0_0_20px_var(--accent-color)]' : 'bg-nexus-900'}`}
           style={{ borderColor: color, opacity: 1 }}
         >
           <div dangerouslySetInnerHTML={{ __html: iconSvg }} className="scale-[2.2]" />
@@ -114,7 +114,7 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
     >
       <div
         className={`
-                    w-full h-full flex flex-col rounded-[56px] border-[3px] transition-all duration-700 pointer-events-auto cursor-pointer group relative
+                    w-full h-full flex flex-col rounded-[56px] border-[3px] transition-[transform,box-shadow,border-color,background-color] duration-300 pointer-events-auto cursor-pointer group relative
                     ${isFocus ? 'ring-[20px] ring-nexus-accent/15 z-50 shadow-[0_50px_150px_-30px_rgba(0,0,0,0.4)]' : 'shadow-[0_20px_60px_rgba(0,0,0,0.4)]'}
                     ${isC || reified ? 'border-dashed' : 'border-solid'}
                     ${reified ? 'bg-nexus-900 ring-4 ring-nexus-accent/10' : isAuthorNote ? 'bg-nexus-900 border-amber-500' : 'bg-nexus-900'}
@@ -133,7 +133,7 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
       >
         <div className="flex items-center gap-8 p-10 flex-1 min-h-0 relative z-10">
           <div
-            className={`w-20 h-20 rounded-[28px] flex items-center justify-center shrink-0 border-[3px] transition-all duration-500 group-hover:-rotate-6 ${isFocus || isHovered ? 'bg-nexus-950 border-nexus-accent shadow-lg' : 'bg-nexus-950 border-nexus-800'}`}
+            className={`w-20 h-20 rounded-[28px] flex items-center justify-center shrink-0 border-[3px] transition-transform duration-500 group-hover:-rotate-6 ${isFocus || isHovered ? 'bg-nexus-950 border-nexus-accent shadow-lg' : 'bg-nexus-950 border-nexus-800'}`}
             style={{ borderColor: isFocus ? 'var(--accent-color)' : `${color}cc` }}
           >
             <div dangerouslySetInnerHTML={{ __html: iconSvg }} className="scale-[2.8]" />

@@ -18,6 +18,7 @@ import { StructureVisualizer } from './components/StructureVisualizer';
 import { HierarchyExplorer } from '../refinery/components/HierarchyExplorer';
 import { UserCircle2, LayoutPanelLeft } from 'lucide-react';
 import { useTutorial } from '../../components/shared/tutorial/TutorialSystem';
+import { InspectorPanel } from '../shared/inspector/InspectorPanel';
 
 interface StructureFeatureProps {
   registry: Record<string, NexusObject>;
@@ -33,7 +34,32 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAuthorNotes, setShowAuthorNotes] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [showInspector, setShowInspector] = useState(false);
+
   useTutorial();
+
+  const selectedObject = useMemo(() => {
+    return selectedId ? registry[selectedId] : null;
+  }, [selectedId, registry]);
+
+  const handleUpdateItem = useCallback(
+    (updates: Partial<NexusObject>) => {
+      if (!selectedId) return;
+      onRegistryUpdate((prev) => {
+        const item = prev[selectedId];
+        if (!item) return prev;
+        return {
+          ...prev,
+          [selectedId]: {
+            ...item,
+            ...updates,
+            last_modified: new Date().toISOString(),
+          } as NexusObject,
+        };
+      });
+    },
+    [selectedId, onRegistryUpdate],
+  );
 
   const filteredRegistry = useMemo(() => {
     const next: Record<string, NexusObject> = {};
@@ -358,7 +384,10 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           <StructureVisualizer
             registry={filteredRegistry}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setSelectedId(id);
+              setShowInspector(true);
+            }}
             onAddChild={handleAddChild}
             onDelete={handleDeleteUnit}
             onReparent={handleReparent}
@@ -366,6 +395,14 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
             onReifyLink={handleReifyLink}
             onReifyNode={handleReifyNode}
             onReifyNodeToLink={handleReifyNodeToLink}
+          />
+          <InspectorPanel
+            isOpen={showInspector}
+            selectedObject={selectedObject}
+            registry={registry}
+            onUpdate={handleUpdateItem}
+            onClose={() => setShowInspector(false)}
+            onOpenWiki={onNavigateToWiki}
           />
         </main>
       </div>
