@@ -19,7 +19,15 @@ interface DrilldownCanvasProps {
   onReifyLink?: (id: string) => void;
   onReifyNode?: (id: string) => void;
   onReifyNodeToLink?: (nodeId: string, sourceId: string, targetId: string) => void;
-  onEstablishLink?: (sourceId: string, targetId: string, verb: string) => void;
+  onEstablishLink?: (
+    sourceId: string,
+    targetId: string,
+    verb: string,
+    useTimeAnchor?: boolean,
+    sourceTemporalId?: string,
+    targetTemporalId?: string,
+  ) => void;
+  onManifestSnapshot?: (nodeId: string, year: number, month?: number, day?: number) => void;
   onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
   integrityFocus?: { linkId: string; path?: string[]; mode: 'CENTER' | 'DRILL' } | null;
   getTimeNavigation?: (id: string) => {
@@ -28,6 +36,7 @@ interface DrilldownCanvasProps {
     onNext?: () => void;
     onPrev?: () => void;
   } | null;
+  simulatedDate?: { year: number; month: number; day: number };
 }
 
 export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
@@ -42,8 +51,10 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
   onReifyNodeToLink,
   onEstablishLink,
   onReparent,
+  onManifestSnapshot,
   integrityFocus,
   getTimeNavigation,
+  simulatedDate,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<SVGSVGElement>(null);
@@ -67,6 +78,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
     registry,
     fullRegistry,
     focusId,
+    simulatedDate,
   });
 
   useEffect(() => {
@@ -102,8 +114,11 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
   const handleNodeClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (linkingSourceId) {
-      if (linkingSourceId !== id && onEstablishLink)
-        onEstablishLink(linkingSourceId, id, 'mentions');
+      if (linkingSourceId !== id && onEstablishLink) {
+        const sourceTemporalId = registry[linkingSourceId]?.activeTemporalId;
+        const targetTemporalId = registry[id]?.activeTemporalId;
+        onEstablishLink(linkingSourceId, id, 'mentions', true, sourceTemporalId, targetTemporalId);
+      }
       setLinkingSourceId(null);
     } else {
       setLockedId(lockedId === id ? null : id);
@@ -236,14 +251,16 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
       {contextMenu &&
         (() => {
           const originalId = contextMenu.id.replace(/-structural-[st]$/, '');
-          const object = fullRegistry[originalId];
+          const baseObj = fullRegistry[originalId];
+          const activeId = registry[originalId]?.activeTemporalId || originalId;
+          const object = fullRegistry[activeId] || baseObj;
 
           if (!object) return null;
 
           return (
             <DrilldownContextMenu
               object={object}
-              registry={fullRegistry}
+              registry={registry as unknown as Record<string, NexusObject>}
               x={contextMenu.x}
               y={contextMenu.y}
               onClose={() => setContextMenu(null)}
@@ -253,11 +270,11 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
               onReify={onReifyLink}
               onReifyNode={onReifyNode}
               onReifyNodeToLink={onReifyNodeToLink}
-              onStartLink={(id) => {
-                setLinkingSourceId(id);
-                setContextMenu(null);
-              }}
+              onStartLink={setLinkingSourceId}
               onEstablishLink={onEstablishLink}
+              onReparent={onReparent}
+              onManifestSnapshot={onManifestSnapshot}
+              simulatedYear={simulatedDate?.year}
             />
           );
         })()}

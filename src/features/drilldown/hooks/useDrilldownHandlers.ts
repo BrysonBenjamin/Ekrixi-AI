@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import {
   NexusObject,
   SimpleNote,
-  SimpleLink,
   ContainerNote,
   NexusType,
   NexusCategory,
@@ -12,18 +11,28 @@ import {
   isContainer,
   isReified,
   NexusGraphUtils,
+  TraitLink,
+  AggregatedSemanticLink,
+  AggregatedHierarchicalLink,
 } from '../../../types';
+import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
+import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
+import { NexusDeletionService, DeletionProfile } from '../../../core/services/NexusDeletionService';
 
 interface UseDrilldownHandlersProps {
   selectedId: string | null;
   onRegistryUpdate?: React.Dispatch<React.SetStateAction<Record<string, NexusObject>>>;
+  onRemoveBatch?: (ids: string[]) => Promise<void>;
   registry: Record<string, NexusObject>;
+  simulatedDate?: { year: number; month: number; day: number };
 }
 
 export const useDrilldownHandlers = ({
   selectedId,
   onRegistryUpdate,
+  onRemoveBatch,
   registry,
+  simulatedDate,
 }: UseDrilldownHandlersProps) => {
   const handleUpdateItem = useCallback(
     (updates: Partial<NexusObject>) => {
@@ -31,6 +40,16 @@ export const useDrilldownHandlers = ({
       onRegistryUpdate((prev) => {
         const item = prev[selectedId];
         if (!item) return prev;
+
+        // Auto-Inheritance for Reified Snapshots
+        const isS = !!(item as SimpleNote).time_data?.base_node_id;
+        const bId = (item as SimpleNote).time_data?.base_node_id;
+        if (isS && bId && isReified(prev[bId])) {
+          const base = prev[bId] as AggregatedSemanticLink | AggregatedHierarchicalLink;
+          (updates as Partial<TraitLink>).source_id = base.source_id;
+          (updates as Partial<TraitLink>).target_id = base.target_id;
+        }
+
         return {
           ...prev,
           [selectedId]: {
@@ -149,28 +168,116 @@ export const useDrilldownHandlers = ({
     [onRegistryUpdate],
   );
 
-  const handleEstablishLink = useCallback(
-    (sourceId: string, targetId: string, verb: string = 'binds') => {
+  const handleManifestSnapshot = useCallback(
+    (nodeId: string, year: number, month?: number, day?: number) => {
       if (!onRegistryUpdate) return;
       onRegistryUpdate((prev) => {
-        const source = prev[sourceId];
-        const target = prev[targetId];
+        const baseNode = prev[nodeId] as SimpleNote;
+        if (!baseNode) return prev;
+
+        let statePayload: Partial<SimpleNote> = {
+          title: `${baseNode.title} (Era: ${year})`,
+          gist: baseNode.gist,
+        };
+
+        // Automated Temporal Anchoring for Reified Links
+        if (isReified(baseNode)) {
+          const sId = (baseNode as AggregatedSemanticLink).source_id;
+          const tId = (baseNode as AggregatedSemanticLink).target_id;
+
+          if (sId && tId) {
+            const sSnapshot = TimeDimensionService.getSnapshot(
+              prev,
+              sId,
+              year,
+              month || 0,
+              day || 0,
+            );
+            const tSnapshot = TimeDimensionService.getSnapshot(
+              prev,
+              tId,
+              year,
+              month || 0,
+              day || 0,
+            );
+
+            statePayload = {
+              ...statePayload,
+              time_data: {
+                year,
+                anchored_source_id: sSnapshot?.stateNode.id || sId,
+                anchored_target_id: tSnapshot?.stateNode.id || tId,
+              },
+            };
+          }
+        }
+
+        const { timeNode, timeLink } = TimeDimensionService.createTimeState(
+          baseNode,
+          year,
+          month,
+          day,
+          statePayload,
+        );
+
+        return {
+          ...prev,
+          [timeNode.id]: timeNode as NexusObject,
+          [timeLink.id]: timeLink as NexusObject,
+        };
+      });
+    },
+    [onRegistryUpdate],
+  );
+
+  const handleEstablishLink = useCallback(
+    (
+      sourceId: string,
+      targetId: string,
+      verb: string = 'binds',
+      useTimeAnchor: boolean = false,
+      sourceTemporalId?: string,
+      targetTemporalId?: string,
+    ) => {
+      if (!onRegistryUpdate) return;
+      onRegistryUpdate((prev) => {
+        // Use temporal IDs as literal IDs if we want strict atomic snapshot-to-snapshot links
+        const effectiveSourceId = sourceTemporalId || sourceId;
+        const effectiveTargetId = targetTemporalId || targetId;
+
+        const source = prev[effectiveSourceId];
+        const target = prev[effectiveTargetId];
         if (!source || !target) return prev;
+
+        const timeData = useTimeAnchor
+          ? {
+              ...simulatedDate,
+              // If we are using base IDs but anchoring, we store the snapshots as metadata
+              // If we are using Snapshot IDs as literal source/target, the anchor is implicit in the topology
+              anchored_source_id: sourceTemporalId,
+              anchored_target_id: targetTemporalId,
+              // Store base IDs for simulation resolution back to layout anchors
+              base_source_id: sourceId,
+              base_target_id: targetId,
+            }
+          : undefined;
+
         const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(
           source,
           target,
           NexusType.SEMANTIC_LINK,
           verb,
+          timeData,
         );
         return {
           ...prev,
-          [sourceId]: updatedSource,
-          [targetId]: updatedTarget,
+          [effectiveSourceId]: updatedSource,
+          [effectiveTargetId]: updatedTarget,
           [link.id]: link,
         };
       });
     },
-    [onRegistryUpdate],
+    [onRegistryUpdate, simulatedDate],
   );
 
   const handleReparent = useCallback(
@@ -267,25 +374,64 @@ export const useDrilldownHandlers = ({
 
   const handleDelete = useCallback(
     (id: string) => {
-      if (!onRegistryUpdate) return;
+      if (!onRegistryUpdate || !onRemoveBatch) return;
+
       onRegistryUpdate((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        Object.keys(next).forEach((k) => {
-          const o = next[k];
-          if (isLink(o) && (o.source_id === id || o.target_id === id)) delete next[k];
-          if (isContainer(o) && o.children_ids.includes(id)) {
-            const container = o as ContainerNote;
-            next[k] = {
-              ...container,
-              children_ids: container.children_ids.filter((cid) => cid !== id),
-            };
-          }
+        const baseObj = prev[id];
+        if (!baseObj) return prev;
+
+        const toDeleteIds = new Set<string>();
+        toDeleteIds.add(id);
+
+        const isSnapshot = !!(baseObj as SimpleNote).time_data?.base_node_id;
+        const isLiteralLink = isLink(baseObj) && !isReified(baseObj);
+
+        // IDENTIFY DELETE CANDIDATES using Centralized Service
+        // If it's a base unit, we use HOLISTIC (Temporal + Structural)
+        // If it's a snapshot or literal link, it only deletes itself (and dependent links)
+        const profile =
+          !isSnapshot && !isLiteralLink
+            ? DeletionProfile.HOLISTIC
+            : DeletionProfile.STRUCTURAL_ORPHAN;
+
+        const candidates = NexusDeletionService.getDeleteCandidates(id, prev, profile);
+        candidates.forEach((cid) => toDeleteIds.add(cid));
+
+        const deletedIdsArray = Array.from(toDeleteIds);
+
+        // UI OPTIMISTIC UPDATE
+        let next = { ...prev };
+        deletedIdsArray.forEach((did) => {
+          delete next[did];
+          // Clean up container references
+          Object.keys(next).forEach((k) => {
+            const o = next[k];
+            if (isContainer(o) && (o as ContainerNote).children_ids?.includes(did)) {
+              const container = o as ContainerNote;
+              next[k] = {
+                ...container,
+                children_ids: container.children_ids.filter((cid) => cid !== did),
+              };
+            }
+          });
         });
-        return next;
+
+        // 3. Identify and purge zombie links that lost their anchor points
+        const finalRegistry = GraphIntegrityService.purgeDanglingLinks(next);
+        const finalDeletedIds = new Set(deletedIdsArray);
+        Object.keys(prev).forEach((id) => {
+          if (!finalRegistry[id]) finalDeletedIds.add(id);
+        });
+
+        // PERSISTENT DELETE (Async) - Include any dangling links found
+        onRemoveBatch(Array.from(finalDeletedIds)).catch((err) =>
+          console.error('[useDrilldownHandlers] Failed to persist recursive delete:', err),
+        );
+
+        return finalRegistry;
       });
     },
-    [onRegistryUpdate],
+    [onRegistryUpdate, onRemoveBatch],
   );
 
   return {
@@ -296,5 +442,6 @@ export const useDrilldownHandlers = ({
     handleEstablishLink,
     handleReparent,
     handleDelete,
+    handleManifestSnapshot,
   };
 };

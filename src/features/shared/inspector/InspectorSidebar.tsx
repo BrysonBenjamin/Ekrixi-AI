@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   Activity,
   PenTool,
+  Anchor,
+  GitMerge,
 } from 'lucide-react';
 import {
   NexusObject,
@@ -20,6 +22,9 @@ import {
   NexusType,
   SimpleNote,
   SemanticLink,
+  HierarchyType,
+  NexusElement,
+  HierarchicalLink,
 } from '../../../types';
 import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
 import { ThinkingProcessViewer } from '../../../components/shared/ThinkingProcessViewer';
@@ -207,6 +212,38 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                   </p>
                 )}
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest ml-1">
+                  Mass Weighting
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    value={
+                      ('internal_weight' in object
+                        ? (object as NexusElement).internal_weight
+                        : 1) || 1
+                    }
+                    onChange={(e) =>
+                      onUpdate({
+                        internal_weight: parseFloat(e.target.value),
+                      } as Partial<NexusObject>)
+                    }
+                    className="flex-1 accent-nexus-accent"
+                  />
+                  <span className="text-[10px] font-mono font-bold text-nexus-accent w-8 text-right">
+                    {(
+                      ('internal_weight' in object
+                        ? (object as NexusElement).internal_weight
+                        : 1) || 1
+                    ).toFixed(1)}
+                  </span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-5">
@@ -262,6 +299,178 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                     className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-4 py-3 text-xs font-bold text-nexus-text focus:border-nexus-accent outline-none"
                     placeholder="Reciprocal..."
                   />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-nexus-800/50 space-y-5">
+                <div className="flex items-center gap-3">
+                  <GitMerge size={14} className="text-nexus-arcane" />
+                  <h4 className="text-[9px] font-display font-black text-nexus-text uppercase tracking-widest">
+                    Logic Parameters
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-display font-black text-nexus-muted uppercase tracking-widest ml-1">
+                      Link Type
+                    </label>
+                    <select
+                      value={object._type}
+                      onChange={(e) =>
+                        onUpdate({ _type: e.target.value as NexusType } as Partial<NexusObject>)
+                      }
+                      className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-3 py-2 text-[9px] font-bold text-nexus-text focus:border-nexus-accent outline-none"
+                    >
+                      <option value={NexusType.SEMANTIC_LINK}>SEMANTIC</option>
+                      <option value={NexusType.HIERARCHICAL_LINK}>HIERARCHICAL</option>
+                      <option value={NexusType.AGGREGATED_SEMANTIC_LINK}>REIFIED SEMANTIC</option>
+                      <option value={NexusType.AGGREGATED_HIERARCHICAL_LINK}>
+                        REIFIED HIERARCHY
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-display font-black text-nexus-muted uppercase tracking-widest ml-1">
+                      Hierarchy
+                    </label>
+                    <select
+                      value={(object as HierarchicalLink).hierarchy_type || ''}
+                      disabled={object._type === NexusType.SEMANTIC_LINK}
+                      onChange={(e) =>
+                        onUpdate({
+                          hierarchy_type: e.target.value as HierarchyType,
+                        } as Partial<NexusObject>)
+                      }
+                      className="w-full bg-nexus-900 border border-nexus-800 rounded-xl px-3 py-2 text-[9px] font-bold text-nexus-text focus:border-nexus-accent outline-none disabled:opacity-30"
+                    >
+                      <option value="">NONE</option>
+                      <option value={HierarchyType.PARENT_OF}>PARENT OF</option>
+                      <option value={HierarchyType.PART_OF}>PART OF</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[8px] font-display font-black text-nexus-muted uppercase tracking-widest">
+                      Resonace Weight
+                    </label>
+                    <span className="text-[9px] font-mono font-bold text-nexus-arcane">
+                      {(
+                        ('internal_weight' in object
+                          ? (object as NexusElement).internal_weight
+                          : 1) || 1
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="0.05"
+                    value={
+                      ('internal_weight' in object
+                        ? (object as NexusElement).internal_weight
+                        : 1) || 1
+                    }
+                    onChange={(e) =>
+                      onUpdate({
+                        internal_weight: parseFloat(e.target.value),
+                      } as Partial<NexusObject>)
+                    }
+                    className="w-full bg-nexus-900 accent-nexus-arcane"
+                  />
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-nexus-800/30">
+                  <div className="flex items-center gap-2">
+                    <Anchor size={12} className="text-nexus-ruby opacity-60" />
+                    <span className="text-[8px] font-display font-black text-nexus-muted uppercase tracking-widest">
+                      Temporal Anchors
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase">
+                        Era Year
+                      </label>
+                      <input
+                        type="number"
+                        value={(object as SimpleNote).time_data?.year || ''}
+                        onChange={(e) =>
+                          onUpdate({
+                            time_data: {
+                              ...((object as SimpleNote).time_data || {}),
+                              year: parseInt(e.target.value) || 0,
+                            },
+                          } as Partial<NexusObject>)
+                        }
+                        className="w-full bg-nexus-900 border border-nexus-800 rounded-lg px-3 py-2 text-[10px] font-mono text-nexus-ruby outline-none focus:border-nexus-ruby/50"
+                        placeholder="Year..."
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase">
+                        Reification
+                      </label>
+                      <button
+                        onClick={() =>
+                          onUpdate({
+                            is_reified: !reified,
+                          } as Partial<NexusObject>)
+                        }
+                        className={`w-full py-2 rounded-lg border text-[8px] font-black uppercase transition-all ${
+                          reified
+                            ? 'bg-nexus-ruby/10 border-nexus-ruby/40 text-nexus-ruby'
+                            : 'bg-nexus-800 border-nexus-700 text-nexus-muted'
+                        }`}
+                      >
+                        {reified ? 'Unit Promoted' : 'Logical Only'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
+                        Source Snapshot
+                      </label>
+                      <input
+                        value={(object as SimpleNote).time_data?.anchored_source_id || ''}
+                        onChange={(e) =>
+                          onUpdate({
+                            time_data: {
+                              ...((object as SimpleNote).time_data || {}),
+                              anchored_source_id: e.target.value,
+                            },
+                          } as Partial<NexusObject>)
+                        }
+                        className="w-full bg-nexus-900/50 border border-nexus-800 rounded-lg px-3 py-1.5 text-[8px] font-mono text-nexus-muted outline-none focus:border-nexus-accent/30"
+                        placeholder="Anchor ID..."
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
+                        Target Snapshot
+                      </label>
+                      <input
+                        value={(object as SimpleNote).time_data?.anchored_target_id || ''}
+                        onChange={(e) =>
+                          onUpdate({
+                            time_data: {
+                              ...((object as SimpleNote).time_data || {}),
+                              anchored_target_id: e.target.value,
+                            },
+                          } as Partial<NexusObject>)
+                        }
+                        className="w-full bg-nexus-900/50 border border-nexus-800 rounded-lg px-3 py-1.5 text-[8px] font-mono text-nexus-muted outline-none focus:border-nexus-accent/30"
+                        placeholder="Anchor ID..."
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

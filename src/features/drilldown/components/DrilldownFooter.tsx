@@ -5,6 +5,8 @@ import { NexusObject, SimpleNote } from '../../../types';
 interface TimeInfo {
   isTimeNode: boolean;
   year: number | null;
+  month?: number | null;
+  day?: number | null;
   baseId: string;
   prevNode: SimpleNote | null;
   nextNode: SimpleNote | null;
@@ -18,6 +20,29 @@ interface DrilldownFooterProps {
   handleTimeNav: (id: string) => void;
 }
 
+const formatDate = (info: TimeInfo) => {
+  if (!info.year) return 'BASE';
+  const months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+  let str = `${info.year}`;
+  if (info.month) {
+    str = `${info.day || 1} ${months[info.month - 1]} ${info.year}`;
+  }
+  return str;
+};
+
 export const DrilldownFooter: React.FC<DrilldownFooterProps> = ({
   currentContainer,
   timeInfo,
@@ -25,19 +50,19 @@ export const DrilldownFooter: React.FC<DrilldownFooterProps> = ({
   handleTimeNav,
 }) => {
   return (
-    <div className="absolute bottom-8 left-8 right-8 pointer-events-none flex justify-between items-end z-20">
-      <div className="p-10 bg-nexus-900/80 backdrop-blur-3xl border border-nexus-800 rounded-[56px] pointer-events-auto shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] max-w-2xl group hover:border-nexus-accent/40 transition-all duration-500 relative overflow-hidden">
+    <div className="absolute bottom-12 left-12 right-12 pointer-events-none flex justify-between items-end z-20">
+      <div className="p-12 bg-nexus-900/80 backdrop-blur-3xl border border-nexus-800 rounded-[64px] pointer-events-auto shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] max-w-2xl group hover:border-nexus-accent/40 transition-all duration-500 relative overflow-hidden">
         {/* Timeline UI Overlay */}
         {timeInfo && (
-          <div className="absolute top-0 right-0 p-8 flex flex-col items-center gap-4 z-30">
+          <div className="absolute top-0 right-0 p-10 flex flex-col items-center gap-4 z-30">
             <div className="flex flex-col items-center gap-2 mb-2">
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 opacity-60">
                 Temporal Era
               </span>
-              <div className="flex items-center gap-3 px-5 py-2.5 bg-indigo-900/40 rounded-2xl border border-indigo-500/30 backdrop-blur-md shadow-lg">
+              <div className="flex items-center gap-3 px-5 py-3 bg-indigo-900/40 rounded-2xl border border-indigo-500/30 backdrop-blur-md shadow-lg">
                 <Calendar size={16} className="text-indigo-300" />
                 <span className="text-sm font-black text-indigo-100 font-mono tracking-tighter">
-                  {timeInfo.year || 'BASE'}
+                  {formatDate(timeInfo)}
                 </span>
               </div>
             </div>
@@ -89,16 +114,16 @@ export const DrilldownFooter: React.FC<DrilldownFooterProps> = ({
           </span>
         </div>
         <h2 className="text-6xl font-display font-black text-nexus-text tracking-tighter leading-[0.9] mb-6 group-hover:text-nexus-accent transition-colors">
-          {currentContainer ? (currentContainer as any).title : 'The Deep Nexus'}
+          {currentContainer ? (currentContainer as SimpleNote).title : 'The Deep Nexus'}
           {timeInfo?.year && (
             <span className="opacity-30 ml-4 text-3xl align-top font-mono tracking-tighter">
-              ({timeInfo.year})
+              ({formatDate(timeInfo)})
             </span>
           )}
         </h2>
         <h2 className="text-[12px] font-display font-black text-nexus-muted uppercase tracking-[0.3em] opacity-40">
           {timeInfo?.isTimeNode
-            ? `Inheritance Core: ${(registry[timeInfo.baseId] as any)?.title || 'Unknown'}`
+            ? `Inheritance Core: ${(registry[timeInfo.baseId] as SimpleNote)?.title || 'Unknown'}`
             : 'Global Manifestation Map'}
         </h2>
       </div>

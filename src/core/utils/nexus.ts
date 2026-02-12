@@ -108,7 +108,13 @@ export const NexusGraphUtils = {
     return { ...base, _type: NexusType.SIMPLE_NOTE } as SimpleNote;
   },
 
-  createLink: (source: NexusObject, target: NexusObject, type: NexusType, verb: string) => {
+  createLink: (
+    source: NexusObject,
+    target: NexusObject,
+    type: NexusType,
+    verb: string,
+    time_data?: any,
+  ) => {
     const now = new Date().toISOString();
     const linkId =
       typeof crypto !== 'undefined' && crypto.randomUUID
@@ -127,6 +133,7 @@ export const NexusGraphUtils = {
       internal_weight: 1.0,
       total_subtree_mass: 0,
       link_ids: [],
+      time_data,
     };
 
     if (type === NexusType.HIERARCHICAL_LINK || type === NexusType.AGGREGATED_HIERARCHICAL_LINK) {

@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import {
   NexusObject,
   SimpleNote,
-  SimpleLink,
   NexusType,
   isContainer,
   isLink,
   isReified,
+  TraitLink,
+  AggregatedSemanticLink,
+  AggregatedHierarchicalLink,
 } from '../../../types';
 
 export type VisibleNode = NexusObject & {
@@ -14,6 +16,7 @@ export type VisibleNode = NexusObject & {
   pathType: 'descendant' | 'ancestor' | 'lateral' | 'focus';
   isParentPath?: boolean;
   isTimeNodeExcluded?: boolean;
+  activeTemporalId?: string;
 };
 
 interface UseDrilldownRegistryProps {
@@ -44,7 +47,7 @@ export const useDrilldownRegistry = ({
         (obj) =>
           (!isLink(obj) || isReified(obj)) &&
           !allChildIds.has(obj.id) &&
-          !(obj as any).time_data?.base_node_id,
+          !(obj as SimpleNote).time_data?.base_node_id,
       );
       roots.forEach((root) => queue.push({ id: root.id, depth: 0, pathType: 'focus' }));
     } else {
@@ -74,10 +77,12 @@ export const useDrilldownRegistry = ({
 
       if (isReified(obj)) {
         // Temporal links are reified but don't show up in the graph
-        if ((obj as any)._type === 'TIME_LINK') continue;
+        // (Note: TimeLink is not strictly reified in type system so this check was redundant)
 
-        const source = registry[(obj as any).source_id];
-        const target = registry[(obj as any).target_id];
+        const source =
+          registry[(obj as AggregatedSemanticLink | AggregatedHierarchicalLink).source_id];
+        const target =
+          registry[(obj as AggregatedSemanticLink | AggregatedHierarchicalLink).target_id];
         const isConnectedToStory =
           source?._type === NexusType.STORY_NOTE || target?._type === NexusType.STORY_NOTE;
         if (isConnectedToStory) continue;
@@ -92,17 +97,23 @@ export const useDrilldownRegistry = ({
         visited.set(id, depth);
 
         const overrideId = activeTimeOverrides[id];
-        let displayObj: any = obj;
+        let displayObj: NexusObject = obj;
 
-        if (overrideId && registry[overrideId] && (obj as any).title !== undefined) {
+        if (overrideId && registry[overrideId]) {
           const timeNode = registry[overrideId] as SimpleNote;
           displayObj = {
             ...obj,
-            title: timeNode.title,
+            title: timeNode.title || (obj as SimpleNote).title,
             gist: timeNode.gist,
             prose_content: timeNode.prose_content,
             tags: timeNode.tags,
-          };
+            time_data: timeNode.time_data,
+            // Support temporal labels for reified links
+            verb: (timeNode as unknown as TraitLink).verb || (obj as unknown as TraitLink).verb,
+            verb_inverse:
+              (timeNode as unknown as TraitLink).verb_inverse ||
+              (obj as unknown as TraitLink).verb_inverse,
+          } as unknown as NexusObject;
         }
 
         subRegistry[id] = {
@@ -110,6 +121,7 @@ export const useDrilldownRegistry = ({
           depth,
           pathType,
           isParentPath: pathType === 'ancestor',
+          activeTemporalId: overrideId,
         } as VisibleNode;
         nodeCount++;
       }
@@ -125,8 +137,8 @@ export const useDrilldownRegistry = ({
       }
 
       if (isReified(obj)) {
-        const sId = (obj as any).source_id;
-        const tId = (obj as any).target_id;
+        const sId = (obj as AggregatedSemanticLink | AggregatedHierarchicalLink).source_id;
+        const tId = (obj as AggregatedSemanticLink | AggregatedHierarchicalLink).target_id;
         if (sId)
           queue.push({
             id: sId,

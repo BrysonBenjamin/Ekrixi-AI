@@ -20,9 +20,13 @@ export interface NexusElement {
 
 export interface NexusTimeData {
   year: number;
+  month?: number; // 1-12
+  day?: number; // 1-31
   base_node_id?: string;
   previous_node_id?: string;
   next_node_id?: string;
+  anchored_source_id?: string;
+  anchored_target_id?: string;
 }
 
 export interface WikiArtifact {
@@ -106,6 +110,8 @@ export interface HierarchicalLink extends Omit<SimpleLink, '_type'>, TraitHierar
 export interface TimeLink extends Omit<SimpleLink, '_type'>, TraitHierarchy {
   _type: 'TIME_LINK';
   year: number;
+  month?: number;
+  day?: number;
 }
 
 export interface AggregatedSemanticLink

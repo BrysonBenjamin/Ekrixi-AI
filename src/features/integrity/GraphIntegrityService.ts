@@ -6,6 +6,7 @@ import {
   isStrictHierarchy,
   ConflictStatus,
   ContainerNote,
+  TraitLink,
 } from '../../types';
 
 export interface IntegrityReport {
@@ -230,5 +231,25 @@ export const GraphIntegrityService = {
     });
 
     return map;
+  },
+
+  /**
+   * Identifies and removes links whose source or target are missing from the registry.
+   */
+  purgeDanglingLinks: (registry: Record<string, NexusObject>): Record<string, NexusObject> => {
+    const next = { ...registry };
+    const linkIds = Object.keys(next).filter((id) => isLink(next[id]));
+
+    linkIds.forEach((lid) => {
+      const link = next[lid] as TraitLink;
+      if (!next[link.source_id] || !next[link.target_id]) {
+        console.warn(
+          `[GraphIntegrityService] Purging dangling link: ${lid} (Source/Target missing)`,
+        );
+        delete next[lid];
+      }
+    });
+
+    return next;
   },
 };

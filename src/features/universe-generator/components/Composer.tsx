@@ -82,7 +82,7 @@ export const Composer: React.FC<ComposerProps> = ({
         prev.filter((p) => !mentionsToRemove.some((r) => r.id === p.id)),
       );
     }
-  }, [text, registry]);
+  }, [text, registry, weightedMentions]);
   // Note: we exclude weightedMentions from dep array to avoid loops,
   // but we need to be careful. Actually, if we only remove, it should be fine.
   // Better implementation: calculate new state and only set if different.

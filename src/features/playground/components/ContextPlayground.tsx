@@ -3,6 +3,7 @@ import {
   WeightedContextUnit,
   ContextAssemblyService,
 } from '../../../core/services/ContextAssemblyService';
+import { ThinkingProcessStep } from '../../../core/services/ArangoSearchService';
 import { dbFixtures } from '../../../core/services/dbFixtures';
 import { ThinkingProcessViewer } from '../../../components/shared/ThinkingProcessViewer';
 import { ContextPill } from '../../../components/shared/ContextPill';
@@ -12,7 +13,7 @@ import { NexusObject, NexusType, SimpleNote, NexusCategory } from '../../../type
 export const ContextPlayground: React.FC = () => {
   const { registry } = useRegistryStore();
   const [weightedMentions, setWeightedMentions] = useState<WeightedContextUnit[]>([]);
-  const [lastAssemblyTrace, setLastAssemblyTrace] = useState<any>(null);
+  const [lastAssemblyTrace, setLastAssemblyTrace] = useState<ThinkingProcessStep[] | null>(null);
   const [generatedPrompt, setGeneratedPrompt] = useState('');
 
   // --- Mock Data Init (If Registry is empty/loading) ---
@@ -138,7 +139,7 @@ export const ContextPlayground: React.FC = () => {
               </h2>
               <ThinkingProcessViewer
                 result={{
-                  node: { id: 'Context_Block', title: 'Context Assembly' } as any,
+                  node: mockNote({ id: 'Context_Block', title: 'Context Assembly' }),
                   score: 1.0,
                   is_filtered_out: false,
                   thinking_process: lastAssemblyTrace,
@@ -165,34 +166,52 @@ export const ContextPlayground: React.FC = () => {
 };
 
 // --- MOCK DATA ---
+const mockNote = (partial: Partial<SimpleNote>): SimpleNote => ({
+  id: partial.id || 'mock',
+  internal_weight: 1,
+  total_subtree_mass: 1,
+  created_at: new Date().toISOString(),
+  last_modified: new Date().toISOString(),
+  link_ids: [],
+  aliases: [],
+  tags: [],
+  prose_content: '',
+  is_ghost: false,
+  _type: NexusType.SIMPLE_NOTE,
+  category_id: NexusCategory.CONCEPT,
+  title: 'Mock',
+  gist: '',
+  ...partial,
+});
+
 const MOCK_REGISTRY: Record<string, NexusObject> = {
-  'Units/HERO': {
+  'Units/HERO': mockNote({
     id: 'Units/HERO',
     _type: NexusType.SIMPLE_NOTE,
     title: 'Aleron (Protagonist)',
     gist: 'The chosen one who seeks the Nexus Core.',
     category_id: NexusCategory.CHARACTER,
     link_ids: ['Units/SWORD'],
-  } as any,
-  'Units/SWORD': {
+  }),
+  'Units/SWORD': mockNote({
     id: 'Units/SWORD',
     title: 'Vorpal Blade',
     _type: NexusType.SIMPLE_NOTE,
     gist: 'A magical sword that glows blue when orcs are near.',
     category_id: NexusCategory.ITEM,
-  } as any,
-  'Units/VILLAGE': {
+  }),
+  'Units/VILLAGE': mockNote({
     id: 'Units/VILLAGE',
     title: 'Riverwood',
     _type: NexusType.SIMPLE_NOTE,
     gist: 'A small hamlet near the river.',
     category_id: NexusCategory.LOCATION,
-  } as any,
-  'Units/KING': {
+  }),
+  'Units/KING': mockNote({
     id: 'Units/KING',
     title: 'King Theoden',
     _type: NexusType.SIMPLE_NOTE,
     gist: 'The ruler of the realm, currently possessed.',
     category_id: NexusCategory.CHARACTER,
-  } as any,
+  }),
 };

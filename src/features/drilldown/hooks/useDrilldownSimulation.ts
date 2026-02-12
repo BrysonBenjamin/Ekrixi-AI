@@ -5,8 +5,10 @@ import {
   isLink,
   isReified,
   NexusType,
-  SemanticLink,
-  HierarchicalLink,
+  TraitLink,
+  SimpleNote,
+  AggregatedSemanticLink,
+  AggregatedHierarchicalLink,
 } from '../../../types';
 import { VisibleNode } from './useDrilldownRegistry';
 
@@ -34,18 +36,21 @@ interface UseDrilldownSimulationProps {
   registry: Record<string, VisibleNode>;
   fullRegistry: Record<string, NexusObject>;
   focusId?: string;
+  simulatedDate?: { year: number; month: number; day: number };
 }
 
 export const useDrilldownSimulation = ({
   registry,
   fullRegistry,
   focusId,
+  simulatedDate,
 }: UseDrilldownSimulationProps) => {
   const [nodes, setNodes] = useState<SimulationNode[]>([]);
   const [links, setLinks] = useState<SimulationLink[]>([]);
 
   const positionMap = useRef<Map<string, { x: number; y: number }>>(new Map());
   const simulationRef = useRef<d3.Simulation<SimulationNode, SimulationLink> | null>(null);
+  const prevNodesRef = useRef<SimulationNode[] | null>(null);
 
   const simData = useMemo(() => {
     const activeNodes: SimulationNode[] = (Object.values(registry) as VisibleNode[]).map((obj) => ({
@@ -54,17 +59,41 @@ export const useDrilldownSimulation = ({
     }));
 
     const activeLinks: SimulationLink[] = [];
+
     (Object.values(fullRegistry) as NexusObject[]).forEach((obj) => {
       if (!isLink(obj)) return;
-      if ((obj as any).time_data?.base_node_id) return; // Skip temporal skins
-      const link = obj as any;
+      if ((obj as unknown as AggregatedSemanticLink).time_data?.base_node_id) return; // Skip temporal reified skins for now, handled below
+
+      const link = obj as TraitLink;
       const sId = link.source_id;
       const tId = link.target_id;
 
-      if (isReified(obj) && registry[obj.id] && registry[sId] && registry[tId]) {
+      // Resolve endpoint base IDs for simulation lookup
+      const sBaseId = (fullRegistry[sId] as SimpleNote)?.time_data?.base_node_id || sId;
+      const tBaseId = (fullRegistry[tId] as SimpleNote)?.time_data?.base_node_id || tId;
+
+      // 1. Both endpoints (base nodes) must be in visible registry
+      if (!registry[sBaseId] || !registry[tBaseId]) return;
+
+      // 2. Atomic Snapshot Check:
+      // If the link explicitly targets a snapshot (sId != sBaseId), it must match the active one.
+      // If it targets a base (sId == sBaseId), it only shows if NO snapshot is active (strict atomic).
+      const sActiveId = registry[sBaseId].activeTemporalId || sBaseId;
+      const tActiveId = registry[tBaseId].activeTemporalId || tBaseId;
+
+      if (sId !== sActiveId || tId !== tActiveId) return;
+
+      // 3. Temporal Filtering (Backup): Link must not be in the future relative to the era
+      const linkYear = (link as unknown as AggregatedSemanticLink).time_data?.year || -Infinity;
+      if (simulatedDate && linkYear > simulatedDate.year) return;
+
+      if (isReified(obj) && registry[obj.id]) {
+        const reified = obj as AggregatedSemanticLink | AggregatedHierarchicalLink;
         activeLinks.push({
           id: `${obj.id}-structural-s`,
-          source: sId,
+          source:
+            (fullRegistry[reified.source_id] as SimpleNote)?.time_data?.base_node_id ||
+            reified.source_id,
           target: obj.id,
           verb: link.verb,
           isReified: true,
@@ -74,19 +103,21 @@ export const useDrilldownSimulation = ({
         activeLinks.push({
           id: `${obj.id}-structural-t`,
           source: obj.id,
-          target: tId,
+          target:
+            (fullRegistry[reified.target_id] as SimpleNote)?.time_data?.base_node_id ||
+            reified.target_id,
           verb: link.verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
         });
-      } else if (registry[sId] && registry[tId]) {
+      } else {
         activeLinks.push({
           id: obj.id,
-          source: sId,
-          target: tId,
-          verb: (obj as SemanticLink | HierarchicalLink).verb || 'bound to',
-          verbInverse: (obj as SemanticLink | HierarchicalLink).verb_inverse || 'part of',
+          source: sBaseId,
+          target: tBaseId,
+          verb: link.verb || 'binds',
+          verbInverse: link.verb_inverse || 'part of',
           isReified: false,
           isStructuralLine: false,
           type: obj._type as NexusType,
@@ -97,7 +128,7 @@ export const useDrilldownSimulation = ({
     });
 
     return { nodes: activeNodes, links: activeLinks };
-  }, [registry, fullRegistry]);
+  }, [registry, fullRegistry, simulatedDate]);
 
   useEffect(() => {
     if (!simData.nodes.length) {
@@ -108,9 +139,12 @@ export const useDrilldownSimulation = ({
       return;
     }
 
-    const prevIds = new Set(nodes.map((n) => n.id));
-    const nextIds = new Set(simData.nodes.map((n) => n.id));
-    const idsChanged = prevIds.size !== nextIds.size || [...nextIds].some((id) => !prevIds.has(id));
+    const idsChanged =
+      !prevNodesRef.current ||
+      prevNodesRef.current.length !== simData.nodes.length ||
+      simData.nodes.some((n, i) => n.id !== prevNodesRef.current?.[i]?.id);
+
+    prevNodesRef.current = simData.nodes;
 
     // Initialize positions from ref safely inside effect
     simData.nodes.forEach((node, idx) => {
@@ -135,6 +169,11 @@ export const useDrilldownSimulation = ({
             simulationRef.current.force('link') as d3.ForceLink<SimulationNode, SimulationLink>
           ).links(simData.links);
         }
+        // Force a sync to React state so LOD and temporal overrides update in the UI
+        queueMicrotask(() => {
+          setNodes([...simData.nodes]);
+          setLinks([...simData.links]);
+        });
         return;
       }
     }

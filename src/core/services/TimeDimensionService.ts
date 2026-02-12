@@ -49,7 +49,7 @@ export class TimeDimensionService {
   }
 
   /**
-   * Retrieves the full history stack for a Base Node, sorted by year.
+   * Retrieves the full history stack for a Base Node, sorted by year, month, day.
    */
   static getTimeStack(registry: Record<string, NexusObject>, baseNodeId: string): SimpleNote[] {
     const baseNode = registry[baseNodeId] as SimpleNote;
@@ -66,19 +66,32 @@ export class TimeDimensionService {
       );
     }) as SimpleNote[];
 
-    // Sort by year ascending
-    return timeNodes.sort((a, b) => (a.time_data?.year || 0) - (b.time_data?.year || 0));
+    // Sort by year, month, day ascending
+    return timeNodes.sort((a, b) => {
+      const ay = a.time_data?.year || 0;
+      const am = a.time_data?.month || 0;
+      const ad = a.time_data?.day || 0;
+      const by = b.time_data?.year || 0;
+      const bm = b.time_data?.month || 0;
+      const bd = b.time_data?.day || 0;
+
+      if (ay !== by) return ay - by;
+      if (am !== bm) return am - bm;
+      return ad - bd;
+    });
   }
 
   /**
-   * "Sniper Retrieval": Returns the precise state of an entity for a specific year.
-   * Logic: Finds the Time Node with the largest year <= requestedYear.
-   * If no such node exists (e.g., year is before birth), returns the Base Node itself.
+   * "Sniper Retrieval": Returns the precise state of an entity for a specific year/month/day.
+   * Logic: Finds the Time Node with the largest date <= requested date.
+   * If no such node exists (e.g., date is before birth), returns the Base Node itself.
    */
   static getSnapshot(
     registry: Record<string, NexusObject>,
     baseNodeId: string,
     targetYear: number,
+    targetMonth: number = 0,
+    targetDay: number = 0,
   ): TimeSnapshot | null {
     const baseNode = registry[baseNodeId] as SimpleNote;
     if (!baseNode) return null;
@@ -86,10 +99,19 @@ export class TimeDimensionService {
     const stack = this.getTimeStack(registry, baseNodeId);
 
     // Find the closest node in the past
-    // Filter for nodes where year <= targetYear
-    const candidateNodes = stack.filter((node) => (node.time_data?.year || 0) <= targetYear);
+    const candidateNodes = stack.filter((node) => {
+      const ny = node.time_data?.year || 0;
+      const nm = node.time_data?.month || 0;
+      const nd = node.time_data?.day || 0;
 
-    // If we have candidates, pick the one with the latest year (closest to target)
+      if (ny < targetYear) return true;
+      if (ny > targetYear) return false;
+      if (nm < targetMonth) return true;
+      if (nm > targetMonth) return false;
+      return nd <= targetDay;
+    });
+
+    // If we have candidates, pick the one with the latest date (closest to target)
     let stateNode: SimpleNote = baseNode;
     let isBaseStateless = true;
 
@@ -114,21 +136,27 @@ export class TimeDimensionService {
   static createTimeState(
     baseNode: SimpleNote,
     year: number,
+    month: number | undefined,
+    day: number | undefined,
     statePayload: Partial<SimpleNote>,
   ): { timeNode: SimpleNote; timeLink: TimeLink } {
     const timeNodeId = generateId();
 
     const isReifiedLink = (baseNode as any).source_id && (baseNode as any).target_id;
+    const dateStr = [year, month, day].filter((v) => v !== undefined).join('-');
 
     const timeNode: SimpleNote = {
       ...baseNode, // Inherit base properties initially
       ...statePayload, // Override with specific state data
       id: timeNodeId,
       _type: isReifiedLink ? baseNode._type : NexusType.SIMPLE_NOTE,
-      title: `${baseNode.title} (${year})`, // Default title, can be renamed
+      title: `${baseNode.title} (${dateStr})`, // Default title, can be renamed
       time_data: {
         year: year,
+        month,
+        day,
         base_node_id: baseNode.id,
+        ...(statePayload.time_data || {}),
       },
       // Reset purely structural/mechanical fields that shouldn't be cloned 1:1 if they exist
       link_ids: [],
@@ -153,6 +181,8 @@ export class TimeDimensionService {
       source_id: baseNode.id,
       target_id: timeNodeId,
       year: year,
+      month,
+      day,
       verb: 'has_state',
       verb_inverse: 'state_of',
       hierarchy_type: 'PARENT_OF' as any, // Leveraging existing hierarchy type for compatibility if needed

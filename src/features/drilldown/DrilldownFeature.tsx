@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { NexusObject, isLink } from '../../types';
+import { NexusObject, isLink, SimpleNote, SimpleLink } from '../../types';
 import { DrilldownCanvas } from './components/DrilldownCanvas';
 import { ShieldAlert } from 'lucide-react';
 import { IntegrityAssistant } from '../integrity/components/IntegrityAssistant';
@@ -9,6 +9,7 @@ import { DrilldownHeader } from './components/DrilldownHeader';
 import { DrilldownFooter } from './components/DrilldownFooter';
 import { useDrilldownHandlers } from './hooks/useDrilldownHandlers';
 import { useDrilldownRegistry } from './hooks/useDrilldownRegistry';
+import { useRegistryStore } from '../../store/useRegistryStore';
 
 interface DrilldownFeatureProps {
   registry: Record<string, NexusObject>;
@@ -19,6 +20,7 @@ interface DrilldownFeatureProps {
     data: { linkId: string; path?: string[]; mode: 'CENTER' | 'DRILL' } | null,
   ) => void;
   onResolveAnomaly?: (linkId: string, action: 'DELETE' | 'REIFY' | 'IGNORE') => void;
+  onRemoveBatch?: (ids: string[]) => Promise<void>;
 }
 
 export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
@@ -32,6 +34,10 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
   const {
     navStack,
     setNavStack,
+    simulatedDate,
+    setSimulatedDate,
+    timelineBounds,
+    setTimelineBounds,
     activeTimeOverrides,
     showAuthorNotes,
     setShowAuthorNotes,
@@ -49,6 +55,8 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
     handleDrilldown,
   } = useDrilldownState({ registry, integrityFocus });
 
+  const { removeBatch } = useRegistryStore();
+
   const {
     handleUpdateItem,
     handleReifyLink,
@@ -57,7 +65,14 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
     handleEstablishLink,
     handleReparent,
     handleDelete,
-  } = useDrilldownHandlers({ selectedId, onRegistryUpdate, registry });
+    handleManifestSnapshot,
+  } = useDrilldownHandlers({
+    selectedId,
+    onRegistryUpdate,
+    onRemoveBatch: removeBatch,
+    registry,
+    simulatedDate,
+  });
 
   const { visibleNodesRegistry } = useDrilldownRegistry({
     registry,
@@ -67,8 +82,27 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
   });
 
   const selectedObject = useMemo(() => {
-    return selectedId ? registry[selectedId] : null;
-  }, [selectedId, registry]);
+    if (!selectedId) return null;
+    const baseObj = registry[selectedId];
+    if (!baseObj) return null;
+
+    const overrideId = activeTimeOverrides[selectedId];
+    if (overrideId && registry[overrideId]) {
+      const timeNode = registry[overrideId] as SimpleNote;
+      return {
+        ...baseObj,
+        title: timeNode.title,
+        gist: timeNode.gist,
+        prose_content: timeNode.prose_content,
+        tags: timeNode.tags,
+        time_data: timeNode.time_data,
+        // Support temporal labels for reified links
+        verb: (timeNode as any).verb || (baseObj as any).verb,
+        verb_inverse: (timeNode as any).verb_inverse || (baseObj as any).verb_inverse,
+      };
+    }
+    return baseObj;
+  }, [selectedId, registry, activeTimeOverrides]);
 
   return (
     <div className="flex flex-col h-full bg-nexus-950 relative overflow-hidden">
@@ -78,6 +112,10 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
         setNavStack={setNavStack}
         showAuthorNotes={showAuthorNotes}
         setShowAuthorNotes={setShowAuthorNotes}
+        simulatedDate={simulatedDate}
+        setSimulatedDate={setSimulatedDate}
+        timelineBounds={timelineBounds}
+        onBoundsChange={setTimelineBounds}
       />
       <main className="flex-1 relative">
         <DrilldownCanvas
@@ -95,8 +133,10 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           onReifyNodeToLink={handleReifyNodeToLink}
           onEstablishLink={handleEstablishLink}
           onReparent={handleReparent}
+          onManifestSnapshot={handleManifestSnapshot}
           integrityFocus={integrityFocus}
           getTimeNavigation={lookupTimeNav}
+          simulatedDate={simulatedDate}
         />
         <InspectorPanel
           isOpen={showInspector}

@@ -14,6 +14,7 @@ import {
   ContainerNote,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
+import { NexusDeletionService, DeletionProfile } from '../../core/services/NexusDeletionService';
 import { StructureVisualizer } from './components/StructureVisualizer';
 import { HierarchyExplorer } from '../refinery/components/HierarchyExplorer';
 import { UserCircle2, LayoutPanelLeft } from 'lucide-react';
@@ -242,16 +243,29 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
   const handleDeleteUnit = useCallback(
     (id: string) => {
       onRegistryUpdate((prev) => {
-        const next = { ...prev };
-        delete next[id];
+        const candidates = NexusDeletionService.getDeleteCandidates(
+          id,
+          prev,
+          DeletionProfile.STRUCTURAL_ORPHAN,
+        );
+
+        let next = { ...prev };
+        candidates.forEach((cid) => {
+          delete next[cid];
+        });
+
+        // Clean up container references and hierarchy links for remaining objects
         Object.keys(next).forEach((k) => {
           const o = next[k];
-          if (isLink(o) && (o.source_id === id || o.target_id === id)) delete next[k];
           if (isContainer(o)) {
             const cn = o as ContainerNote;
-            next[k] = { ...cn, children_ids: cn.children_ids.filter((cid) => cid !== id) };
+            const updatedChildren = cn.children_ids.filter((cid) => !candidates.has(cid));
+            if (updatedChildren.length !== cn.children_ids.length) {
+              next[k] = { ...cn, children_ids: updatedChildren };
+            }
           }
         });
+
         return next;
       });
     },

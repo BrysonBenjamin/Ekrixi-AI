@@ -100,14 +100,15 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   const activeSeed = useMemo(() => seeds.find((s) => s.id === activeSeedId), [seeds, activeSeedId]);
 
   // Check for existing Base Node when active seed title changes
+  const activeTitle = activeSeed?.title;
   useEffect(() => {
-    if (activeSeed && registry) {
-      const base = TimeDimensionService.findBaseNode(registry, activeSeed.title);
+    if (activeTitle && registry) {
+      const base = TimeDimensionService.findBaseNode(registry, activeTitle);
       setPotentialBaseNode(base);
     } else {
       setPotentialBaseNode(null);
     }
-  }, [activeSeed?.title, registry]);
+  }, [activeTitle, registry]);
 
   const handleTextClick = (entityText: string) => {
     if (isAkaMode && activeSeedId) {
@@ -529,7 +530,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
                           </div>
                           <button
                             className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors border border-indigo-500/30"
-                            onClick={(e) => {
+                            onClick={() => {
                               // Focus the input instead? or just default to current year?
                               // For now, let's just default to current year if clicked directly
                               attachTimeState(

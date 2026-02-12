@@ -22,7 +22,9 @@ import {
   SimpleNote,
   SemanticLink,
   HierarchicalLink,
+  TraitLink,
 } from '../../../types';
+import { VisibleNode } from '../hooks/useDrilldownRegistry';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 
 interface DrilldownContextMenuProps {
@@ -38,7 +40,18 @@ interface DrilldownContextMenuProps {
   onReifyNode?: (id: string) => void;
   onReifyNodeToLink?: (nodeId: string, sourceId: string, targetId: string) => void;
   onStartLink: (id: string) => void;
-  onEstablishLink?: (sourceId: string, targetId: string, verb: string) => void;
+  onEstablishLink?: (
+    sourceId: string,
+    targetId: string,
+    verb: string,
+    useTimeAnchor?: boolean,
+    sourceTemporalId?: string,
+    targetTemporalId?: string,
+  ) => void;
+  onManifestSnapshot?: (nodeId: string, year: number, month?: number, day?: number) => void;
+  onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
+  simulatedYear?: number;
+  simulatedDate?: { year: number; month: number; day: number };
 }
 
 type MenuState = 'DEFAULT' | 'LINK_SEARCH' | 'REIFY_CHOOSE_SOURCE' | 'REIFY_CHOOSE_TARGET';
@@ -57,6 +70,10 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
   onReifyNodeToLink,
   onStartLink,
   onEstablishLink,
+  onManifestSnapshot,
+  onReparent,
+  simulatedYear,
+  simulatedDate,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuState, setMenuState] = useState<MenuState>('DEFAULT');
@@ -64,6 +81,7 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
   const [reifySelection, setReifySelection] = useState<{ sourceId?: string; targetId?: string }>(
     {},
   );
+  const [useTimeAnchor, setUseTimeAnchor] = useState(true);
 
   const reified = isReified(object);
   const isL = isLink(object) && !reified;
@@ -93,7 +111,7 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         return l.source_id === object.id || l.target_id === object.id;
       })
       .map((l) => {
-        const link = l as any;
+        const link = l as SemanticLink | HierarchicalLink;
         const neighborId = link.source_id === object.id ? link.target_id : link.source_id;
         return registry[neighborId];
       })
@@ -108,7 +126,10 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         (n) =>
           (!isLink(n) || isReified(n)) &&
           n.id !== object.id &&
-          (('title' in n ? (n as any).title : '') || ('verb' in n ? (n as any).verb : ''))
+          (
+            ('title' in n ? (n as SimpleNote).title : '') ||
+            ('verb' in n ? (n as TraitLink).verb : '')
+          )
             .toLowerCase()
             .includes(q),
       )
@@ -116,7 +137,20 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
   }, [searchQuery, registry, object.id, menuState]);
 
   const handleEstablishLinkWithTarget = (targetId: string) => {
-    if (onEstablishLink) onEstablishLink(object.id, targetId, 'mentions');
+    if (onEstablishLink) {
+      const sourceTemporalId = (object as VisibleNode).activeTemporalId;
+      const targetNode = registry[targetId] as VisibleNode;
+      const targetTemporalId = targetNode?.activeTemporalId;
+
+      onEstablishLink(
+        object.id,
+        targetId,
+        'mentions',
+        useTimeAnchor,
+        sourceTemporalId,
+        targetTemporalId,
+      );
+    }
     onClose();
   };
 
@@ -238,6 +272,23 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
                   onClick={() => setMenuState('LINK_SEARCH')}
                   color="text-nexus-essence opacity-70"
                 />
+                {!isL && simulatedYear && !(object as SimpleNote).time_data?.base_node_id && (
+                  <MenuItem
+                    icon={Sparkles}
+                    label="Scry Era"
+                    desc={`Snapshot history at ${simulatedYear}`}
+                    onClick={() => {
+                      onManifestSnapshot?.(
+                        object.id,
+                        simulatedDate?.year || 0,
+                        simulatedDate?.month,
+                        simulatedDate?.day,
+                      );
+                      onClose();
+                    }}
+                    color="text-fuchsia-400"
+                  />
+                )}
               </>
             )}
 
@@ -314,6 +365,19 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
                 );
               })}
             </div>
+            {simulatedYear && (
+              <div className="mt-3 pt-3 border-t border-nexus-800/50 flex items-center justify-between px-2">
+                <span className="text-[8px] font-mono font-black text-nexus-muted uppercase tracking-widest">
+                  Temporal Anchor
+                </span>
+                <button
+                  onClick={() => setUseTimeAnchor(!useTimeAnchor)}
+                  className={`px-2 py-1 rounded-lg border text-[8px] font-black uppercase transition-all ${useTimeAnchor ? 'bg-nexus-accent/10 border-nexus-accent/40 text-nexus-accent shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : 'bg-nexus-800 border-nexus-700 text-nexus-muted'}`}
+                >
+                  {useTimeAnchor ? `ERA: ${simulatedYear}` : 'OFF'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

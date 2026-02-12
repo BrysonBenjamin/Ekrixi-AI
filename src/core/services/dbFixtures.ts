@@ -131,6 +131,8 @@ export const dbFixtures = {
       const { timeNode, timeLink } = TimeDimensionService.createTimeState(
         baseNode,
         state.year,
+        undefined,
+        undefined,
         state.payload,
       );
       // Cast to NexusObject just to be safe with type checker
@@ -200,16 +202,22 @@ export const dbFixtures = {
     const earthStates = [
       {
         year: 2150,
+        month: 1,
+        day: 1,
         title: 'Earth Directorate',
         gist: 'A bureaucratic body managing Earths dwindling resources.',
       },
       {
         year: 2155,
+        month: 6,
+        day: 15,
         title: 'Martial Law Authority',
         gist: 'Emergency powers invoked to crush the Lunar riots.',
       },
       {
         year: 2160,
+        month: 12,
+        day: 30,
         title: 'Solar Commonwealth',
         gist: 'A reformed, federalist government seeking peace.',
       },
@@ -219,47 +227,62 @@ export const dbFixtures = {
     const moonStates = [
       {
         year: 2150,
+        month: 1,
+        day: 1,
         title: 'Lunar Mining Corp',
         gist: 'A corporate colony extracting Helium-3 for Earth.',
       },
       {
         year: 2155,
+        month: 6,
+        day: 15,
         title: 'Free Moon Movement',
         gist: 'Armed militia seizing control of the mass drivers.',
       },
       {
         year: 2160,
+        month: 12,
+        day: 30,
         title: 'The Lunar Republic',
         gist: 'An independent sovereign state recognized by treaty.',
       },
     ];
 
     // 3. Create Time States for Nodes
+    const earthSkins: Record<number, string> = {};
+    const moonSkins: Record<number, string> = {};
+
     earthStates.forEach((s) => {
-      const { timeNode, timeLink } = TimeDimensionService.createTimeState(earthBase, s.year, {
-        title: s.title,
-        gist: s.gist,
-      });
+      const { timeNode, timeLink } = TimeDimensionService.createTimeState(
+        earthBase,
+        s.year,
+        s.month,
+        s.day,
+        { title: s.title, gist: s.gist },
+      );
       objectsToSave.push(timeNode as any, timeLink as any);
+      earthSkins[s.year] = timeNode.id;
     });
 
     moonStates.forEach((s) => {
-      const { timeNode, timeLink } = TimeDimensionService.createTimeState(moonBase, s.year, {
-        title: s.title,
-        gist: s.gist,
-      });
+      const { timeNode, timeLink } = TimeDimensionService.createTimeState(
+        moonBase,
+        s.year,
+        s.month,
+        s.day,
+        { title: s.title, gist: s.gist },
+      );
       objectsToSave.push(timeNode as any, timeLink as any);
+      moonSkins[s.year] = timeNode.id;
     });
 
     // 4. Create Reified War Connection
-    // First, establish the base link: Earth -> conflicts_with -> Moon
-    // Then reify it into "The Variance War"
     const warLinkId = generateId();
     const warLink = {
       id: warLinkId,
       source_id: earthId,
       target_id: moonId,
-      _type: NexusType.AGGREGATED_SEMANTIC_LINK, // Pre-reified
+      _type: NexusType.AGGREGATED_SEMANTIC_LINK,
       verb: 'conflicts_with',
       verb_inverse: 'conflicts_with',
       is_reified: true,
@@ -277,33 +300,44 @@ export const dbFixtures = {
     objectsToSave.push(warLink);
 
     // 5. TIMELINE: The War Itself
-    // The War entity (Reified Link) also has history!
     const warStates = [
       {
         year: 2150,
+        month: 1,
+        day: 1,
         title: 'Tycho Tax Riots',
         gist: 'Protests against increased oxygen tariffs turn violent.',
       },
       {
         year: 2155,
+        month: 6,
+        day: 15,
         title: 'The Variance War (Total)',
         gist: 'Open warfare. Mass Driver bombardments vs Orbital Drop Shocks.',
       },
       {
         year: 2160,
+        month: 12,
+        day: 30,
         title: 'Treaty of Tycho',
         gist: 'Ceasefire and recognition of Lunar sovereignty.',
       },
     ];
 
     warStates.forEach((s) => {
-      // We can treat reified link as a SimpleNote for time skin purposes?
-      // TimeDimensionService expects SimpleNote.
-      // Let's cast warLink to SimpleNote for creation, as it acts as a node.
       const { timeNode, timeLink } = TimeDimensionService.createTimeState(
         warLink as SimpleNote,
         s.year,
-        { title: s.title, gist: s.gist },
+        s.month,
+        s.day,
+        {
+          title: s.title,
+          gist: s.gist,
+          time_data: {
+            anchored_source_id: earthSkins[s.year] || earthId,
+            anchored_target_id: moonSkins[s.year] || moonId,
+          } as any,
+        } as any,
       );
       objectsToSave.push(timeNode as any, timeLink as any);
     });

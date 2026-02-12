@@ -19,6 +19,7 @@ interface RegistryState {
   upsertObject: (id: string, updates: Partial<NexusObject>) => Promise<void>;
   addBatch: (objects: NexusObject[]) => Promise<void>;
   removeObject: (id: string) => Promise<void>;
+  removeBatch: (ids: string[]) => Promise<void>;
   resetUniverse: () => Promise<void>;
 
   // Cleanup
@@ -108,6 +109,16 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
       return;
     }
     await DataService.deleteNexusObject(universeId, id);
+  },
+
+  removeBatch: async (ids) => {
+    const universeId = get().activeUniverseId;
+    if (!universeId) {
+      console.warn('Cannot remove batch: No active universe selected.');
+      return;
+    }
+    if (ids.length === 0) return;
+    await DataService.batchDelete(universeId, ids);
   },
 
   resetUniverse: async () => {

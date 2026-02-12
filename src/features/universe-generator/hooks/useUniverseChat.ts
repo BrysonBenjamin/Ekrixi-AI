@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChatSession, MessageNode } from '../types';
 import { generateId } from '../../../utils/ids';
-import { NexusObject, isLink, SimpleNote } from '../../../types';
+import { NexusObject } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
 import { DataService } from '../../../core/services/DataService';
 import { useSessionStore } from '../../../store/useSessionStore';

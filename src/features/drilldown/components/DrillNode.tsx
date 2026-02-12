@@ -159,9 +159,31 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
                 {isAuthorNote ? "Author's Note" : reified ? 'REIFIED LOGIC UNIT' : category}
               </span>
 
+              {/* Temporal Snapshot Indicator */}
+              {((object as any).time_data?.year !== undefined || (object as any).created_at) && (
+                <div
+                  className={`flex items-center gap-3 px-4 py-2 rounded-2xl border text-[12px] font-mono uppercase tracking-widest transition-all ${(object as any).time_data?.base_node_id ? 'bg-nexus-accent/10 border-nexus-accent/40 text-nexus-accent shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]' : 'bg-nexus-950/50 border-nexus-800 text-nexus-muted opacity-60'}`}
+                >
+                  <Activity
+                    size={14}
+                    className={(object as any).time_data?.base_node_id ? 'animate-pulse' : ''}
+                  />
+                  ERA:{' '}
+                  {(object as any).time_data?.year ||
+                    ((object as any).created_at
+                      ? new Date((object as any).created_at).getFullYear()
+                      : 'ORIGIN')}
+                  {(object as any).time_data?.base_node_id && (
+                    <span className="ml-1 opacity-80 text-[10px] bg-nexus-accent text-white px-2 py-0.5 rounded-md font-black shadow-[0_0_10px_rgba(var(--accent-rgb),0.5)]">
+                      SYNC
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Internal Mass Indicator */}
               <div className="flex items-center gap-3 px-4 py-2 bg-nexus-950/50 rounded-2xl border border-nexus-800/80 text-[12px] font-mono text-nexus-muted uppercase tracking-widest">
-                <div className="w-2 h-2 rounded-full bg-nexus-accent shadow-[0_0_10px_var(--accent-color)] animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-nexus-accent shadow-[0_0_10px_var(--accent-color)] opacity-40" />
                 MASS: {(nexusObj as any).total_subtree_mass || 0.0}
               </div>
 
