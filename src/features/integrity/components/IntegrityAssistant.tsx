@@ -78,11 +78,13 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
             </div>
           )}
           <div>
-            <h2 className="text-sm font-display font-black text-nexus-text uppercase tracking-[0.3em]">
-              {activeAnomaly ? 'Anomaly Audit' : 'Integrity Oracle'}
+            <h2 className="text-base font-display font-black text-nexus-text uppercase tracking-[0.3em]">
+              {activeAnomaly ? 'ANOMALY AUDIT' : 'INTEGRITY ORACLE'}
             </h2>
-            <p className="text-[10px] text-nexus-muted font-mono uppercase tracking-widest mt-1">
-              {activeAnomaly ? `Logic: ${activeAnomaly.link.verb}` : 'Status: Monitoring Drift'}
+            <p className="text-[11px] text-nexus-muted font-mono uppercase tracking-[0.25em] mt-1 font-bold">
+              {activeAnomaly
+                ? `LOGIC PROTOCOL: ${activeAnomaly.link.verb}`
+                : 'SYSTEM STATUS: MONITORING DRIFT'}
             </p>
           </div>
         </div>
@@ -125,11 +127,11 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                   <ShieldAlert size={18} className="text-nexus-accent" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xs font-display font-black text-nexus-text uppercase tracking-widest">
-                    Chronicler's Audit
+                  <h3 className="text-sm font-display font-black text-nexus-text uppercase tracking-widest">
+                    CHRONICLER'S AUDIT
                   </h3>
-                  <div className="text-[8px] font-mono text-red-500 uppercase mt-0.5 font-bold">
-                    {activeAnomaly.info.status} DETECTED
+                  <div className="text-[10px] font-mono text-nexus-accent uppercase mt-1.5 font-black tracking-widest">
+                    {activeAnomaly.info.status} PERSPECTIVE DETECTED
                   </div>
                 </div>
               </div>
@@ -138,7 +140,7 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                 "{activeAnomaly.info.reason}"
               </p>
 
-              <div className="flex gap-2 mb-8">
+              <div className="flex gap-4 mb-8">
                 <button
                   onClick={() =>
                     onFocusAnomaly({
@@ -147,9 +149,9 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                       mode: 'CENTER',
                     })
                   }
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-nexus-800 border border-nexus-700 text-[10px] font-black uppercase tracking-widest text-nexus-muted hover:text-nexus-text transition-all shadow-sm"
+                  className="flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl bg-nexus-800 border border-nexus-700 text-[11px] font-black uppercase tracking-widest text-nexus-muted hover:text-nexus-text transition-all shadow-md group border-b-4 active:translate-y-0.5 active:border-b-0"
                 >
-                  <Target size={14} /> Center
+                  <Target size={18} /> CENTER
                 </button>
                 <button
                   onClick={() =>
@@ -159,9 +161,9 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                       mode: 'DRILL',
                     })
                   }
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-nexus-accent/10 border border-nexus-accent/30 text-[10px] font-black uppercase tracking-widest text-nexus-accent hover:bg-nexus-accent hover:text-white transition-all shadow-sm"
+                  className="flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl bg-nexus-accent/10 border-b-4 border-nexus-accent/40 text-[11px] font-black uppercase tracking-widest text-nexus-accent hover:bg-nexus-accent hover:text-white transition-all shadow-md active:translate-y-0.5 active:border-b-0"
                 >
-                  <Compass size={14} /> Drill Down
+                  <Compass size={18} /> DRILL DOWN
                 </button>
               </div>
 
@@ -228,18 +230,18 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                   }}
                   className={`w-full text-left p-5 rounded-[28px] border transition-all group relative overflow-hidden ${selectedAnomalyId === link.id ? 'bg-nexus-accent/5 border-nexus-accent shadow-lg' : 'bg-nexus-950 border-nexus-800 hover:border-nexus-700'}`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <span
-                      className={`text-[8px] font-mono font-black px-2 py-0.5 rounded-full border ${info.status === 'REDUNDANT' ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-amber-500/10 border-amber-500/30 text-amber-500'}`}
+                      className={`text-[10px] font-black uppercase px-3 py-1 rounded-xl border tracking-widest ${info.status === 'REDUNDANT' ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-amber-500/10 border-amber-500/30 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]'}`}
                     >
                       {info.status}
                     </span>
                     <ChevronRight
-                      size={14}
+                      size={18}
                       className={`transition-transform group-hover:translate-x-1 ${selectedAnomalyId === link.id ? 'rotate-90 text-nexus-accent' : 'text-nexus-muted'}`}
                     />
                   </div>
-                  <div className="text-xs font-display font-bold text-nexus-text uppercase truncate">
+                  <div className="text-sm font-display font-black text-nexus-text uppercase truncate tracking-tight">
                     {/* Fix: Access 'title' via SimpleNote cast or fallback */}
                     {'title' in (registry[link.source_id] || {})
                       ? (registry[link.source_id] as SimpleNote).title
@@ -249,8 +251,8 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
                       ? (registry[link.target_id] as SimpleNote).title
                       : '?'}
                   </div>
-                  <div className="text-[10px] text-nexus-muted mt-1 italic">
-                    Logic: "{link.verb}"
+                  <div className="text-[11px] text-nexus-muted mt-2 italic font-serif border-t border-nexus-800/50 pt-2 group-hover:text-nexus-accent transition-colors">
+                    SIGNAL: "{link.verb}"
                   </div>
                 </button>
               ))}
@@ -304,10 +306,10 @@ const DecisionButton: React.FC<DecisionButtonProps> = ({
       <Icon size={18} />
     </div>
     <div className="flex-1 min-w-0">
-      <div className="text-[12px] font-display font-bold text-nexus-text transition-colors">
+      <div className="text-[14px] font-display font-black text-nexus-text transition-colors uppercase tracking-tight">
         {label}
       </div>
-      <div className="text-[8px] font-mono uppercase tracking-widest text-nexus-muted mt-0.5">
+      <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-nexus-muted mt-1 font-bold opacity-60">
         {desc}
       </div>
     </div>

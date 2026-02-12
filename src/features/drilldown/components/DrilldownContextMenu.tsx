@@ -93,7 +93,7 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         return l.source_id === object.id || l.target_id === object.id;
       })
       .map((l) => {
-        const link = l as SemanticLink | HierarchicalLink;
+        const link = l as any;
         const neighborId = link.source_id === object.id ? link.target_id : link.source_id;
         return registry[neighborId];
       })
@@ -108,10 +108,7 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         (n) =>
           (!isLink(n) || isReified(n)) &&
           n.id !== object.id &&
-          (
-            ('title' in n ? (n as SimpleNote).title : '') ||
-            ('verb' in n ? (n as SemanticLink).verb : '')
-          )
+          (('title' in n ? (n as any).title : '') || ('verb' in n ? (n as any).verb : ''))
             .toLowerCase()
             .includes(q),
       )

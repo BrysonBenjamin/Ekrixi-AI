@@ -6,6 +6,7 @@ import {
   Flame,
   Eye,
   Hammer,
+  History,
   ScrollText,
   BookType,
   Map as MapIcon,
@@ -134,6 +135,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               icon={MapIcon}
               label="Explorer"
               isActive={isActiveView('/explore')}
+              onClick={handleNavigate}
+            />
+            <NavItem
+              path="/timeline"
+              icon={History}
+              label="Timeline"
+              isActive={isActiveView('/timeline')}
               onClick={handleNavigate}
             />
             <NavItem
@@ -287,6 +295,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                   { path: '/scanner', icon: Eye, label: 'Scanner' },
                   { path: '/refinery', icon: Hammer, label: 'Refinery' },
                   { path: '/explore', icon: MapIcon, label: 'Explorer' },
+                  { path: '/timeline', icon: History, label: 'Timeline' },
                   { path: '/library', icon: BookType, label: 'Library' },
                   { path: '/studio', icon: PenTool, label: 'Studio' },
                 ].map((item) => {

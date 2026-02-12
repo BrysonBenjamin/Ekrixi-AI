@@ -112,7 +112,7 @@ export const ResponsiveTree: React.FC<ResponsiveTreeProps> = ({
           isContainer(node) && !isBranchCollapsed
             ? node.children_ids
                 .map((cid) => registry[cid])
-                .filter((n) => !!n)
+                .filter((n) => !!n && !(n as SimpleNote).time_data?.base_node_id)
                 .map((c) => buildTree(c, new Set(visited)))
                 .filter(Boolean)
             : [],

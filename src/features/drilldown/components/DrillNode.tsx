@@ -4,11 +4,11 @@ import {
   getCategoryColor,
   getCategoryIconSvg,
 } from '../../refinery/components/visualizer/NodeTemplates';
-import { Layers, Hash, ArrowRight, Activity } from 'lucide-react';
-import { VisibleNode } from '../DrilldownFeature';
+import { Layers, Hash, ArrowRight, Activity, ArrowUp, ArrowDown } from 'lucide-react';
 import { IntegrityBadge } from '../../integrity/components/IntegrityBadge';
 import { IntegrityReport } from '../../integrity/GraphIntegrityService';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
+import { VisibleNode } from '../hooks/useDrilldownRegistry';
 
 interface DrillNodeProps {
   object: VisibleNode;
@@ -18,6 +18,12 @@ interface DrillNodeProps {
   isHovered?: boolean;
   integrityReport?: IntegrityReport;
   onLinkClick?: (id: string) => void;
+  timeNavigation?: {
+    nextId?: string;
+    prevId?: string;
+    onNext?: () => void;
+    onPrev?: () => void;
+  } | null;
 }
 
 export const DrillNode: React.FC<DrillNodeProps> = ({
@@ -28,6 +34,7 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
   isHovered,
   integrityReport,
   onLinkClick,
+  timeNavigation,
 }) => {
   const isLODDetailed = zoomScale > 0.45 || isFocus || isHovered;
   const isLODMicro = zoomScale < 0.15 && !isHovered && !isFocus;
@@ -106,16 +113,16 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
 
   return (
     <foreignObject
-      width={isLODDetailed ? '420' : '320'}
-      height={isLODDetailed ? (reified ? '380' : '320') : '120'}
-      x={isLODDetailed ? '-210' : '-160'}
-      y={isLODDetailed ? (reified ? '-190' : '-160') : '-60'}
+      width={isLODDetailed ? '1000' : '800'}
+      height={isLODDetailed ? (reified ? '850' : '750') : '280'}
+      x={isLODDetailed ? '-500' : '-400'}
+      y={isLODDetailed ? (reified ? '-425' : '-375') : '-140'}
       className="overflow-visible"
     >
       <div
         className={`
-                    w-full h-full flex flex-col rounded-[56px] border-[3px] transition-[transform,box-shadow,border-color,background-color] duration-300 pointer-events-auto cursor-pointer group relative
-                    ${isFocus ? 'ring-[20px] ring-nexus-accent/15 z-50 shadow-[0_50px_150px_-30px_rgba(0,0,0,0.4)]' : 'shadow-[0_20px_60px_rgba(0,0,0,0.4)]'}
+                    w-full h-full flex flex-col rounded-[72px] border-[4px] transition-[transform,box-shadow,border-color,background-color] duration-300 pointer-events-auto cursor-pointer group relative
+                    ${isFocus ? 'ring-[32px] ring-nexus-accent/15 z-50 shadow-[0_80px_200px_-50px_rgba(0,0,0,0.5)]' : 'shadow-[0_40px_100px_rgba(0,0,0,0.4)]'}
                     ${isC || reified ? 'border-dashed' : 'border-solid'}
                     ${reified ? 'bg-nexus-900 ring-4 ring-nexus-accent/10' : isAuthorNote ? 'bg-nexus-900 border-amber-500' : 'bg-nexus-900'}
                 `}
@@ -123,43 +130,97 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
           borderColor: isFocus ? 'var(--accent-color)' : isHovered ? color : `${color}80`,
           opacity: 1,
           transform: isFocus
-            ? 'scale(1.1)'
+            ? 'scale(1.15)'
             : isHovered
-              ? 'scale(1.04)'
+              ? 'scale(1.06)'
               : isReifiedTarget
-                ? 'scale(1.05)'
+                ? 'scale(1.08)'
                 : 'scale(1)',
         }}
       >
-        <div className="flex items-center gap-8 p-10 flex-1 min-h-0 relative z-10">
+        <div className="flex items-center gap-10 p-12 flex-1 min-h-0 relative z-10">
           <div
-            className={`w-20 h-20 rounded-[28px] flex items-center justify-center shrink-0 border-[3px] transition-transform duration-500 group-hover:-rotate-6 ${isFocus || isHovered ? 'bg-nexus-950 border-nexus-accent shadow-lg' : 'bg-nexus-950 border-nexus-800'}`}
+            className={`w-28 h-28 rounded-[36px] flex items-center justify-center shrink-0 border-[4px] transition-transform duration-500 group-hover:-rotate-6 ${isFocus || isHovered ? 'bg-nexus-950 border-nexus-accent shadow-xl' : 'bg-nexus-950 border-nexus-800'}`}
             style={{ borderColor: isFocus ? 'var(--accent-color)' : `${color}cc` }}
           >
-            <div dangerouslySetInnerHTML={{ __html: iconSvg }} className="scale-[2.8]" />
+            <div dangerouslySetInnerHTML={{ __html: iconSvg }} className="scale-[3.5]" />
           </div>
 
-          <div className="flex-1 min-w-0 text-left">
+          <div className="flex-1 min-w-0 text-left py-4 flex flex-col justify-center">
             <div
-              className={`text-[26px] font-display font-black uppercase tracking-tight truncate transition-colors ${isFocus ? 'text-nexus-accent' : isAuthorNote ? 'text-amber-500' : reified ? 'text-nexus-accent' : 'text-nexus-text'}`}
+              className={`text-[48px] font-display font-black uppercase tracking-tight leading-[1] transition-colors break-words ${isFocus ? 'text-nexus-accent' : isAuthorNote ? 'text-amber-500' : reified ? 'text-nexus-accent' : 'text-nexus-text'}`}
             >
               {title}
             </div>
-            <div className="flex items-center gap-4 mt-2.5">
+            <div className="flex items-center gap-6 mt-5">
               <span
-                className={`px-3 py-1 rounded-xl border text-[10px] font-display font-black uppercase tracking-widest ${isAuthorNote ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' : reified ? 'bg-nexus-accent/10 border-nexus-accent/30 text-nexus-accent' : 'bg-nexus-800 border-nexus-700 text-nexus-muted'}`}
+                className={`px-5 py-2 rounded-2xl border text-[14px] font-display font-black uppercase tracking-[0.25em] ${isAuthorNote ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.1)]' : reified ? 'bg-nexus-accent/10 border-nexus-accent/30 text-nexus-accent' : 'bg-nexus-800 border-nexus-700 text-nexus-muted'}`}
               >
-                {isAuthorNote ? "Author's Note" : reified ? 'Reified Logic Unit' : category}
+                {isAuthorNote ? "Author's Note" : reified ? 'REIFIED LOGIC UNIT' : category}
               </span>
+
+              {/* Internal Mass Indicator */}
+              <div className="flex items-center gap-3 px-4 py-2 bg-nexus-950/50 rounded-2xl border border-nexus-800/80 text-[12px] font-mono text-nexus-muted uppercase tracking-widest">
+                <div className="w-2 h-2 rounded-full bg-nexus-accent shadow-[0_0_10px_var(--accent-color)] animate-pulse" />
+                MASS: {(nexusObj as any).total_subtree_mass || 0.0}
+              </div>
+
               {integrityReport && integrityReport.status !== 'APPROVED' && (
                 <IntegrityBadge status={integrityReport.status} variant="minimal" />
               )}
             </div>
+
+            {/* Inline Tags for LOD Micro-Detailed */}
+            {!isLODDetailed && ((nexusObj as any).tags?.length || 0) > 0 && (
+              <div className="flex flex-wrap gap-3 mt-6">
+                {(nexusObj as any).tags?.slice(0, 3).map((tag: string) => (
+                  <span
+                    key={tag}
+                    className="text-[10px] font-black uppercase tracking-widest text-nexus-accent/60 px-3 py-1 bg-nexus-accent/5 rounded-lg border border-nexus-accent/10"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+                {((nexusObj as any).tags?.length || 0) > 3 && (
+                  <span className="text-[10px] font-black text-nexus-muted opacity-40">
+                    +{(nexusObj as any).tags?.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Time Navigation Arrows */}
+          {timeNavigation && (
+            <div className="flex flex-col gap-3 ml-6">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  timeNavigation.onPrev?.();
+                }}
+                disabled={!timeNavigation.prevId}
+                className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${timeNavigation.prevId ? 'bg-nexus-800 border-nexus-700 hover:bg-nexus-accent hover:text-white cursor-pointer' : 'opacity-20 border-transparent cursor-not-allowed'}`}
+                title="Previous Era (Past)"
+              >
+                <ArrowUp size={24} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  timeNavigation.onNext?.();
+                }}
+                disabled={!timeNavigation.nextId}
+                className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${timeNavigation.nextId ? 'bg-nexus-800 border-nexus-700 hover:bg-nexus-accent hover:text-white cursor-pointer' : 'opacity-20 border-transparent cursor-not-allowed'}`}
+                title="Next Era (Future)"
+              >
+                <ArrowDown size={24} />
+              </button>
+            </div>
+          )}
         </div>
 
         {isLODDetailed && (
-          <div className="px-12 pb-14 border-t border-nexus-800 pt-10 animate-in fade-in slide-in-from-top-4 duration-700 relative z-10 flex flex-col gap-8">
+          <div className="px-14 pb-16 border-t border-nexus-800 pt-12 animate-in fade-in slide-in-from-top-4 duration-700 relative z-10 flex flex-col gap-10">
             {integrityReport && integrityReport.status !== 'APPROVED' && (
               <div className="mb-0">
                 <IntegrityBadge
@@ -171,36 +232,53 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
             )}
 
             <div className="relative">
+              <div className="mb-4 text-[12px] font-display font-black text-nexus-accent uppercase tracking-[0.4em] opacity-40">
+                LORE REACTION GIST
+              </div>
               <NexusMarkdown
                 content={`"${(object as any).gist || 'Fragment resolved from global neural memory.'}"`}
                 registry={fullRegistry}
                 onLinkClick={onLinkClick}
-                className={`[&_p]:font-serif [&_p]:italic [&_p]:font-medium [&_p]:text-[15px] [&_p]:leading-[1.7] [&_p]:line-clamp-3 [&_p]:m-0 ${isAuthorNote ? '[&_p]:text-amber-200/90' : '[&_p]:text-nexus-text/90'}`}
+                className={`[&_p]:font-serif [&_p]:italic [&_p]:font-medium [&_p]:text-[24px] [&_p]:leading-[1.5] [&_p]:m-0 ${isAuthorNote ? '[&_p]:text-amber-200/90' : '[&_p]:text-nexus-text/90'}`}
               />
+
+              {/* Tags in Detailed View */}
+              {((nexusObj as any).tags?.length || 0) > 0 && (
+                <div className="flex flex-wrap gap-4 mt-10 p-6 bg-nexus-950/30 rounded-[32px] border border-nexus-800/40">
+                  {(nexusObj as any).tags?.map((tag: string) => (
+                    <span
+                      key={tag}
+                      className="px-5 py-2.5 rounded-2xl bg-nexus-900 border border-nexus-800 text-[11px] font-black text-nexus-muted uppercase tracking-widest hover:border-nexus-accent hover:text-nexus-text transition-all cursor-default"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {reifiedContext && (
-              <div className="p-6 bg-nexus-950 border border-nexus-800 rounded-[32px] flex items-center justify-between gap-4 shadow-inner">
+              <div className="p-8 bg-nexus-950 border border-nexus-800 rounded-[40px] flex items-center justify-between gap-6 shadow-inner">
                 <div className="flex-1 min-w-0 text-center">
-                  <div className="text-[8px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1 opacity-50">
+                  <div className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1 opacity-50">
                     Origin
                   </div>
-                  <div className="text-[10px] font-bold text-nexus-text truncate">
+                  <div className="text-[14px] font-bold text-nexus-text truncate">
                     {reifiedContext.sourceName}
                   </div>
                 </div>
-                <div className="flex flex-col items-center gap-1 shrink-0 px-2">
-                  <Activity size={12} className="text-nexus-accent animate-pulse" />
-                  <div className="text-[9px] font-display font-black text-nexus-accent uppercase tracking-widest italic">
+                <div className="flex flex-col items-center gap-2 shrink-0 px-4">
+                  <Activity size={20} className="text-nexus-accent animate-pulse" />
+                  <div className="text-[12px] font-display font-black text-nexus-accent uppercase tracking-[0.2em] italic">
                     {reifiedContext.verb}
                   </div>
-                  <ArrowRight size={10} className="text-nexus-accent opacity-50" />
+                  <ArrowRight size={16} className="text-nexus-accent opacity-50" />
                 </div>
                 <div className="flex-1 min-w-0 text-center">
-                  <div className="text-[8px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1 opacity-50">
+                  <div className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-widest mb-1 opacity-50">
                     Terminal
                   </div>
-                  <div className="text-[10px] font-bold text-nexus-text truncate">
+                  <div className="text-[14px] font-bold text-nexus-text truncate">
                     {reifiedContext.targetName}
                   </div>
                 </div>
@@ -208,14 +286,14 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
             )}
 
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-nexus-800 border border-nexus-700 text-[11px] font-display font-black text-nexus-muted uppercase tracking-widest">
-                  <Layers size={16} className="opacity-40" />{' '}
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 px-6 py-3 rounded-2xl bg-nexus-800 border border-nexus-700 text-[14px] font-display font-black text-nexus-muted uppercase tracking-widest">
+                  <Layers size={20} className="opacity-40" />{' '}
                   {isC || reified ? (object as any).children_ids?.length || 0 : 0} Connections
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-[11px] font-mono text-nexus-muted font-bold">
-                <Hash size={14} className="opacity-30" /> {nexusObj.id.slice(0, 8)}
+              <div className="flex items-center gap-3 text-[14px] font-mono text-nexus-muted font-bold">
+                <Hash size={18} className="opacity-30" /> {nexusObj.id.slice(0, 8)}
               </div>
             </div>
           </div>

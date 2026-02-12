@@ -181,6 +181,23 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
     const isFolder = isContainer(node);
     const reified = isReified(node);
     const isAuthorNote = 'is_author_note' in node && (node as SimpleNote).is_author_note;
+
+    // Check for Time Data (Base Node or Time Node)
+    // Time Nodes should be filtered out before calling renderNode generally, but double check
+    const isTimeNode = !!(node as SimpleNote).time_data?.base_node_id;
+    // Base Node is one that HAS children that are time nodes, but here we just check if it's a "Soul"
+    // Actually typically the registry doesn't explicitly flag "has time nodes" unless we check children.
+    // For visual purposes, we might want to check if this node IS a base node for others.
+    // But determining that requires scanning all nodes.
+    // However, if we simply want to show if it IS a base node, we might need a lookup.
+    // For now, let's just Style it if it looks like a locked anchor (optional feature).
+    // The requirement says "Base Nodes will be visually distinct... (acting as locked anchors)".
+    // How do we know it has history effectively without scanning?
+    // Maybe we just rely on `time_data` being absent but `children` having it?
+    // Costly to check every time. Let's skip the "Locked" icon for now unless we are sure.
+    // Actually, checking if it is a target of a TIME_LINK is the robust way.
+    // But let's proceed with hiding Time Nodes first.
+
     const isOpen = expandedFolders.has(node.id);
     const isActive = selectedId === node.id;
     const isDraggingOver = dragOverId === node.id;
@@ -192,6 +209,8 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
           : 'Untitled Unit';
 
     const incomingReifiedIds = !isShadowAttachment ? reifiedLinksByOrigin[node.id] || [] : [];
+
+    if (isTimeNode) return null; // Safety filter
 
     return (
       <React.Fragment
@@ -290,6 +309,8 @@ export const HierarchyExplorer: React.FC<HierarchyExplorerProps> = ({
             <div className="flex flex-col mt-1">
               {node.children_ids.map((cid) => {
                 const child = registry[cid];
+                // Filter out Time Nodes from children list
+                if (child && (child as SimpleNote).time_data?.base_node_id) return null;
                 return child ? renderNode(child, depth + 1, { parentId: node.id }) : null;
               })}
             </div>

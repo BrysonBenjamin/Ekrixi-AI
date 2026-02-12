@@ -12,6 +12,8 @@ import {
   NarrativeStatus,
   SimpleNote,
   ContainerNote,
+  AggregatedSemanticLink,
+  AggregatedHierarchicalLink,
 } from '../types';
 
 export const isContainer = (obj: NexusObject): obj is NexusObject & TraitContainer => {
@@ -26,7 +28,9 @@ export const isStory = (obj: NexusObject): obj is StoryNote => {
   return obj._type === NexusType.STORY_NOTE;
 };
 
-export const isReified = (obj: NexusObject): boolean => {
+export const isReified = (
+  obj: NexusObject,
+): obj is AggregatedSemanticLink | AggregatedHierarchicalLink => {
   return 'is_reified' in obj && (obj as any).is_reified === true;
 };
 

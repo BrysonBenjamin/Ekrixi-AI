@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Box,
@@ -21,6 +22,11 @@ import {
   SemanticLink,
 } from '../../../types';
 import { MarkdownToolbar } from '../../shared/MarkdownToolbar';
+import { ThinkingProcessViewer } from '../../../components/shared/ThinkingProcessViewer';
+import {
+  ArangoSearchService,
+  GovernedSearchResult,
+} from '../../../core/services/ArangoSearchService';
 
 interface InspectorSidebarProps {
   object: NexusObject;
@@ -37,6 +43,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   onClose,
   onOpenWiki,
 }) => {
+  const navigate = useNavigate();
   const isL = isLink(object);
   const reified = isReified(object);
   const isStory = object._type === NexusType.STORY_NOTE;
@@ -44,6 +51,23 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
     ('title' in object ? (object as SimpleNote).title : null) ||
     (isL && 'verb' in object ? (object as SemanticLink).verb : 'Untitled');
   const proseRef = useRef<HTMLTextAreaElement>(null);
+
+  // -- GOVERNANCE SIMULATION STATE --
+  const [simulationResults, setSimulationResults] = useState<GovernedSearchResult[]>([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  const runSimulation = async () => {
+    setIsSimulating(true);
+    setSimulationResults([]); // Clear previous
+    try {
+      const results = await ArangoSearchService.performGovernedGraphSearch([]);
+      setSimulationResults(results);
+    } catch (err) {
+      console.error('Governance Trace Failed', err);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-nexus-900 font-sans">
@@ -75,15 +99,60 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
             </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 text-nexus-muted hover:text-nexus-text transition-colors"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Timeline Button */}
+          {!isL && (
+            <button
+              onClick={() => {
+                const baseId =
+                  ('time_data' in object && object.time_data?.base_node_id) || object.id;
+                navigate(`/timeline/${baseId}`);
+              }}
+              className="p-2 text-nexus-muted hover:text-nexus-text transition-colors"
+              title="View Timeline"
+            >
+              <HistoryIcon size={20} />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-2 text-nexus-muted hover:text-nexus-text transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-8 pb-48">
+        {/* --- GOVERNED SEARCH PROTOTYPE --- */}
+        <div className="p-6 bg-nexus-950 border border-nexus-800 rounded-[32px] shadow-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-nexus-arcane/10 rounded-xl text-nexus-arcane">
+                <HistoryIcon size={16} />
+              </div>
+              <h3 className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">
+                Governance Simulation
+              </h3>
+            </div>
+            <button
+              onClick={runSimulation}
+              disabled={isSimulating}
+              className="text-[10px] bg-nexus-accent/10 hover:bg-nexus-accent/20 text-nexus-accent px-3 py-1 rounded-full font-bold transition-colors disabled:opacity-50"
+            >
+              {isSimulating ? 'Running...' : 'Run Trace'}
+            </button>
+          </div>
+
+          {simulationResults.length > 0 && (
+            <div className="space-y-2 mt-4">
+              {simulationResults.map((res, i) => (
+                <ThinkingProcessViewer key={i} result={res} />
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="p-6 bg-nexus-950 border border-nexus-800 rounded-[32px] shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none">
             <Activity size={100} />

@@ -8,7 +8,7 @@ import {
   SemanticLink,
   HierarchicalLink,
 } from '../../../types';
-import { VisibleNode } from '../DrilldownFeature';
+import { VisibleNode } from './useDrilldownRegistry';
 
 export interface SimulationNode extends d3.SimulationNodeDatum {
   id: string;
@@ -56,7 +56,8 @@ export const useDrilldownSimulation = ({
     const activeLinks: SimulationLink[] = [];
     (Object.values(fullRegistry) as NexusObject[]).forEach((obj) => {
       if (!isLink(obj)) return;
-      const link = obj as SemanticLink | HierarchicalLink;
+      if ((obj as any).time_data?.base_node_id) return; // Skip temporal skins
+      const link = obj as any;
       const sId = link.source_id;
       const tId = link.target_id;
 
@@ -65,7 +66,7 @@ export const useDrilldownSimulation = ({
           id: `${obj.id}-structural-s`,
           source: sId,
           target: obj.id,
-          verb: (obj as SemanticLink).verb,
+          verb: link.verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
@@ -74,7 +75,7 @@ export const useDrilldownSimulation = ({
           id: `${obj.id}-structural-t`,
           source: obj.id,
           target: tId,
-          verb: (obj as SemanticLink).verb,
+          verb: link.verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
@@ -100,13 +101,16 @@ export const useDrilldownSimulation = ({
 
   useEffect(() => {
     if (!simData.nodes.length) {
-      // Use queueMicrotask to avoid state updates during render if called synchronously
       queueMicrotask(() => {
         setNodes([]);
         setLinks([]);
       });
       return;
     }
+
+    const prevIds = new Set(nodes.map((n) => n.id));
+    const nextIds = new Set(simData.nodes.map((n) => n.id));
+    const idsChanged = prevIds.size !== nextIds.size || [...nextIds].some((id) => !prevIds.has(id));
 
     // Initialize positions from ref safely inside effect
     simData.nodes.forEach((node, idx) => {
@@ -115,13 +119,25 @@ export const useDrilldownSimulation = ({
         node.x = prevPos.x;
         node.y = prevPos.y;
       } else {
-        // Start closer to center to avoid "flying in" from edges
         node.x = ((idx * 50) % 200) - 100;
         node.y = ((idx * 50 * 0.7) % 200) - 100;
       }
     });
 
-    if (simulationRef.current) simulationRef.current.stop();
+    if (simulationRef.current) {
+      if (idsChanged || simulationRef.current.alpha() < 0.05) {
+        simulationRef.current.stop();
+      } else {
+        // Just update nodes in existing simulation without high alpha restart
+        simulationRef.current.nodes(simData.nodes);
+        if (simulationRef.current.force('link')) {
+          (
+            simulationRef.current.force('link') as d3.ForceLink<SimulationNode, SimulationLink>
+          ).links(simData.links);
+        }
+        return;
+      }
+    }
 
     const simulation = d3
       .forceSimulation<SimulationNode>(simData.nodes)
@@ -130,11 +146,11 @@ export const useDrilldownSimulation = ({
         d3
           .forceLink<SimulationNode, SimulationLink>(simData.links)
           .id((d) => d.id)
-          .distance((d) => (d.isStructuralLine ? 400 : 650))
+          .distance((d) => (d.isStructuralLine ? 1500 : 2500))
           .strength((d) => (d.isStructuralLine ? 1.0 : 0.6)),
       )
-      .force('charge', d3.forceManyBody().strength(-45000))
-      .force('collide', d3.forceCollide().radius(400).iterations(4))
+      .force('charge', d3.forceManyBody().strength(-150000))
+      .force('collide', d3.forceCollide().radius(700).iterations(8))
       .force(
         'radial',
         d3
@@ -142,7 +158,7 @@ export const useDrilldownSimulation = ({
             (d) => {
               if (d.id === focusId) return 0;
               const absDepth = Math.abs(d.object.depth);
-              return d.object.pathType === 'ancestor' ? absDepth * 600 : absDepth * 900;
+              return d.object.pathType === 'ancestor' ? absDepth * 1800 : absDepth * 2800;
             },
             0,
             0,
@@ -158,7 +174,10 @@ export const useDrilldownSimulation = ({
         d3.forceY().strength((d) => (d.id === focusId ? 0.6 : 0.05)),
       );
 
-    simulation.alpha(1).alphaDecay(0.02).restart();
+    simulation
+      .alpha(idsChanged ? 1 : 0.3)
+      .alphaDecay(0.02)
+      .restart();
     simulationRef.current = simulation;
 
     simulation.on('tick', () => {

@@ -24,6 +24,12 @@ interface DrilldownNodeWrapperProps {
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent, id: string) => void;
   onInspect: (id: string) => void;
+  timeNavigation?: {
+    nextId?: string;
+    prevId?: string;
+    onNext?: () => void;
+    onPrev?: () => void;
+  } | null;
 }
 
 export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
@@ -46,6 +52,7 @@ export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
   onDragLeave,
   onDrop,
   onInspect,
+  timeNavigation,
 }) => {
   const isPartOfAnomaly =
     integrityFocus?.path?.includes(node.id) ||
@@ -82,6 +89,7 @@ export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
           isHovered={node.id === hoveredId}
           integrityReport={integrityMap[node.id]}
           onLinkClick={onInspect}
+          timeNavigation={timeNavigation}
         />
       </g>
     </g>

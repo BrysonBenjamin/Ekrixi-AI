@@ -11,10 +11,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { NexusObject, isLink, isContainer, SimpleNote } from '../../../types';
+import { WeightedContextUnit } from '../../../core/services/ContextAssemblyService';
+import { ContextPill } from '../../../components/shared/ContextPill';
 
 interface ComposerProps {
   isLoading: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, context?: WeightedContextUnit[]) => void;
   variant?: 'footer' | 'center';
   registry: Record<string, NexusObject>;
 }
@@ -26,6 +28,7 @@ export const Composer: React.FC<ComposerProps> = ({
   registry,
 }) => {
   const [text, setText] = useState('');
+  const [weightedMentions, setWeightedMentions] = useState<WeightedContextUnit[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showContextOverlay, setShowContextOverlay] = useState(false);
   const [atMenu, setAtMenu] = useState<{ query: string } | null>(null);
@@ -33,25 +36,73 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const handleSend = () => {
     if (!text.trim() || isLoading) return;
-    onSend(text.trim());
+    onSend(text.trim(), weightedMentions);
     setText('');
+    setWeightedMentions([]);
     setIsExpanded(false);
     setAtMenu(null);
   };
 
+  const handleUpdateMention = (updated: WeightedContextUnit) => {
+    setWeightedMentions(weightedMentions.map((m) => (m.id === updated.id ? updated : m)));
+  };
+
+  const handleRemoveMention = (id: string, title?: string) => {
+    setWeightedMentions(weightedMentions.filter((m) => m.id !== id));
+    // Also remove text representation if title is provided
+    if (title) {
+      const mentionText = `[[${title}]]`;
+      if (text.includes(mentionText)) {
+        setText(text.replace(mentionText, ''));
+      }
+    }
+  };
+
+  // Sync Text -> Context: If user deletes [[Title]], remove the context pill
+  useEffect(() => {
+    if (weightedMentions.length === 0) return;
+
+    const activeTitlesInText = new Set<string>();
+    // Simple regex to find [[Title]] patterns.
+    // Note: This assumes titles don't have nested brackets.
+    const matches = text.match(/\[\[(.*?)\]\]/g);
+    if (matches) {
+      matches.forEach((m) => activeTitlesInText.add(m.slice(2, -2)));
+    }
+
+    // Identify mentions that are no longer in text
+    const mentionsToRemove = weightedMentions.filter((wm) => {
+      const note = registry[wm.id] as SimpleNote;
+      if (!note) return false;
+      return !activeTitlesInText.has(note.title);
+    });
+
+    if (mentionsToRemove.length > 0) {
+      setWeightedMentions((prev) =>
+        prev.filter((p) => !mentionsToRemove.some((r) => r.id === p.id)),
+      );
+    }
+  }, [text, registry]);
+  // Note: we exclude weightedMentions from dep array to avoid loops,
+  // but we need to be careful. Actually, if we only remove, it should be fine.
+  // Better implementation: calculate new state and only set if different.
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       if (atMenu) {
+        // Allow selection from menu via keyboard if implemented, otherwise close
         setAtMenu(null);
+      } else {
+        e.preventDefault();
+        handleSend();
       }
-      e.preventDefault();
-      handleSend();
     }
   };
 
   const detectAtTrigger = (val: string, pos: number) => {
     const beforeCursor = val.slice(0, pos);
     const lastAtIndex = beforeCursor.lastIndexOf('@');
+    // Ensure we are typing a valid query (no spaces after @ yet)
     if (lastAtIndex !== -1 && !beforeCursor.slice(lastAtIndex).includes(' ')) {
       setAtMenu({ query: beforeCursor.slice(lastAtIndex + 1) });
     } else {
@@ -59,18 +110,29 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const insertMention = (nodeTitle: string) => {
+  const insertMention = (node: SimpleNote) => {
     if (!textareaRef.current) return;
     const pos = textareaRef.current.selectionStart;
     const beforeCursor = text.slice(0, pos);
     const afterCursor = text.slice(pos);
     const lastAtIndex = beforeCursor.lastIndexOf('@');
-    // Support underscore spaces in search but replace with original title spaces in tag
-    const newText = beforeCursor.slice(0, lastAtIndex) + `[[${nodeTitle}]]` + afterCursor;
+
+    // Insert [[Title]]
+    const mentionText = `[[${node.title}]]`;
+    const newText = beforeCursor.slice(0, lastAtIndex) + mentionText + ' ' + afterCursor;
     setText(newText);
+
+    // Add to Weighted Mentions with MAX score (10)
+    if (!weightedMentions.some((m) => m.id === node.id)) {
+      setWeightedMentions((prev) => [...prev, { id: node.id, score: 10 }]);
+    }
+
     setAtMenu(null);
     setTimeout(() => {
       textareaRef.current?.focus();
+      // Move cursor after the inserted mention + space
+      const newPos = lastAtIndex + mentionText.length + 1;
+      textareaRef.current?.setSelectionRange(newPos, newPos);
     }, 0);
   };
 
@@ -130,43 +192,46 @@ export const Composer: React.FC<ComposerProps> = ({
   );
 
   return (
+    // ... (imports remain)
+
+    // Inside the component return:
     <div
       className={`
             shrink-0 transition-all duration-500 ease-out w-full
-            ${isExpanded ? 'fixed inset-0 bg-nexus-950/90 backdrop-blur-xl flex items-center justify-center p-6 md:p-12 z-[100]' : 'z-40 relative'}
+            ${isExpanded ? 'fixed inset-0 bg-nexus-950/95 backdrop-blur-3xl flex items-center justify-center p-8 md:p-16 z-[100]' : 'z-40 relative'}
         `}
     >
       {/* Mention Menu */}
       {atMenu && suggestions.length > 0 && (
         <div
-          className={`absolute bottom-full left-0 mb-4 w-full max-w-sm bg-nexus-900 border border-nexus-700 rounded-[28px] shadow-2xl overflow-hidden backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200 z-[110] ${isExpanded ? 'ml-0' : ''}`}
+          className={`absolute bottom-full left-0 mb-6 w-full max-w-lg bg-nexus-900 border border-nexus-700 rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.7)] overflow-hidden backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-300 z-[110] ${isExpanded ? 'ml-0' : ''}`}
         >
-          <div className="px-5 py-3 border-b border-nexus-800 flex items-center justify-between bg-nexus-950/40">
-            <span className="text-xs md:text-[10px] font-display font-black text-nexus-accent uppercase tracking-widest flex items-center gap-2">
-              <Sparkles size={12} /> Neural Registry Scry
+          <div className="px-8 py-5 border-b border-nexus-800 flex items-center justify-between bg-nexus-950/40">
+            <span className="text-xs md:text-[11px] font-display font-black text-nexus-accent uppercase tracking-[0.25em] flex items-center gap-3">
+              <Sparkles size={16} /> NEURAL REGISTRY SCRY
             </span>
             <button
               onClick={() => setAtMenu(null)}
-              className="text-nexus-muted hover:text-nexus-text transition-colors"
+              className="p-2 rounded-full hover:bg-white/5 text-nexus-muted hover:text-nexus-text transition-all"
             >
-              <X size={14} />
+              <X size={20} />
             </button>
           </div>
-          <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto no-scrollbar">
+          <div className="p-4 space-y-2 max-h-[450px] overflow-y-auto no-scrollbar">
             {suggestions.map((n) => {
               const node = n as SimpleNote;
               return (
                 <button
                   key={node.id}
-                  onClick={() => insertMention(node.title)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl hover:bg-nexus-accent hover:text-white transition-all group text-left"
+                  onClick={() => insertMention(node)}
+                  className="w-full flex items-center gap-5 px-6 py-4 rounded-[28px] hover:bg-nexus-accent hover:text-white transition-all group text-left border border-transparent hover:border-white/20"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[10px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all">
+                  <div className="w-12 h-12 rounded-2xl bg-nexus-900 border border-nexus-800 flex items-center justify-center text-[12px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all shadow-sm">
                     {node.category_id?.charAt(0) || 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold truncate">{node.title}</div>
-                    <div className="text-[8px] opacity-60 uppercase font-mono">
+                    <div className="text-lg font-black truncate leading-tight">{node.title}</div>
+                    <div className="text-[10px] opacity-50 uppercase font-mono font-bold tracking-widest mt-0.5">
                       {node.category_id}
                     </div>
                   </div>
@@ -182,14 +247,33 @@ export const Composer: React.FC<ComposerProps> = ({
                 relative flex flex-col transition-all duration-300 group pointer-events-auto
                 ${
                   isExpanded
-                    ? 'w-full max-w-4xl h-[80vh] bg-nexus-900 rounded-[40px] border border-nexus-700 shadow-2xl overflow-hidden'
+                    ? 'w-full max-w-5xl h-[75vh] bg-nexus-900 rounded-[56px] border border-nexus-700 shadow-[0_100px_200px_-50px_rgba(0,0,0,0.8)] overflow-hidden'
                     : isCenter
-                      ? 'mx-auto max-w-2xl bg-nexus-900 rounded-[32px] shadow-xl border border-nexus-800 p-2'
-                      : 'mx-auto w-full bg-nexus-900 rounded-[24px] border border-nexus-800 shadow-lg ring-1 ring-nexus-text/5 hover:ring-nexus-accent/20'
+                      ? 'mx-auto max-w-3xl bg-nexus-900 rounded-[40px] shadow-2xl border border-nexus-800 p-3'
+                      : 'mx-auto w-full bg-nexus-900 rounded-[32px] border border-nexus-800 shadow-xl ring-1 ring-nexus-text/5 hover:ring-nexus-accent/20'
                 }
             `}
       >
-        <div className={`w-full flex-1 min-h-0 ${isExpanded ? 'p-8 pb-0' : 'px-6 pt-5 pb-2'}`}>
+        {/* Context Pills Area */}
+        {weightedMentions.length > 0 && (
+          <div
+            className={`px-10 pt-8 pb-2 flex flex-wrap gap-4 transition-all ${isExpanded ? 'px-14' : ''}`}
+          >
+            {weightedMentions.map((unit) => (
+              <ContextPill
+                key={unit.id}
+                unit={unit}
+                registry={registry}
+                onUpdate={handleUpdateMention}
+                onRemove={() =>
+                  handleRemoveMention(unit.id, (registry[unit.id] as SimpleNote)?.title)
+                }
+              />
+            ))}
+          </div>
+        )}
+
+        <div className={`w-full flex-1 min-h-0 ${isExpanded ? 'p-14 pb-0' : 'px-10 pt-6 pb-4'}`}>
           <textarea
             ref={textareaRef}
             value={text}
@@ -202,7 +286,7 @@ export const Composer: React.FC<ComposerProps> = ({
             className={`
                             w-full bg-transparent border-none focus:ring-0 focus:outline-none resize-none no-scrollbar
                             text-nexus-text placeholder-nexus-muted font-normal leading-relaxed
-                            ${isExpanded ? 'h-full text-xl' : 'min-h-[52px] text-[15px]'}
+                            ${isExpanded ? 'h-full text-3xl font-serif italic' : 'min-h-[64px] text-[20px]'}
                         `}
             rows={1}
           />

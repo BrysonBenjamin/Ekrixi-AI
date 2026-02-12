@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { Link2, X } from 'lucide-react';
 import { NexusObject, isContainer, SimpleNote } from '../../../types';
-import { VisibleNode } from '../DrilldownFeature';
+import { VisibleNode } from '../hooks/useDrilldownRegistry';
 import { DrilldownContextMenu } from './DrilldownContextMenu';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 import { useDrilldownSimulation } from '../hooks/useDrilldownSimulation';
@@ -22,6 +22,12 @@ interface DrilldownCanvasProps {
   onEstablishLink?: (sourceId: string, targetId: string, verb: string) => void;
   onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
   integrityFocus?: { linkId: string; path?: string[]; mode: 'CENTER' | 'DRILL' } | null;
+  getTimeNavigation?: (id: string) => {
+    nextId?: string;
+    prevId?: string;
+    onNext?: () => void;
+    onPrev?: () => void;
+  } | null;
 }
 
 export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
@@ -37,6 +43,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
   onEstablishLink,
   onReparent,
   integrityFocus,
+  getTimeNavigation,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<SVGSVGElement>(null);
@@ -156,22 +163,17 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
       >
         <g transform={zoomTransform.toString()}>
           <defs>
-            <pattern id="nexus-grid-major" width="200" height="200" patternUnits="userSpaceOnUse">
+            <pattern id="nexus-grid-major" width="1000" height="1000" patternUnits="userSpaceOnUse">
               <path
-                d="M 200 0 L 0 0 0 200"
+                d="M 1000 0 L 0 0 0 1000"
                 fill="none"
                 stroke="var(--accent-color)"
-                strokeWidth="0.5"
-                opacity="0.08"
+                strokeWidth="2"
+                opacity="0.1"
               />
             </pattern>
-            <pattern id="nexus-grid-minor" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="var(--ley-color)"
-                strokeWidth="0.25"
-              />
+            <pattern id="nexus-grid-minor" width="200" height="200" patternUnits="userSpaceOnUse">
+              <path d="M 200 0 L 0 0 0 200" fill="none" stroke="var(--ley-color)" strokeWidth="1" />
             </pattern>
             <filter id="sigil-glow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="15" result="blur" />
@@ -225,6 +227,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
                 onDragLeave={() => setDragOverNodeId(null)}
                 onDrop={handleDrop}
                 onInspect={onInspect}
+                timeNavigation={getTimeNavigation?.(node.id)}
               />
             ))}
           </g>

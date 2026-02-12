@@ -301,12 +301,12 @@ const StudioBlockEditor: React.FC<{
               Subject of Mutation
             </label>
             {sub ? (
-              <div className="flex items-center gap-2 px-3 py-1 bg-nexus-accent/10 border border-nexus-accent/20 rounded-full text-[10px] font-bold text-nexus-accent uppercase animate-in slide-in-from-right-2">
-                <Target size={12} /> {(sub as SimpleNote).title}
+              <div className="flex items-center gap-3 px-5 py-2.5 bg-nexus-accent/10 border border-nexus-accent/20 rounded-2xl text-[12px] font-black text-nexus-accent uppercase animate-in slide-in-from-right-4 shadow-lg">
+                <Target size={16} /> {(sub as SimpleNote).title}
               </div>
             ) : (
-              <span className="text-[8px] text-nexus-muted italic font-mono uppercase opacity-40">
-                Drag Lore Unit Here to Assign Subject
+              <span className="text-[10px] text-nexus-muted italic font-mono uppercase opacity-40">
+                DRAG LORE UNIT HERE TO ASSIGN SUBJECT
               </span>
             )}
           </div>
@@ -495,7 +495,7 @@ const StudioBlockEditor: React.FC<{
                   {block.data.aliases?.map((a: string) => (
                     <span
                       key={a}
-                      className="px-2 py-1 bg-nexus-essence/10 border border-nexus-essence/30 rounded text-[9px] font-bold text-nexus-essence"
+                      className="px-4 py-1.5 bg-nexus-essence/10 border border-nexus-essence/30 rounded-xl text-[11px] font-black text-nexus-essence tracking-wider uppercase"
                     >
                       {a}
                     </span>
@@ -515,7 +515,7 @@ const StudioBlockEditor: React.FC<{
                   {block.data.tags?.map((t: string) => (
                     <span
                       key={t}
-                      className="px-2 py-1 bg-nexus-950 border border-nexus-800 rounded text-[9px] font-bold text-nexus-muted"
+                      className="px-4 py-1.5 bg-nexus-950 border border-nexus-800 rounded-xl text-[11px] font-black text-nexus-muted tracking-wider uppercase"
                     >
                       #{t}
                     </span>

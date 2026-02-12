@@ -18,6 +18,13 @@ export interface NexusElement {
   link_ids: string[];
 }
 
+export interface NexusTimeData {
+  year: number;
+  base_node_id?: string;
+  previous_node_id?: string;
+  next_node_id?: string;
+}
+
 export interface WikiArtifact {
   node_id: string;
   content: string;
@@ -59,6 +66,7 @@ export interface SimpleNote extends NexusElement {
   is_author_note?: boolean;
   background_url?: string;
   theme_color?: string;
+  time_data?: NexusTimeData;
 }
 
 export interface ContainerNote extends Omit<SimpleNote, '_type'>, TraitContainer {
@@ -95,6 +103,11 @@ export interface HierarchicalLink extends Omit<SimpleLink, '_type'>, TraitHierar
   _type: 'HIERARCHICAL_LINK';
 }
 
+export interface TimeLink extends Omit<SimpleLink, '_type'>, TraitHierarchy {
+  _type: 'TIME_LINK';
+  year: number;
+}
+
 export interface AggregatedSemanticLink
   extends
     Omit<SemanticLink, '_type'>,
@@ -122,4 +135,5 @@ export type NexusObject =
   | HierarchicalLink
   | AggregatedSemanticLink
   | AggregatedHierarchicalLink
+  | TimeLink
   | ManifestoBlock;

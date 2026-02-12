@@ -42,6 +42,11 @@ export interface EntitySeed {
   category: NexusCategory;
   isManual: boolean;
   isAuthorNote: boolean;
+  timeData?: {
+    baseId: string;
+    year: number;
+    baseTitle: string;
+  };
   suggestedChildren: Array<{
     title: string;
     category: NexusCategory;
@@ -198,6 +203,14 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
           (u) => u.title.toLowerCase() === s.title.toLowerCase(),
         );
 
+        // Determine Base Note properties if Time Data is present
+        const timeDataInfo = s.timeData
+          ? {
+              year: s.timeData.year,
+              base_node_id: s.timeData.baseId,
+            }
+          : undefined;
+
         finalBatch.push({
           id: s.id,
           _type: childIds.length > 0 ? 'CONTAINER_NOTE' : 'SIMPLE_NOTE',
@@ -214,6 +227,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
           aliases: s.aliases || [],
           tags: [],
           is_ghost: false,
+          time_data: timeDataInfo,
           ...(childIds.length > 0
             ? {
                 children_ids: childIds,
@@ -223,6 +237,25 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
               }
             : {}),
         } as NexusObject);
+
+        // If this is a Time Node, creating the TIME_LINK to the Base
+        if (s.timeData) {
+          finalBatch.push({
+            id: generateId(),
+            _type: NexusType.TIME_LINK,
+            source_id: s.timeData.baseId,
+            target_id: s.id,
+            year: s.timeData.year,
+            verb: 'has_state',
+            verb_inverse: 'state_of',
+            hierarchy_type: HierarchyType.PARENT_OF,
+            created_at: now,
+            last_modified: now,
+            link_ids: [],
+            internal_weight: 1.0,
+            total_subtree_mass: 0,
+          } as NexusObject);
+        }
       });
 
       // 2. Resolve Links from AI Architecture
@@ -328,6 +361,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
           <div className="h-full flex flex-col">
             <PreprocessorAgent
               text={inputText}
+              registry={registry}
               onFinalize={handleInitiateScan}
               onCancel={() => setStage('INPUT')}
             />

@@ -18,22 +18,29 @@ import {
   Check,
   MousePointerClick,
   ArrowLeft,
+  Calendar,
+  History,
+  Link,
+  Unlink,
 } from 'lucide-react';
 import { EntitySeed } from '../ScannerFeature';
-import { NexusCategory } from '../../../types';
+import { NexusCategory, NexusObject, SimpleNote } from '../../../types';
 import { generateId } from '../../../utils/ids';
 import { useLLM } from '../../system/hooks/useLLM';
 import { GEMINI_MODELS } from '../../../core/llm';
 import { safeParseJson } from '../../../utils/json';
+import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
 
 interface PreprocessorAgentProps {
   text: string;
+  registry?: Record<string, NexusObject>;
   onFinalize: (seeds: EntitySeed[]) => void;
   onCancel: () => void;
 }
 
 export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   text,
+  registry = {},
   onFinalize,
   onCancel,
 }) => {
@@ -48,6 +55,9 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number; text: string } | null>(
     null,
   );
+
+  // Time Inherited Nodes Logic
+  const [potentialBaseNode, setPotentialBaseNode] = useState<SimpleNote | null>(null);
 
   const workbenchRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +98,16 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   }, [text, isReady, generateContent]);
 
   const activeSeed = useMemo(() => seeds.find((s) => s.id === activeSeedId), [seeds, activeSeedId]);
+
+  // Check for existing Base Node when active seed title changes
+  useEffect(() => {
+    if (activeSeed && registry) {
+      const base = TimeDimensionService.findBaseNode(registry, activeSeed.title);
+      setPotentialBaseNode(base);
+    } else {
+      setPotentialBaseNode(null);
+    }
+  }, [activeSeed?.title, registry]);
 
   const handleTextClick = (entityText: string) => {
     if (isAkaMode && activeSeedId) {
@@ -230,6 +250,20 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
 
   const updateSeed = (id: string, updates: Partial<EntitySeed>) => {
     setSeeds((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+  };
+
+  const attachTimeState = (seedId: string, baseId: string, baseTitle: string, year: number) => {
+    updateSeed(seedId, {
+      timeData: {
+        baseId,
+        baseTitle,
+        year,
+      },
+    });
+  };
+
+  const detachTimeState = (seedId: string) => {
+    updateSeed(seedId, { timeData: undefined });
   };
 
   const removeSuggestion = (seedId: string, index: number) => {
@@ -389,22 +423,36 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
               {/* Parent Anchor Editor */}
               <div
-                className={`bg-nexus-800/40 border rounded-[32px] p-8 shadow-xl relative overflow-hidden group transition-all duration-500 ${activeSeed.isAuthorNote ? 'border-amber-500/40 bg-amber-500/5' : 'border-nexus-700'}`}
+                className={`bg-nexus-800/40 border rounded-[32px] p-8 shadow-xl relative overflow-hidden group transition-all duration-500 
+                ${activeSeed.timeData ? 'border-indigo-500/40 bg-indigo-500/5' : activeSeed.isAuthorNote ? 'border-amber-500/40 bg-amber-500/5' : 'border-nexus-700'}`}
               >
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`p-3 rounded-2xl border transition-all ${activeSeed.isAuthorNote ? 'bg-amber-500/10 border-amber-500/30' : 'bg-nexus-accent/10 border-nexus-accent/30'}`}
+                      className={`p-3 rounded-2xl border transition-all 
+                        ${
+                          activeSeed.timeData
+                            ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500'
+                            : activeSeed.isAuthorNote
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                              : 'bg-nexus-accent/10 border-nexus-accent/30 text-nexus-accent'
+                        }`}
                     >
-                      {activeSeed.isAuthorNote ? (
-                        <UserCircle2 size={20} className="text-amber-500" />
+                      {activeSeed.timeData ? (
+                        <History size={20} />
+                      ) : activeSeed.isAuthorNote ? (
+                        <UserCircle2 size={20} />
                       ) : (
-                        <Target size={20} className="text-nexus-accent" />
+                        <Target size={20} />
                       )}
                     </div>
                     <div>
                       <h3 className="text-sm font-display font-black text-nexus-text uppercase tracking-wider">
-                        {activeSeed.isAuthorNote ? 'Meta Anchor' : 'Primary Anchor'}
+                        {activeSeed.timeData
+                          ? 'Time State'
+                          : activeSeed.isAuthorNote
+                            ? 'Meta Anchor'
+                            : 'Primary Anchor'}
                       </h3>
                       <p className="text-[9px] text-nexus-muted font-mono uppercase tracking-widest">
                         SEED_ID: {activeSeed.id.slice(0, 8)}
@@ -428,6 +476,100 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
                     </button>
                   </div>
                 </div>
+
+                {/* Time Node Attachment Banner */}
+                {potentialBaseNode && !activeSeed.timeData && (
+                  <div className="mb-6 p-4 bg-indigo-900/40 border border-indigo-500/30 rounded-2xl animate-in slide-in-from-top-2">
+                    <div className="flex items-start gap-3">
+                      <Sparkles className="text-indigo-400 shrink-0 mt-0.5" size={16} />
+                      <div className="flex-1">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">
+                          Soul Detected
+                        </h4>
+                        <p className="text-[11px] text-indigo-100/80 mb-3">
+                          "<strong>{potentialBaseNode.title}</strong>" already exists in the Nexus.
+                          Would you like to attach this as a historical state (Skin) instead of
+                          creating a new concept?
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <Calendar
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-300"
+                              size={12}
+                            />
+                            <input
+                              type="number"
+                              placeholder="Year"
+                              className="w-24 bg-indigo-950/50 border border-indigo-500/30 rounded-lg pl-8 pr-2 py-1.5 text-xs text-indigo-100 placeholder:text-indigo-400/50 outline-none focus:border-indigo-400"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = parseInt(e.currentTarget.value);
+                                  if (!isNaN(val)) {
+                                    attachTimeState(
+                                      activeSeed.id,
+                                      potentialBaseNode.id,
+                                      potentialBaseNode.title,
+                                      val,
+                                    );
+                                  }
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val)) {
+                                  attachTimeState(
+                                    activeSeed.id,
+                                    potentialBaseNode.id,
+                                    potentialBaseNode.title,
+                                    val,
+                                  );
+                                }
+                              }}
+                            />
+                          </div>
+                          <button
+                            className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors border border-indigo-500/30"
+                            onClick={(e) => {
+                              // Focus the input instead? or just default to current year?
+                              // For now, let's just default to current year if clicked directly
+                              attachTimeState(
+                                activeSeed.id,
+                                potentialBaseNode.id,
+                                potentialBaseNode.title,
+                                new Date().getFullYear(),
+                              );
+                            }}
+                          >
+                            Link to Timeline
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeSeed.timeData && (
+                  <div className="mb-6 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Link size={16} className="text-indigo-400" />
+                      <div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-indigo-300">
+                          Linked to Soul
+                        </div>
+                        <div className="text-xs font-bold text-indigo-100">
+                          {activeSeed.timeData.baseTitle} (Year {activeSeed.timeData.year})
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => detachTimeState(activeSeed.id)}
+                      className="p-1.5 text-indigo-300 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      title="Unlink Time State"
+                    >
+                      <Unlink size={16} />
+                    </button>
+                  </div>
+                )}
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">

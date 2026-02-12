@@ -1,7 +1,7 @@
 import React from 'react';
 import { SimulationLink, SimulationNode } from '../hooks/useDrilldownSimulation';
 import { NexusObject } from '../../../types';
-import { VisibleNode } from '../DrilldownFeature';
+import { VisibleNode } from '../hooks/useDrilldownRegistry';
 import { IntegrityReport } from '../../integrity/GraphIntegrityService';
 
 interface DrilldownLinkProps {
@@ -138,7 +138,7 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
         fill="none"
         stroke={flowColor}
         strokeWidth={
-          link.isStructuralLine ? 10 : isAnomalyFocus ? 14 : isPartOfAnomalyPath ? 10 : 4
+          link.isStructuralLine ? 16 : isAnomalyFocus ? 20 : isPartOfAnomalyPath ? 16 : 8
         }
         className={`${
           link.isStructuralLine ? 'structural-path-flow opacity-60' : 'link-path-flow'
@@ -151,23 +151,23 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
         d={`M${visualSource.x},${visualSource.y}A${dr},${dr} 0 0,1 ${visualTarget.x},${visualTarget.y}`}
         fill="none"
         stroke={flowColor}
-        strokeWidth={link.isStructuralLine ? 4 : 2}
+        strokeWidth={link.isStructuralLine ? 8 : 4}
         opacity="0.3"
         className="pointer-events-none"
       />
 
       {(isRelevant || isAnomalyFocus || isPartOfAnomalyPath) && !link.isStructuralLine && (
         <foreignObject
-          x={midX - 100}
-          y={midY - 40}
-          width="200"
-          height="80"
+          x={midX - 150}
+          y={midY - 60}
+          width="300"
+          height="120"
           className="overflow-visible pointer-events-auto"
         >
           <div className="w-full h-full flex items-center justify-center">
             <div
               onContextMenu={(e) => onContextMenu(e, link.id)}
-              className={`px-5 py-2.5 rounded-full border shadow-2xl flex items-center gap-3 backdrop-blur-md cursor-pointer bg-nexus-900 border-nexus-800 ${
+              className={`px-8 py-4 rounded-full border shadow-2xl flex items-center gap-4 backdrop-blur-md cursor-pointer bg-nexus-900 border-nexus-800 ${
                 isAnomalyFocus ? 'ring-4 ring-red-500/20' : ''
               }`}
               style={{
@@ -175,7 +175,7 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
                 textDecoration: isRedundant && !isAnomalyFocus ? 'line-through' : 'none',
               }}
             >
-              <span className="text-[10px] font-display font-black uppercase tracking-[0.25em]">
+              <span className="text-[14px] font-display font-black uppercase tracking-[0.3em]">
                 {isAnomalyFocus
                   ? 'ANOMALY: '
                   : isPartOfAnomalyPath

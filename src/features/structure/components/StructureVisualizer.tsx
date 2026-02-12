@@ -80,13 +80,22 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
     const roots = allObjects.filter(
       (obj) =>
         (!isLink(obj) || isReified(obj)) &&
-        (!childIds.has(obj.id) || (obj as SimpleNote).tags?.includes('__is_root__')),
+        (!childIds.has(obj.id) || (obj as SimpleNote).tags?.includes('__is_root__')) &&
+        !(obj as SimpleNote).time_data?.base_node_id, // Filter out Time Nodes
     ) as NexusObject[];
 
     const newCollapsed = new Set(collapsedIds);
     let changed = false;
 
     const walk = (id: string, depth: number) => {
+      // Filter out Time Nodes during walk if encountered (though ideally they aren't walked if not in children)
+      // Actually ResponsiveTree follows children_ids. We can't easily block ResponsiveTree from here without
+      // altering the registry it sees or modifying ResponsiveTree.
+      // But calculating collapsedIds for them is irrelevant if they are hidden.
+      // So we just focus on roots here.
+      // To strictly hide them in graph, we need to modify ResponsiveTree or filter the children maps there.
+      // For now, let's keep the collapse logic consistent.
+
       if (evaluatedIdsRef.current.has(id)) {
         // Fix: Explicitly cast registry access to handle line 60 and 61 errors
         const node = registry[id] as NexusObject | undefined;
@@ -98,6 +107,9 @@ export const StructureVisualizer: React.FC<StructureVisualizerProps> = ({
 
       const node = registry[id] as NexusObject | undefined;
       if (!node) return;
+
+      // Skip Time Nodes logic
+      if ((node as SimpleNote).time_data?.base_node_id) return;
 
       evaluatedIdsRef.current.add(id);
 

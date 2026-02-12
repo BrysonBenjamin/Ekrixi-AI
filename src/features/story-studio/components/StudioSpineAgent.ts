@@ -13,6 +13,7 @@ import {
 import { generateId } from '../../../utils/ids';
 import { config } from '../../../config';
 import { useSessionStore } from '../../../store/useSessionStore';
+import { ContextAssemblyService } from '../../../core/services/ContextAssemblyService';
 
 // NOTE: Currently operating in RAW TEXT MODE for maximum structural stability.
 // Markdown symbols are treated as literal characters to prevent parsing drift during recursive search.
@@ -183,14 +184,12 @@ export const StudioSpineAgent = {
       )
       .join(' | ');
 
-    const knownUnits = (Object.values(registry) as NexusObject[])
-      .filter((o) => o._type === NexusType.SIMPLE_NOTE || o._type === NexusType.CONTAINER_NOTE)
-      .slice(0, 20)
-      .map((o) => {
-        const note = o as SimpleNote;
-        return `${note.title}: ${note.gist}`;
-      })
-      .join('\n');
+    // FORMALIZED CONTEXT PIPELINE
+    const contextAssembly = ContextAssemblyService.assembleWorldContext(registry, [], intent, 20);
+    const knownUnits = contextAssembly.contextString;
+
+    // Telemetry Hook (Future: Stream to UI)
+    console.log('[StudioSpineAgent] Context Assembly Trace:', contextAssembly.thinking_process);
 
     const prompt = `
             ACT AS: The Ekrixi Neural Unit Forge.

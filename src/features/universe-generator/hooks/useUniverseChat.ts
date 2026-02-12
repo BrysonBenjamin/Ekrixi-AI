@@ -5,6 +5,10 @@ import { NexusObject, isLink, SimpleNote } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
 import { DataService } from '../../../core/services/DataService';
 import { useSessionStore } from '../../../store/useSessionStore';
+import {
+  ContextAssemblyService,
+  WeightedContextUnit,
+} from '../../../core/services/ContextAssemblyService';
 
 export const useUniverseChat = (
   registry: Record<string, NexusObject>,
@@ -98,7 +102,12 @@ export const useUniverseChat = (
   }, []);
 
   const triggerGeneration = useCallback(
-    async (sessionId: string, leafId: string, historyNodes: MessageNode[]) => {
+    async (
+      sessionId: string,
+      leafId: string,
+      historyNodes: MessageNode[],
+      explicitContext: WeightedContextUnit[] = [],
+    ) => {
       if (!activeUniverseId) return;
       setIsLoading(true);
       const botId = generateId();
@@ -121,13 +130,24 @@ export const useUniverseChat = (
       await DataService.addMessageToChat(activeUniverseId, sessionId, botNode, leafId);
 
       try {
-        const knownUnits = (Object.values(registry) as NexusObject[])
-          .filter((o) => !isLink(o))
-          .map((o) => {
-            const note = o as SimpleNote;
-            return `- ${note.title}: ${note.gist}`;
-          })
-          .join('\n');
+        // FORMALIZED CONTEXT ASSEMBLY
+        // Use the explicit context if provided, otherwise default to "scan" (empty list handled by service?)
+        // The service needs weightedUnits. If empty, it prioritizes nothing but still scans candidates.
+        const assemblyResult = ContextAssemblyService.assembleWorldContext(
+          registry,
+          explicitContext,
+          historyNodes[historyNodes.length - 1]?.text || 'User Query',
+        );
+
+        // Log Thinking Process (Future: Visualize)
+        if (import.meta.env.DEV) {
+          console.log(
+            '[useUniverseChat] Context Assembly Thinking Process:',
+            assemblyResult.thinking_process,
+          );
+        }
+
+        const knownUnits = assemblyResult.contextString;
 
         const historyText = historyNodes
           .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
@@ -189,10 +209,11 @@ export const useUniverseChat = (
   );
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, context?: WeightedContextUnit[]) => {
       if (import.meta.env.DEV) {
         console.log('[useUniverseChat] sendMessage sequence started:', {
           text,
+          context,
           currentSessionId,
           activeUniverseId,
           isLoading,
@@ -320,7 +341,7 @@ export const useUniverseChat = (
         };
 
         const history = getThread({ ...tempSession, senderId: 'system' });
-        triggerGeneration(sessionId, userMsgId, history);
+        triggerGeneration(sessionId, userMsgId, history, context);
       } catch (error) {
         console.error('[useUniverseChat] Failed to send message:', error);
         setIsLoading(false);

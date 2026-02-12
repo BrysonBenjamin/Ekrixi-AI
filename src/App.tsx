@@ -13,6 +13,7 @@ import { PlaygroundFeature } from './features/playground/PlaygroundFeature';
 import { useAuth } from './core/auth/AuthContext';
 import { LoginFeature } from './features/auth/LoginFeature';
 import { SurveyPopup } from './features/survey/components/SurveyPopup';
+import { TimelineFeature } from './features/timeline/TimelineFeature';
 import {
   NexusObject,
   isLink,
@@ -22,6 +23,7 @@ import {
   DefaultLayout,
 } from './types';
 import { generateId } from './utils/ids';
+import { dbFixtures } from './core/services/dbFixtures';
 import { useRegistryStore } from './store/useRegistryStore';
 import { useUIStore } from './store/useUIStore';
 import { useRefineryStore } from './store/useRefineryStore';
@@ -241,7 +243,7 @@ export default function App(): React.ReactNode {
     <div className="relative h-full w-full">
       {showIntro && <IntroOverlay onComplete={handleIntroComplete} />}
       <SurveyPopup />
-      <AppShell theme={theme}>
+      <AppShell>
         <Routes>
           <Route path="/login" element={<LoginFeature />} />
           <Route path="/" element={<Navigate to="/nexus" replace />} />
@@ -258,6 +260,19 @@ export default function App(): React.ReactNode {
                       new CustomEvent('nexus-seed-manifesto', { detail: blocks }),
                     );
                     navigate('/studio');
+                  }}
+                  onSeedTimeline={() => {
+                    if (activeUniverseId) {
+                      dbFixtures.seedTimelineScenario(activeUniverseId);
+                      // Optional: Navigate to timeline or show toast
+                      navigate('/timeline');
+                    }
+                  }}
+                  onSeedWar={() => {
+                    if (activeUniverseId) {
+                      dbFixtures.seedWarScenario(activeUniverseId);
+                      navigate('/explore');
+                    }
                   }}
                 />
               </ProtectedRoute>
@@ -277,6 +292,48 @@ export default function App(): React.ReactNode {
                   onSelectNote={(id) => {
                     setSelectedNoteId(id);
                     navigate('/library');
+                  }}
+                />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/timeline"
+            element={
+              <ProtectedRoute>
+                <TimelineFeature
+                  registry={registry}
+                  onSelect={(id) => {
+                    navigate('/explore');
+                    setSelectedNoteId(id);
+                  }}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/timeline/:nodeId"
+            element={
+              <ProtectedRoute>
+                <TimelineFeature
+                  registry={registry}
+                  onSelect={(id) => {
+                    // Navigate back to Drilldown focused on this ID
+                    // We need a way to pass this state, or just navigate to /explore and let it handle it via URL or state
+                    // Drilldown uses internal state for navStack.
+                    // We might need to expose a way to set deep link.
+                    // For now, let's just use navigate('/explore') and maybe set a global state or search param?
+                    // Currently navigate('/explore') resets stack? No, Drilldown uses internal state.
+                    // But Drilldown handles `integrityFocus` prop.
+                    // Let's just navigate to explore, and maybe Drilldown should read from URL params?
+                    // Implementing full deep linking is out of scope.
+                    // But the prop `onSelect` in TimelineFeature navigates to /explore currently.
+                    // We can improve this later.
+                    navigate('/explore');
+                    // We might want to set selectedNoteId too, but Drilldown handles that internally?
+                    // Let's just update the selected note so Drilldown *might* pick it up if it reads it.
+                    setSelectedNoteId(id);
                   }}
                 />
               </ProtectedRoute>

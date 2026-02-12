@@ -11,6 +11,7 @@ import {
   BookOpen,
   PenTool,
   Globe,
+  History,
 } from 'lucide-react';
 import { getRefineryDemoBatch } from '../refinery/fixtures/refinery_batch_fixture';
 import { getNeonSyndicateBatch } from '../refinery/fixtures/neon_syndicate_fixture';
@@ -24,12 +25,16 @@ interface PlaygroundFeatureProps {
   onSeedRefinery: (items: NexusObject[], name: string) => void;
   onSeedRegistry: (items: NexusObject[]) => void;
   onSeedManifesto?: (blocks: StudioBlock[]) => void;
+  onSeedTimeline?: () => void;
+  onSeedWar?: () => void;
 }
 
 export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
   onSeedRefinery,
   onSeedRegistry,
   onSeedManifesto,
+  onSeedTimeline,
+  onSeedWar,
 }) => {
   return (
     <div className="h-full w-full bg-nexus-950 overflow-y-auto no-scrollbar p-8 md:p-12 font-sans">
@@ -118,6 +123,29 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
               onSeed={() => onSeedRegistry(getGaiaPrimeExpandedBatch())}
               actionLabel="Inject to Registry"
               variant="registry"
+            />
+
+            <FixtureCard
+              title="Timestamp: Aethelgard"
+              desc="Historical timeline of a city across 3 eras (Foundation, Golden Age, Ruin). Tests time-travel navigation."
+              itemsCount={4}
+              category="Timeline Logic"
+              icon={History}
+              onSeed={() => onSeedTimeline?.()}
+              actionLabel="Seed Timeline"
+              variant="registry"
+            />
+
+            <FixtureCard
+              title="Scenario: The Variance War"
+              desc="Two sovereign states (Earth vs Moon) with a reified war connection. Tests multi-node temporal states."
+              itemsCount={12}
+              category="Complex Timeline"
+              icon={History}
+              onSeed={() => onSeedWar?.()}
+              actionLabel="Seed War"
+              variant="registry"
+              theme="ruby"
             />
           </div>
         </section>
