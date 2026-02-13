@@ -12,6 +12,7 @@ import {
   Compass,
   GitBranch,
   ChevronRight,
+  Calendar,
   LucideIcon,
 } from 'lucide-react';
 import {
@@ -54,7 +55,12 @@ interface DrilldownContextMenuProps {
   simulatedDate?: { year: number; month: number; day: number };
 }
 
-type MenuState = 'DEFAULT' | 'LINK_SEARCH' | 'REIFY_CHOOSE_SOURCE' | 'REIFY_CHOOSE_TARGET';
+type MenuState =
+  | 'DEFAULT'
+  | 'LINK_SEARCH'
+  | 'REIFY_CHOOSE_SOURCE'
+  | 'REIFY_CHOOSE_TARGET'
+  | 'SCRY_ERA_SELECT';
 
 export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
   object,
@@ -82,6 +88,15 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
     {},
   );
   const [useTimeAnchor, setUseTimeAnchor] = useState(true);
+  const [scryDate, setScryDate] = useState<{
+    year: number;
+    month?: number;
+    day?: number;
+  }>({
+    year: simulatedYear || 2160,
+    month: simulatedDate?.month,
+    day: simulatedDate?.day,
+  });
 
   const reified = isReified(object);
   const isL = isLink(object) && !reified;
@@ -189,11 +204,13 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
             ? 'PROMOTION: SELECT ORIGIN'
             : menuState === 'REIFY_CHOOSE_TARGET'
               ? 'PROMOTION: SELECT TERMINAL'
-              : reified
-                ? 'Reified Unit'
-                : isL
-                  ? 'Logic Stream'
-                  : 'Unit Signature'}
+              : menuState === 'SCRY_ERA_SELECT'
+                ? 'TEMPORAL MANIFESTATION'
+                : reified
+                  ? 'Reified Unit'
+                  : isL
+                    ? 'Logic Stream'
+                    : 'Unit Signature'}
         </div>
         <div className="text-[14px] font-display font-black text-nexus-text truncate">{title}</div>
       </div>
@@ -272,24 +289,17 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
                   onClick={() => setMenuState('LINK_SEARCH')}
                   color="text-nexus-essence opacity-70"
                 />
-                {!isL && simulatedYear && !(object as SimpleNote).time_data?.base_node_id && (
-                  <MenuItem
-                    icon={Sparkles}
-                    label="Scry Era"
-                    desc={`Snapshot history at ${simulatedYear}`}
-                    onClick={() => {
-                      onManifestSnapshot?.(
-                        object.id,
-                        simulatedDate?.year || 0,
-                        simulatedDate?.month,
-                        simulatedDate?.day,
-                      );
-                      onClose();
-                    }}
-                    color="text-fuchsia-400"
-                  />
-                )}
               </>
+            )}
+
+            {!(object as SimpleNote).time_data?.base_node_id && (
+              <MenuItem
+                icon={Sparkles}
+                label="Scry Era"
+                desc={`Snapshot history`}
+                onClick={() => setMenuState('SCRY_ERA_SELECT')}
+                color="text-fuchsia-400"
+              />
             )}
 
             <div className="h-px bg-nexus-800/50 my-2 mx-4" />
@@ -441,6 +451,91 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
             >
               Abort Promotion
             </button>
+          </div>
+        )}
+
+        {menuState === 'SCRY_ERA_SELECT' && (
+          <div className="p-2 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center justify-between mb-4 px-2">
+              <span className="text-[9px] font-display font-black text-fuchsia-400 uppercase tracking-widest flex items-center gap-2">
+                <Sparkles size={12} /> Target Date
+              </span>
+              <button
+                onClick={() => setMenuState('DEFAULT')}
+                className="text-nexus-muted hover:text-white transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-3 px-1">
+              <div className="space-y-1">
+                <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
+                  Year
+                </label>
+                <input
+                  type="number"
+                  value={scryDate.year}
+                  onChange={(e) =>
+                    setScryDate({ ...scryDate, year: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-full bg-nexus-950 border border-nexus-800 rounded-lg px-3 py-2 text-[11px] font-mono text-nexus-text outline-none focus:border-fuchsia-500/50"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
+                    Month
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    placeholder="MM"
+                    value={scryDate.month || ''}
+                    onChange={(e) =>
+                      setScryDate({
+                        ...scryDate,
+                        month: parseInt(e.target.value) || undefined,
+                      })
+                    }
+                    className="w-full bg-nexus-950 border border-nexus-800 rounded-lg px-3 py-2 text-[11px] font-mono text-nexus-text outline-none focus:border-fuchsia-500/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
+                    Day
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    placeholder="DD"
+                    value={scryDate.day || ''}
+                    onChange={(e) =>
+                      setScryDate({
+                        ...scryDate,
+                        day: parseInt(e.target.value) || undefined,
+                      })
+                    }
+                    className="w-full bg-nexus-950 border border-nexus-800 rounded-lg px-3 py-2 text-[11px] font-mono text-nexus-text outline-none focus:border-fuchsia-500/50"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    onManifestSnapshot?.(object.id, scryDate.year, scryDate.month, scryDate.day);
+                    onClose();
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-nexus-accent/10 border border-nexus-accent/20 text-nexus-accent hover:bg-nexus-accent hover:text-white transition-all text-[10px] font-display font-black uppercase tracking-widest shadow-lg"
+                >
+                  Manifest Snapshot
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -10,6 +10,7 @@ import {
   AggregatedSemanticLink,
   AggregatedHierarchicalLink,
 } from '../../../types';
+import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
 
 export type VisibleNode = NexusObject & {
   depth: number;
@@ -46,6 +47,8 @@ export const useDrilldownRegistry = ({
       const roots = (Object.values(registry) as NexusObject[]).filter(
         (obj) =>
           (!isLink(obj) || isReified(obj)) &&
+          (obj as any)._type !== 'TIME_LINK' &&
+          (obj as any).verb !== 'has_state' &&
           !allChildIds.has(obj.id) &&
           !(obj as SimpleNote).time_data?.base_node_id,
       );
@@ -69,6 +72,8 @@ export const useDrilldownRegistry = ({
       if (!obj) continue;
 
       if (obj._type === NexusType.STORY_NOTE) continue;
+      if ((obj as any)._type === 'TIME_LINK') continue;
+      if ((obj as any).verb === 'has_state') continue;
 
       // Exclude generic Time Nodes from graph structure (unless they are the override content source, handled later)
       if ((obj as SimpleNote).time_data?.base_node_id && id !== currentContainerId) {
@@ -97,24 +102,30 @@ export const useDrilldownRegistry = ({
         visited.set(id, depth);
 
         const overrideId = activeTimeOverrides[id];
-        let displayObj: NexusObject = obj;
+        let displayObj: any = obj;
 
         if (overrideId && registry[overrideId]) {
           const timeNode = registry[overrideId] as SimpleNote;
           displayObj = {
             ...obj,
-            title: timeNode.title || (obj as SimpleNote).title,
+            title: timeNode.title || (obj as any).title,
             gist: timeNode.gist,
             prose_content: timeNode.prose_content,
             tags: timeNode.tags,
             time_data: timeNode.time_data,
             // Support temporal labels for reified links
-            verb: (timeNode as unknown as TraitLink).verb || (obj as unknown as TraitLink).verb,
-            verb_inverse:
-              (timeNode as unknown as TraitLink).verb_inverse ||
-              (obj as unknown as TraitLink).verb_inverse,
-          } as unknown as NexusObject;
+            verb: (timeNode as any).verb || (obj as any).verb,
+            verb_inverse: (timeNode as any).verb_inverse || (obj as any).verb_inverse,
+          };
         }
+
+        // Apply Fractal Inheritance (T3 -> T2 -> T1)
+        const context = TimeDimensionService.resolveInheritedContext(registry, id);
+        displayObj = {
+          ...displayObj,
+          gist: displayObj.gist || context.gist,
+          tags: Array.from(new Set([...(displayObj.tags || []), ...(context.tags || [])])),
+        };
 
         subRegistry[id] = {
           ...displayObj,

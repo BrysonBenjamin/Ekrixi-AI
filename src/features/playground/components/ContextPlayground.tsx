@@ -8,7 +8,27 @@ import { dbFixtures } from '../../../core/services/dbFixtures';
 import { ThinkingProcessViewer } from '../../../components/shared/ThinkingProcessViewer';
 import { ContextPill } from '../../../components/shared/ContextPill';
 import { useRegistryStore } from '../../../store/useRegistryStore';
-import { NexusObject, NexusType, SimpleNote, NexusCategory } from '../../../types';
+import { NexusType, SimpleNote, NexusCategory } from '../../../types';
+import { getPlaygroundMockRegistry } from '../fixtures/playground_mock_fixture';
+
+// --- MOCK DATA ---
+const mockNote = (partial: Partial<SimpleNote>): SimpleNote => ({
+  id: partial.id || 'mock',
+  internal_weight: 1,
+  total_subtree_mass: 1,
+  created_at: new Date().toISOString(),
+  last_modified: new Date().toISOString(),
+  link_ids: [],
+  aliases: [],
+  tags: [],
+  prose_content: '',
+  is_ghost: false,
+  _type: NexusType.SIMPLE_NOTE,
+  category_id: NexusCategory.CONCEPT,
+  title: 'Mock',
+  gist: '',
+  ...partial,
+});
 
 export const ContextPlayground: React.FC = () => {
   const { registry } = useRegistryStore();
@@ -18,8 +38,8 @@ export const ContextPlayground: React.FC = () => {
 
   // --- Mock Data Init (If Registry is empty/loading) ---
   // In a real scenario, registry comes from FireStore.
-  // This fallback ensures the playgrounchecd works even if the user hasn't loaded data.
-  const displayRegistry = Object.keys(registry).length > 0 ? registry : MOCK_REGISTRY;
+  // This fallback ensures the playground works even if the user hasn't loaded data.
+  const displayRegistry = Object.keys(registry).length > 0 ? registry : getPlaygroundMockRegistry();
 
   const handleAddMention = (id: string) => {
     if (weightedMentions.some((m) => m.id === id)) return;
@@ -122,9 +142,47 @@ export const ContextPlayground: React.FC = () => {
                   );
                 }
               }}
-              className="w-full py-3 bg-nexus-800 text-nexus-muted hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-700 transition-all text-xs border border-nexus-700 hover:border-nexus-600"
+              className="w-full py-3 bg-nexus-800 text-nexus-muted hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-700 transition-all text-xs border border-nexus-700 hover:border-nexus-600 mb-3"
             >
               Load Timeline Demo Data
+            </button>
+
+            <button
+              onClick={() => {
+                const universeId = useRegistryStore.getState().activeUniverseId;
+                if (universeId) {
+                  dbFixtures.seedWarScenario(universeId);
+                  alert(
+                    'War Scenario Seeded! Search for "The Variance War" to see the temporal conflict.',
+                  );
+                } else {
+                  alert(
+                    'No active universe found. Please go to Settings and load/create a universe first.',
+                  );
+                }
+              }}
+              className="w-full py-3 bg-nexus-950/50 text-nexus-ruby hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-ruby transition-all text-xs border border-nexus-ruby/30 hover:border-nexus-ruby shadow-lg shadow-nexus-ruby/10 mb-3"
+            >
+              Load War Scenario (Conflicts)
+            </button>
+
+            <button
+              onClick={() => {
+                const universeId = useRegistryStore.getState().activeUniverseId;
+                if (universeId) {
+                  dbFixtures.seedTriangleWarScenario(universeId);
+                  alert(
+                    'Triangle War Seeded! Search for "Country A" to test time navigation arrows.',
+                  );
+                } else {
+                  alert(
+                    'No active universe found. Please go to Settings and load/create a universe first.',
+                  );
+                }
+              }}
+              className="w-full py-3 bg-nexus-950/50 text-nexus-accent hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-accent transition-all text-xs border border-nexus-accent/30 hover:border-nexus-accent shadow-lg shadow-nexus-accent/10"
+            >
+              Load Triangle War (Arrows Test)
             </button>
           </div>
         </div>
@@ -163,55 +221,4 @@ export const ContextPlayground: React.FC = () => {
       </div>
     </div>
   );
-};
-
-// --- MOCK DATA ---
-const mockNote = (partial: Partial<SimpleNote>): SimpleNote => ({
-  id: partial.id || 'mock',
-  internal_weight: 1,
-  total_subtree_mass: 1,
-  created_at: new Date().toISOString(),
-  last_modified: new Date().toISOString(),
-  link_ids: [],
-  aliases: [],
-  tags: [],
-  prose_content: '',
-  is_ghost: false,
-  _type: NexusType.SIMPLE_NOTE,
-  category_id: NexusCategory.CONCEPT,
-  title: 'Mock',
-  gist: '',
-  ...partial,
-});
-
-const MOCK_REGISTRY: Record<string, NexusObject> = {
-  'Units/HERO': mockNote({
-    id: 'Units/HERO',
-    _type: NexusType.SIMPLE_NOTE,
-    title: 'Aleron (Protagonist)',
-    gist: 'The chosen one who seeks the Nexus Core.',
-    category_id: NexusCategory.CHARACTER,
-    link_ids: ['Units/SWORD'],
-  }),
-  'Units/SWORD': mockNote({
-    id: 'Units/SWORD',
-    title: 'Vorpal Blade',
-    _type: NexusType.SIMPLE_NOTE,
-    gist: 'A magical sword that glows blue when orcs are near.',
-    category_id: NexusCategory.ITEM,
-  }),
-  'Units/VILLAGE': mockNote({
-    id: 'Units/VILLAGE',
-    title: 'Riverwood',
-    _type: NexusType.SIMPLE_NOTE,
-    gist: 'A small hamlet near the river.',
-    category_id: NexusCategory.LOCATION,
-  }),
-  'Units/KING': mockNote({
-    id: 'Units/KING',
-    title: 'King Theoden',
-    _type: NexusType.SIMPLE_NOTE,
-    gist: 'The ruler of the realm, currently possessed.',
-    category_id: NexusCategory.CHARACTER,
-  }),
 };

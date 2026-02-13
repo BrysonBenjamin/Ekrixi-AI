@@ -274,6 +274,18 @@ export default function App(): React.ReactNode {
                       navigate('/explore');
                     }
                   }}
+                  onSeedTriangleWar={() => {
+                    if (activeUniverseId) {
+                      dbFixtures.seedTriangleWarScenario(activeUniverseId);
+                      navigate('/explore');
+                    }
+                  }}
+                  onSeedFractalWar={() => {
+                    if (activeUniverseId) {
+                      dbFixtures.seedFractalWarScenario(activeUniverseId);
+                      navigate('/explore');
+                    }
+                  }}
                 />
               </ProtectedRoute>
             }

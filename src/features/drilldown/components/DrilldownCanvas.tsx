@@ -129,7 +129,48 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ id, x: e.clientX, y: e.clientY });
+
+    // Context Menu Smarts:
+    // If we right-clicked a link, we need to find the "Best" link ID if there are overlapping ones.
+    // The visual link ID might be specific, but let's check if there's a better candidate in the simulation based on time.
+
+    // 1. Identify if 'id' is a link
+    const clickedLink = links.find((l) => l.id === id);
+    let selectedId = id;
+
+    if (clickedLink && simulatedDate) {
+      // Find all links active between these two nodes
+      const overlappingLinks = links.filter(
+        (l) =>
+          (l.source as any).id === (clickedLink.source as any).id &&
+          (l.target as any).id === (clickedLink.target as any).id,
+      );
+
+      if (overlappingLinks.length > 1) {
+        // Logic: Default to the closest one to the current year rounded down
+        // Which means: find links where start_year <= current_year
+        // Then pick the one with start_year closest to current_year
+        const currentYear = simulatedDate.year;
+
+        const bestLink = overlappingLinks.reduce((best, current) => {
+          const bestStart = (best as any).temporal_bounds?.effective_date?.year || -Infinity;
+          const currentStart = (current as any).temporal_bounds?.effective_date?.year || -Infinity;
+
+          // We want max start date that is <= currentYear
+          const bestDiff = currentYear - bestStart;
+          const currentDiff = currentYear - currentStart;
+
+          if (currentDiff < 0) return best; // Current is in future, ignore if possible (unless best is also future?)
+          if (bestDiff < 0) return current; // Best was active in future, current is valid now
+
+          return currentDiff < bestDiff ? current : best;
+        });
+
+        if (bestLink) selectedId = bestLink.id;
+      }
+    }
+
+    setContextMenu({ id: selectedId, x: e.clientX, y: e.clientY });
   };
 
   return (
@@ -194,6 +235,17 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
               <feGaussianBlur stdDeviation="15" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
+            <marker
+              id="arrow-head"
+              viewBox="0 -5 10 10"
+              refX="28" // Push arrow back a bit from node center
+              refY="0"
+              markerWidth="8"
+              markerHeight="8"
+              orient="auto"
+            >
+              <path d="M0,-5L10,0L0,5" fill="var(--accent-color)" opacity="0.8" />
+            </marker>
           </defs>
           <rect x="-40000" y="-40000" width="80000" height="80000" fill="url(#nexus-grid-minor)" />
           <rect x="-40000" y="-40000" width="80000" height="80000" fill="url(#nexus-grid-major)" />
@@ -260,7 +312,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
           return (
             <DrilldownContextMenu
               object={object}
-              registry={registry as unknown as Record<string, NexusObject>}
+              registry={registry as any}
               x={contextMenu.x}
               y={contextMenu.y}
               onClose={() => setContextMenu(null)}

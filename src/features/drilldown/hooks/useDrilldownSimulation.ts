@@ -11,6 +11,8 @@ import {
   AggregatedHierarchicalLink,
 } from '../../../types';
 import { VisibleNode } from './useDrilldownRegistry';
+import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
+import { LinkTier } from '../../../core/types/enums';
 
 export interface SimulationNode extends d3.SimulationNodeDatum {
   id: string;
@@ -30,6 +32,7 @@ export interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
   type: NexusType;
   originalSourceId?: string;
   originalTargetId?: string;
+  isTemporalActive?: boolean;
 }
 
 interface UseDrilldownSimulationProps {
@@ -53,45 +56,111 @@ export const useDrilldownSimulation = ({
   const prevNodesRef = useRef<SimulationNode[] | null>(null);
 
   const simData = useMemo(() => {
-    const activeNodes: SimulationNode[] = (Object.values(registry) as VisibleNode[]).map((obj) => ({
-      id: obj.id,
-      object: obj,
-    }));
+    const activeNodes: SimulationNode[] = (Object.values(registry) as VisibleNode[])
+      .filter((obj) => (obj as any).category_id !== 'STATE') // HIDE STATE NODES
+      .map((obj) => ({
+        id: obj.id,
+        object: obj,
+      }));
 
     const activeLinks: SimulationLink[] = [];
 
+    // Helper to check if a link is temporally active
+    const checkTemporalStatus = (link: any, date?: { year: number }) => {
+      if (!date) return true; // No date simulation = always active
+      const linkYear =
+        link.temporal_bounds?.effective_date?.year || link.time_data?.year || -Infinity;
+      const linkEndYear = link.temporal_bounds?.valid_until?.year || Infinity;
+      return linkYear <= date.year && date.year <= linkEndYear;
+    };
+
+    // Inject Bubbled Links (State Node -> Parent Logic)
+    // This allows a link to "France (1800)" to appear as a link to "France" in the main view.
+    // We convert the SimulationNode[] back to SimpleNote[] for the service
+    const activeSimpleNotes = (Object.values(registry) as VisibleNode[]).map(
+      (n) => n as unknown as SimpleNote,
+    );
+    const bubbledLinks = TimeDimensionService.getBubbledLinks(fullRegistry, activeSimpleNotes);
+
+    bubbledLinks.forEach((bLink, idx) => {
+      // Avoid duplicates if a real link already exists
+      const exists = activeLinks.some(
+        (l) =>
+          (l.source === bLink.source && l.target === bLink.target) ||
+          (l.source === bLink.target && l.target === bLink.source),
+      );
+      if (exists) return;
+
+      // For bubbled links, we assume they are active if the state node was active
+      // But since we are hiding state nodes, we need to defer to the link's own bounds if we can find the original link
+      // For now, bubbled links are "Active" because getBubbledLinks only returns active states.
+      activeLinks.push({
+        id: `bubbled-${bLink.source}-${bLink.target}-${idx}`,
+        source: bLink.source,
+        target: bLink.target,
+        verb: bLink.verb,
+        verbInverse: 'linked state',
+        isReified: false,
+        type: NexusType.SIMPLE_LINK,
+        originalSourceId: bLink.source, // Approximate
+        originalTargetId: bLink.target,
+        isTemporalActive: true, // Bubbled links are inherently active because they come from active states
+      } as any);
+    });
+
     (Object.values(fullRegistry) as NexusObject[]).forEach((obj) => {
       if (!isLink(obj)) return;
-      if ((obj as unknown as AggregatedSemanticLink).time_data?.base_node_id) return; // Skip temporal reified skins for now, handled below
 
-      const link = obj as TraitLink;
+      if ((obj as any).time_state?.parent_identity_id || (obj as any).time_data?.base_node_id)
+        return; // Skip temporal reified skins for now, handled below
+      const link = obj as any;
       const sId = link.source_id;
       const tId = link.target_id;
 
-      // Resolve endpoint base IDs for simulation lookup
-      const sBaseId = (fullRegistry[sId] as SimpleNote)?.time_data?.base_node_id || sId;
-      const tBaseId = (fullRegistry[tId] as SimpleNote)?.time_data?.base_node_id || tId;
+      const sBaseId =
+        (fullRegistry[sId] as any)?.time_state?.parent_identity_id ||
+        (fullRegistry[sId] as any)?.time_data?.base_node_id ||
+        sId;
+      const tBaseId =
+        (fullRegistry[tId] as any)?.time_state?.parent_identity_id ||
+        (fullRegistry[tId] as any)?.time_data?.base_node_id ||
+        tId;
 
       // 1. Both endpoints (base nodes) must be in visible registry
       if (!registry[sBaseId] || !registry[tBaseId]) return;
 
-      // 2. Atomic Snapshot Check:
+      // 2. Atomic Snapshot Check (Updated for Time State):
       // If the link explicitly targets a snapshot (sId != sBaseId), it must match the active one.
       // If it targets a base (sId == sBaseId), it only shows if NO snapshot is active (strict atomic).
       const sActiveId = registry[sBaseId].activeTemporalId || sBaseId;
       const tActiveId = registry[tBaseId].activeTemporalId || tBaseId;
 
-      if (sId !== sActiveId || tId !== tActiveId) return;
+      // Relaxed Check: Allow link if it points to the Active Snapshot OR the Base Node (Inheritance)
+      const isSourceValid = sId === sActiveId || sId === sBaseId;
+      const isTargetValid = tId === tActiveId || tId === tBaseId;
+
+      if (!isSourceValid || !isTargetValid) return;
 
       // 3. Temporal Filtering (Backup): Link must not be in the future relative to the era
-      const linkYear = (link as unknown as AggregatedSemanticLink).time_data?.year || -Infinity;
-      if (simulatedDate && linkYear > simulatedDate.year) return;
+      // Now checking valid_until range!
+      const isTemporalActive = checkTemporalStatus(link, simulatedDate);
 
       if (isReified(obj) && registry[obj.id]) {
-        const reified = obj as AggregatedSemanticLink | AggregatedHierarchicalLink;
+        const reified = obj as AggregatedSemanticLink;
+
+        // --- Granularity Shifting Logic ---
+        // If this is a nested reified link (has parent_container_id),
+        // only show it if the parent is the one in focus.
+        if (reified.parent_container_id && reified.parent_container_id !== focusId) {
+          // Check if parent is also in registry. If it is, and we aren't focusing it, hide the child to keep graph clean.
+          if (registry[reified.parent_container_id]) return;
+        }
+
+        // Reified structural lines are active if the Reified Node itself is temporally consistent
         activeLinks.push({
           id: `${obj.id}-structural-s`,
           source:
+            (fullRegistry[reified.source_id] as SimpleNote)?.time_state?.parent_identity_id ||
             (fullRegistry[reified.source_id] as SimpleNote)?.time_data?.base_node_id ||
             reified.source_id,
           target: obj.id,
@@ -99,19 +168,22 @@ export const useDrilldownSimulation = ({
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
-        });
+          isTemporalActive: true,
+        } as any);
         activeLinks.push({
           id: `${obj.id}-structural-t`,
           source: obj.id,
           target:
+            (fullRegistry[reified.target_id] as SimpleNote)?.time_state?.parent_identity_id ||
             (fullRegistry[reified.target_id] as SimpleNote)?.time_data?.base_node_id ||
             reified.target_id,
           verb: link.verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
-        });
-      } else {
+          isTemporalActive: true,
+        } as any);
+      } else if (!isReified(obj)) {
         activeLinks.push({
           id: obj.id,
           source: sBaseId,
@@ -123,12 +195,13 @@ export const useDrilldownSimulation = ({
           type: obj._type as NexusType,
           originalSourceId: sId,
           originalTargetId: tId,
-        });
+          isTemporalActive: isTemporalActive, // Pass this down
+        } as any);
       }
     });
 
     return { nodes: activeNodes, links: activeLinks };
-  }, [registry, fullRegistry, simulatedDate]);
+  }, [registry, fullRegistry, simulatedDate, focusId]);
 
   useEffect(() => {
     if (!simData.nodes.length) {
@@ -225,6 +298,12 @@ export const useDrilldownSimulation = ({
           positionMap.current.set(node.id, { x: node.x, y: node.y });
         }
       });
+      setNodes([...simData.nodes]);
+      setLinks([...simData.links]);
+    });
+
+    // Force initial render state to prevent "invisible nodes" bug on fresh load
+    queueMicrotask(() => {
       setNodes([...simData.nodes]);
       setLinks([...simData.links]);
     });

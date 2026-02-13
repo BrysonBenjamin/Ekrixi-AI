@@ -32,6 +32,8 @@ import {
   ArangoSearchService,
   GovernedSearchResult,
 } from '../../../core/services/ArangoSearchService';
+import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
+import { SnapshotPicker } from './components/SnapshotPicker';
 
 interface InspectorSidebarProps {
   object: NexusObject;
@@ -39,6 +41,7 @@ interface InspectorSidebarProps {
   onUpdate: (updates: Partial<NexusObject>) => void;
   onClose: () => void;
   onOpenWiki?: (id: string) => void;
+  onSelect?: (id: string) => void;
 }
 
 export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
@@ -47,6 +50,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   onUpdate,
   onClose,
   onOpenWiki,
+  onSelect,
 }) => {
   const navigate = useNavigate();
   const isL = isLink(object);
@@ -433,41 +437,92 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
-                        Source Snapshot
+                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase">
+                        Month
                       </label>
                       <input
-                        value={(object as SimpleNote).time_data?.anchored_source_id || ''}
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={(object as SimpleNote).time_data?.month || ''}
                         onChange={(e) =>
                           onUpdate({
                             time_data: {
                               ...((object as SimpleNote).time_data || {}),
-                              anchored_source_id: e.target.value,
+                              month: parseInt(e.target.value) || undefined,
                             },
                           } as Partial<NexusObject>)
                         }
-                        className="w-full bg-nexus-900/50 border border-nexus-800 rounded-lg px-3 py-1.5 text-[8px] font-mono text-nexus-muted outline-none focus:border-nexus-accent/30"
-                        placeholder="Anchor ID..."
+                        className="w-full bg-nexus-900 border border-nexus-800 rounded-lg px-3 py-2 text-[10px] font-mono text-nexus-ruby outline-none focus:border-nexus-ruby/50"
+                        placeholder="MM"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
-                        Target Snapshot
+                      <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase">
+                        Day
                       </label>
                       <input
-                        value={(object as SimpleNote).time_data?.anchored_target_id || ''}
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={(object as SimpleNote).time_data?.day || ''}
                         onChange={(e) =>
                           onUpdate({
                             time_data: {
                               ...((object as SimpleNote).time_data || {}),
-                              anchored_target_id: e.target.value,
+                              day: parseInt(e.target.value) || undefined,
                             },
                           } as Partial<NexusObject>)
                         }
-                        className="w-full bg-nexus-900/50 border border-nexus-800 rounded-lg px-3 py-1.5 text-[8px] font-mono text-nexus-muted outline-none focus:border-nexus-accent/30"
-                        placeholder="Anchor ID..."
+                        className="w-full bg-nexus-900 border border-nexus-800 rounded-lg px-3 py-2 text-[10px] font-mono text-nexus-ruby outline-none focus:border-nexus-ruby/50"
+                        placeholder="DD"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-nexus-800/30">
+                    <div className="space-y-1">
+                      <SnapshotPicker
+                        label="Source Snapshot"
+                        baseNodeId={
+                          isL
+                            ? (registry[(object as SemanticLink).source_id] as SimpleNote)
+                                ?.time_data?.base_node_id || (object as SemanticLink).source_id
+                            : ''
+                        }
+                        selectedSnapshotId={(object as SimpleNote).time_data?.anchored_source_id}
+                        registry={registry}
+                        onSelect={(id) =>
+                          onUpdate({
+                            time_data: {
+                              ...((object as SimpleNote).time_data || {}),
+                              anchored_source_id: id,
+                            },
+                          } as Partial<NexusObject>)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <SnapshotPicker
+                        label="Target Snapshot"
+                        baseNodeId={
+                          isL
+                            ? (registry[(object as SemanticLink).target_id] as SimpleNote)
+                                ?.time_data?.base_node_id || (object as SemanticLink).target_id
+                            : ''
+                        }
+                        selectedSnapshotId={(object as SimpleNote).time_data?.anchored_target_id}
+                        registry={registry}
+                        onSelect={(id) =>
+                          onUpdate({
+                            time_data: {
+                              ...((object as SimpleNote).time_data || {}),
+                              anchored_target_id: id,
+                            },
+                          } as Partial<NexusObject>)
+                        }
                       />
                     </div>
                   </div>
@@ -475,6 +530,88 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* --- TEMPORAL LINEAGE PROTOYPE --- */}
+        <div className="p-6 bg-nexus-950 border border-nexus-800 rounded-[32px] shadow-xl space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-fuchsia-500/10 rounded-xl text-fuchsia-500">
+              <HistoryIcon size={16} />
+            </div>
+            <h3 className="text-[10px] font-display font-black text-nexus-text uppercase tracking-widest">
+              Temporal Lineage
+            </h3>
+          </div>
+
+          <div className="space-y-2">
+            <div className="max-h-[200px] overflow-y-auto no-scrollbar space-y-1">
+              {[
+                ...(TimeDimensionService.getTimeStack(
+                  registry,
+                  ('time_data' in object && object.time_data?.base_node_id) || object.id,
+                ) || []),
+                registry[('time_data' in object && object.time_data?.base_node_id) || object.id],
+              ]
+                .filter(Boolean)
+                .sort((a, b) => {
+                  // Sort by time: Base (0) -> Oldest -> Newest
+                  const getScore = (n: NexusObject) => {
+                    if (!('time_data' in n) || !n.time_data?.base_node_id) return -1; // Base is always first
+                    return (
+                      (n.time_data.year || 0) * 10000 +
+                      (n.time_data.month || 0) * 100 +
+                      (n.time_data.day || 0)
+                    );
+                  };
+                  return getScore(a) - getScore(b);
+                })
+                // Deduplicate by ID just in case
+                .filter((n, i, self) => i === self.findIndex((t) => t.id === n.id))
+                .map((snapshot) => {
+                  const isCurrent = snapshot.id === object.id;
+                  const isBase = !('time_data' in snapshot) || !snapshot.time_data?.base_node_id;
+                  const dateStr = isBase
+                    ? 'TIMELESS BASE'
+                    : `ERA: ${snapshot.time_data?.year || '????'}.${snapshot.time_data?.month || '??'}.${snapshot.time_data?.day || '??'}`;
+
+                  return (
+                    <button
+                      key={snapshot.id}
+                      onClick={() => onSelect?.(snapshot.id)}
+                      disabled={isCurrent}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
+                        isCurrent
+                          ? 'bg-fuchsia-500/10 border-fuchsia-500/50 text-fuchsia-400 cursor-default'
+                          : 'bg-nexus-900 border-nexus-800 text-nexus-muted hover:bg-nexus-800 hover:text-nexus-text hover:border-nexus-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-fuchsia-500 animate-pulse' : 'bg-nexus-700'}`}
+                        />
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-widest truncate">
+                          {dateStr}
+                        </span>
+                      </div>
+                      {isCurrent && (
+                        <span className="text-[8px] font-black uppercase text-fuchsia-500 tracking-widest">
+                          Active
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+
+              {!TimeDimensionService.getTimeStack(
+                registry,
+                ('time_data' in object && object.time_data?.base_node_id) || object.id,
+              )?.length && (
+                <div className="p-4 text-center text-[9px] text-nexus-muted font-mono uppercase tracking-widest opacity-50 italic">
+                  No temporal manifestations recorded.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="p-6 bg-nexus-950 border border-nexus-800 rounded-[32px] shadow-xl space-y-4">

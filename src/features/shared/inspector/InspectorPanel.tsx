@@ -9,6 +9,7 @@ interface InspectorPanelProps {
   onUpdate: (updates: Partial<NexusObject>) => void;
   onClose: () => void;
   onOpenWiki?: (id: string) => void;
+  onSelect?: (id: string) => void;
 }
 
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({
@@ -18,6 +19,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onUpdate,
   onClose,
   onOpenWiki,
+  onSelect,
 }) => {
   return (
     <div
@@ -34,6 +36,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           onUpdate={onUpdate}
           onClose={onClose}
           onOpenWiki={onOpenWiki}
+          onSelect={onSelect}
         />
       )}
     </div>

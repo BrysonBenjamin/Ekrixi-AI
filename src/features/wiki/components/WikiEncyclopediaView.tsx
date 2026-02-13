@@ -3,6 +3,7 @@ import { Sparkles, Save, RotateCw, Wand2 } from 'lucide-react';
 import { Logo } from '../../../components/shared/Logo';
 import { WikiArtifact, NexusObject, SimpleNote } from '../../../types';
 import { NexusMarkdown } from '../../../components/shared/NexusMarkdown';
+import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
 
 interface WikiEncyclopediaViewProps {
   currentArtifact: WikiArtifact | null;
@@ -73,6 +74,49 @@ export const WikiEncyclopediaView: React.FC<WikiEncyclopediaViewProps> = ({
               onLinkClick={onSelect}
             />
           </div>
+
+          {/* Chronicle Timeline (Temporal Anchors) */}
+          {(() => {
+            const timeStack = TimeDimensionService.getTimeStack(registry, note.id);
+            if (timeStack.length > 0) {
+              return (
+                <div className="mt-12 px-8">
+                  <h3 className="text-nexus-muted text-xs font-display font-black uppercase tracking-[0.3em] mb-6 pl-4 border-l-2 border-nexus-accent/30">
+                    Chronicle Timeline
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {timeStack.map((stateNode) => (
+                      <div
+                        key={stateNode.id}
+                        onClick={() => onSelect(stateNode.id)}
+                        className="group flex items-center justify-between p-6 bg-nexus-900/40 border border-nexus-800/60 rounded-3xl hover:bg-nexus-900 hover:border-nexus-accent/50 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-6">
+                          <div className="text-nexus-accent font-mono font-bold text-lg w-16 text-right">
+                            {stateNode.time_state?.effective_date?.year ||
+                              stateNode.time_data?.year}
+                          </div>
+                          <div className="h-8 w-[2px] bg-nexus-800 group-hover:bg-nexus-accent/50 transition-colors" />
+                          <div>
+                            <div className="text-nexus-text font-bold text-sm group-hover:text-nexus-accent transition-colors">
+                              {stateNode.title}
+                            </div>
+                            <div className="text-nexus-muted text-xs truncate max-w-[300px] opacity-60">
+                              {stateNode.gist}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-nexus-muted/40 group-hover:text-nexus-accent transition-colors">
+                          <RotateCw size={16} className="rotate-[-90deg]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           <div className="flex justify-center pt-10">
             <button

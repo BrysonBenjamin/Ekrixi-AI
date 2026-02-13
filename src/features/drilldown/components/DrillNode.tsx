@@ -43,6 +43,7 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
   // const depth = object.depth; // unused
   const reified = isReified(nexusObj);
   const category = (object as any).category_id || 'CONCEPT';
+  const isStateNode = category === 'STATE';
   const isParentPath = object.pathType === 'ancestor';
   const isAuthorNote = (object as any).is_author_note;
 
@@ -67,7 +68,9 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
 
   const iconSvg = isAuthorNote
     ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
-    : getCategoryIconSvg(category, color, reified);
+    : isStateNode
+      ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`
+      : getCategoryIconSvg(category, color, reified);
   const isC = isContainer(nexusObj);
 
   const title = useMemo(() => {
@@ -160,22 +163,59 @@ export const DrillNode: React.FC<DrillNodeProps> = ({
               </span>
 
               {/* Temporal Snapshot Indicator */}
-              {((object as any).time_data?.year !== undefined || (object as any).created_at) && (
+              {((object as any).time_state ||
+                (object as any).time_data?.year !== undefined ||
+                (object as any).created_at) && (
                 <div
-                  className={`flex items-center gap-3 px-4 py-2 rounded-2xl border text-[12px] font-mono uppercase tracking-widest transition-all ${(object as any).time_data?.base_node_id ? 'bg-nexus-accent/10 border-nexus-accent/40 text-nexus-accent shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]' : 'bg-nexus-950/50 border-nexus-800 text-nexus-muted opacity-60'}`}
+                  className={`flex items-center gap-3 px-4 py-2 rounded-2xl border text-[12px] font-mono uppercase tracking-widest transition-all ${
+                    (object as any).time_state?.parent_identity_id ||
+                    (object as any).time_data?.base_node_id
+                      ? 'bg-nexus-accent/10 border-nexus-accent/40 text-nexus-accent shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]'
+                      : 'bg-nexus-950/50 border-nexus-800 text-nexus-muted opacity-60'
+                  }`}
                 >
                   <Activity
                     size={14}
-                    className={(object as any).time_data?.base_node_id ? 'animate-pulse' : ''}
+                    className={
+                      (object as any).time_state?.parent_identity_id ? 'animate-pulse' : ''
+                    }
                   />
-                  ERA:{' '}
-                  {(object as any).time_data?.year ||
-                    ((object as any).created_at
-                      ? new Date((object as any).created_at).getFullYear()
-                      : 'ORIGIN')}
-                  {(object as any).time_data?.base_node_id && (
+                  {(object as any).time_state ? (
+                    <>
+                      {/* New Time State Display */}
+                      {(object as any).time_state.effective_date.year}
+                      {(object as any).time_state.valid_until && (
+                        <span className="opacity-70">
+                          {' '}
+                          - {(object as any).time_state.valid_until.year}
+                        </span>
+                      )}
+                    </>
+                  ) : (object as any).time_data?.year ? (
+                    <>
+                      {/* Legacy Time Data Display */}
+                      {(object as any).time_data.month && (
+                        <span className="opacity-70">
+                          {new Date(2000, (object as any).time_data.month - 1, 1).toLocaleString(
+                            'default',
+                            { month: 'short' },
+                          )}
+                          {(object as any).time_data.day
+                            ? ` ${(object as any).time_data.day}, `
+                            : ' '}
+                        </span>
+                      )}
+                      ERA: {(object as any).time_data.year}
+                    </>
+                  ) : (object as any).created_at ? (
+                    `ORIGIN: ${new Date((object as any).created_at).getFullYear()}`
+                  ) : (
+                    'ORIGIN'
+                  )}
+                  {((object as any).time_state?.parent_identity_id ||
+                    (object as any).time_data?.base_node_id) && (
                     <span className="ml-1 opacity-80 text-[10px] bg-nexus-accent text-white px-2 py-0.5 rounded-md font-black shadow-[0_0_10px_rgba(var(--accent-rgb),0.5)]">
-                      SYNC
+                      {(object as any).time_state?.is_canonical ? 'CANON' : 'SNAP'}
                     </span>
                   )}
                 </div>

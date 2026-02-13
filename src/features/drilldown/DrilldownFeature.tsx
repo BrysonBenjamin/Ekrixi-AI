@@ -145,6 +145,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           onUpdate={handleUpdateItem}
           onClose={() => setShowInspector(false)}
           onOpenWiki={onSelectNote}
+          onSelect={setSelectedId}
         />
       </main>
       <DrilldownFooter

@@ -99,21 +99,26 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
     focusId === sourceNode.id ||
     focusId === targetNode.id;
 
+  // TEMPORAL OPACITY LOGIC
+  const isTemporalActive = link.isTemporalActive !== false; // Default to true if undefined
+  const baseOpacity = isTemporalActive ? (isRedundant ? 0.6 : 0.8) : 0.15; // Dim inactive links
+
   const globalOpacity = isAnomalyFocus
     ? 1
     : isPartOfAnomalyPath
       ? 0.9
       : isRelevant
-        ? isRedundant
-          ? 0.6
-          : 0.8
-        : 0.2;
+        ? Math.max(baseOpacity, 0.4) // Boost visibility if hovered even if inactive
+        : baseOpacity;
 
   const dx = visualTarget.x! - visualSource.x!;
   const dy = visualTarget.y! - visualSource.y!;
   const dr = Math.sqrt(dx * dx + dy * dy) * 1.8;
   const midX = (visualSource.x! + visualTarget.x!) / 2;
   const midY = (visualSource.y! + visualTarget.y!) / 2;
+
+  // Only show arrows for active links to reduce noise on inactive/dim ones
+  const showArrow = isTemporalActive && !link.isStructuralLine;
 
   return (
     <g
@@ -127,70 +132,83 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
         d={`M${visualSource.x},${visualSource.y}A${dr},${dr} 0 0,1 ${visualTarget.x},${visualTarget.y}`}
         fill="none"
         stroke="transparent"
-        strokeWidth="100"
+        strokeWidth="100" // Hitbox
         className="pointer-events-auto cursor-pointer"
         onContextMenu={(e) => onContextMenu(e, link.id)}
       />
 
-      {/* Flow Animation Path */}
-      <path
-        d={`M${visualSource.x},${visualSource.y}A${dr},${dr} 0 0,1 ${visualTarget.x},${visualTarget.y}`}
-        fill="none"
-        stroke={flowColor}
-        strokeWidth={
-          link.isStructuralLine ? 16 : isAnomalyFocus ? 20 : isPartOfAnomalyPath ? 16 : 8
-        }
-        className={`${
-          link.isStructuralLine ? 'structural-path-flow opacity-60' : 'link-path-flow'
-        } pointer-events-none`}
-        filter={link.isStructuralLine ? 'url(#sigil-glow)' : 'none'}
-      />
+      {/* Flow Animation Path (Active Links Only) */}
+      {isTemporalActive && (
+        <path
+          d={`M${visualSource.x},${visualSource.y}A${dr},${dr} 0 0,1 ${visualTarget.x},${visualTarget.y}`}
+          fill="none"
+          stroke={flowColor}
+          strokeWidth={
+            link.isStructuralLine ? 16 : isAnomalyFocus ? 20 : isPartOfAnomalyPath ? 16 : 8
+          }
+          strokeDasharray={
+            link.isStructuralLine
+              ? 'none'
+              : (visualSource.object as any).time_data?.base_node_id ||
+                  (visualTarget.object as any).time_data?.base_node_id
+                ? '4 4'
+                : 'none'
+          }
+          className={`${
+            link.isStructuralLine ? 'structural-path-flow opacity-60' : 'link-path-flow'
+          } pointer-events-none`}
+          filter={link.isStructuralLine ? 'url(#sigil-glow)' : 'none'}
+        />
+      )}
 
-      {/* Static Underlying Path for clarity */}
+      {/* Static Underlying Path (Always Visible, includes Arrow) */}
       <path
         d={`M${visualSource.x},${visualSource.y}A${dr},${dr} 0 0,1 ${visualTarget.x},${visualTarget.y}`}
         fill="none"
         stroke={flowColor}
         strokeWidth={link.isStructuralLine ? 8 : 4}
-        opacity="0.3"
+        opacity={isTemporalActive ? 0.3 : 1.0} // If inactive, this is the main visual, keep opacity high relative to the group opacity
+        markerEnd={showArrow ? 'url(#arrow-head)' : undefined}
         className="pointer-events-none"
       />
 
-      {(isRelevant || isAnomalyFocus || isPartOfAnomalyPath) && !link.isStructuralLine && (
-        <foreignObject
-          x={midX - 150}
-          y={midY - 60}
-          width="300"
-          height="120"
-          className="overflow-visible pointer-events-auto"
-        >
-          <div className="w-full h-full flex items-center justify-center">
-            <div
-              onContextMenu={(e) => onContextMenu(e, link.id)}
-              className={`px-8 py-4 rounded-full border shadow-2xl flex items-center gap-4 backdrop-blur-md cursor-pointer bg-nexus-900 border-nexus-800 ${
-                isAnomalyFocus ? 'ring-4 ring-red-500/20' : ''
-              }`}
-              style={{
-                color: flowColor,
-                textDecoration: isRedundant && !isAnomalyFocus ? 'line-through' : 'none',
-              }}
-            >
-              <span className="text-[14px] font-display font-black uppercase tracking-[0.3em]">
-                {isAnomalyFocus
-                  ? 'ANOMALY: '
-                  : isPartOfAnomalyPath
-                    ? 'CAUSAL PATH: '
-                    : isRedundant
-                      ? '[REDUNDANT] '
-                      : isImplied
-                        ? '[IMPLIED] '
-                        : ''}
-                {displayVerb}
-              </span>
+      {(isRelevant || isAnomalyFocus || isPartOfAnomalyPath) &&
+        !link.isStructuralLine &&
+        isTemporalActive && (
+          <foreignObject
+            x={midX - 150}
+            y={midY - 60}
+            width="300"
+            height="120"
+            className="overflow-visible pointer-events-auto"
+          >
+            <div className="w-full h-full flex items-center justify-center">
+              <div
+                onContextMenu={(e) => onContextMenu(e, link.id)}
+                className={`px-8 py-4 rounded-full border shadow-2xl flex items-center gap-4 backdrop-blur-md cursor-pointer bg-nexus-900 border-nexus-800 ${
+                  isAnomalyFocus ? 'ring-4 ring-red-500/20' : ''
+                }`}
+                style={{
+                  color: flowColor,
+                  textDecoration: isRedundant && !isAnomalyFocus ? 'line-through' : 'none',
+                }}
+              >
+                <span className="text-[14px] font-display font-black uppercase tracking-[0.3em]">
+                  {isAnomalyFocus
+                    ? 'ANOMALY: '
+                    : isPartOfAnomalyPath
+                      ? 'CAUSAL PATH: '
+                      : isRedundant
+                        ? '[REDUNDANT] '
+                        : isImplied
+                          ? '[IMPLIED] '
+                          : ''}
+                  {displayVerb}
+                </span>
+              </div>
             </div>
-          </div>
-        </foreignObject>
-      )}
+          </foreignObject>
+        )}
     </g>
   );
 };

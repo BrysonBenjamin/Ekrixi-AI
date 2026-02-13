@@ -7,6 +7,7 @@ import {
   ContainmentType,
   DefaultLayout,
   HierarchyType,
+  LinkTier,
 } from './enums';
 
 export interface NexusElement {
@@ -27,6 +28,16 @@ export interface NexusTimeData {
   next_node_id?: string;
   anchored_source_id?: string;
   anchored_target_id?: string;
+}
+
+export interface NexusTimeState {
+  is_historical_snapshot: boolean;
+  parent_identity_id?: string; // The 'True' entity (e.g., Solar Hegemony)
+  effective_date: { year: number; month?: number; day?: number };
+  valid_until?: { year: number; month?: number; day?: number }; // Range logic
+  is_canonical: boolean; // "Current" version
+  perspective_id?: string; // "In-Universe" vs "Absolute"
+  reliability?: number; // 0.0 to 1.0
 }
 
 export interface WikiArtifact {
@@ -54,6 +65,8 @@ export interface TraitLink {
   target_id: string;
   verb: string;
   verb_inverse: string;
+  temporal_bounds?: NexusTimeState;
+  tier?: LinkTier; // T1 (Semantic), T2 (Descriptive), T3 (Temporal/Recursive)
 }
 
 export interface SimpleNote extends NexusElement {
@@ -70,7 +83,8 @@ export interface SimpleNote extends NexusElement {
   is_author_note?: boolean;
   background_url?: string;
   theme_color?: string;
-  time_data?: NexusTimeData;
+  time_data?: NexusTimeData; // @deprecated - migrating to time_state
+  time_state?: NexusTimeState;
 }
 
 export interface ContainerNote extends Omit<SimpleNote, '_type'>, TraitContainer {
@@ -121,6 +135,8 @@ export interface AggregatedSemanticLink
     Omit<SimpleNote, '_type' | keyof NexusElement> {
   _type: 'AGGREGATED_SEMANTIC_LINK';
   is_reified: true;
+  tier: LinkTier.TIER_2 | LinkTier.TIER_3;
+  parent_container_id?: string; // For fractal state inheritance
 }
 
 export interface AggregatedHierarchicalLink

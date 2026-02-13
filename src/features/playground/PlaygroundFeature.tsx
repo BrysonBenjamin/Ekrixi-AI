@@ -7,19 +7,16 @@ import {
   ChevronRight,
   Package,
   Terminal,
-  Box,
   BookOpen,
   PenTool,
   Globe,
   History,
+  LucideIcon,
 } from 'lucide-react';
-import { getRefineryDemoBatch } from '../refinery/fixtures/refinery_batch_fixture';
-import { getNeonSyndicateBatch } from '../refinery/fixtures/neon_syndicate_fixture';
-import { getGaiaPrimeExpandedBatch } from './fixtures/gaia_prime_expanded_fixture';
-import { getCompletedManuscriptBatch } from './fixtures/completed_manuscript_fixture';
-import { getSeedStoryManifesto } from './fixtures/story_manifesto_fixture';
+import { dbFixtures } from '../../core/services/dbFixtures';
 import { NexusObject } from '../../types';
 import { StudioBlock } from '../story-studio/types';
+import { ContextPlayground } from './components/ContextPlayground';
 
 interface PlaygroundFeatureProps {
   onSeedRefinery: (items: NexusObject[], name: string) => void;
@@ -27,6 +24,8 @@ interface PlaygroundFeatureProps {
   onSeedManifesto?: (blocks: StudioBlock[]) => void;
   onSeedTimeline?: () => void;
   onSeedWar?: () => void;
+  onSeedTriangleWar?: () => void;
+  onSeedFractalWar?: () => void;
 }
 
 export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
@@ -35,6 +34,8 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
   onSeedManifesto,
   onSeedTimeline,
   onSeedWar,
+  onSeedTriangleWar,
+  onSeedFractalWar,
 }) => {
   return (
     <div className="h-full w-full bg-nexus-950 overflow-y-auto no-scrollbar p-8 md:p-12 font-sans">
@@ -66,65 +67,7 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FixtureCard
-              title="Manifesto: Memory Thief"
-              desc="Protocol blocks for a high-fidelity 'Save the Cat' story. Seeds the writing forge with thesis, arc delta, and latent world units."
-              itemsCount={5}
-              category="Drafting Blocks"
-              icon={PenTool}
-              theme="ruby"
-              onSeed={() => onSeedManifesto?.(getSeedStoryManifesto())}
-              actionLabel="Seed Story Forge"
-            />
-
-            <FixtureCard
-              title="Manuscript: Resonance"
-              desc="Already completed manuscript hierarchy (Polished). Includes chapters, scenes, and embedded drafting history."
-              itemsCount={6}
-              category="Completed Work"
-              icon={BookOpen}
-              theme="ruby"
-              onSeed={() =>
-                onSeedRefinery(getCompletedManuscriptBatch(), 'GAIA_RESONANCE_POLISHED')
-              }
-            />
-
-            <FixtureCard
-              title="Kernel: Gaia Prime (v2)"
-              desc="Comprehensive expanded planetary lore. Multiple regions, nested organizations, and bio-tech character scry-nodes."
-              itemsCount={14}
-              category="World Building"
-              icon={Globe}
-              onSeed={() => onSeedRefinery(getGaiaPrimeExpandedBatch(), 'GAIA_CORE_EXPANDED')}
-            />
-
-            <FixtureCard
-              title="World: Oros Shattered"
-              desc="Classic Oros hierarchical map featuring floating islands and semantic hunt-logic."
-              itemsCount={15}
-              category="High Fantasy"
-              onSeed={() => onSeedRefinery(getRefineryDemoBatch(), 'OROS_WORLD_SEVENTH_ERA')}
-            />
-
-            <FixtureCard
-              title="Syndicate Intel"
-              desc="Cyberpunk associations focused on semantic links between hackers, illegal tech, and criminal organizations."
-              itemsCount={7}
-              category="Cyberpunk"
-              onSeed={() => onSeedRefinery(getNeonSyndicateBatch(), 'SYNDICATE_INTEL_SCRAPE')}
-            />
-
-            <FixtureCard
-              title="Inject: Deep Lore"
-              desc="Direct injection of Gaia fixture to the global registry (bypassing refinery)."
-              itemsCount={12}
-              category="Internal Dev"
-              icon={Database}
-              onSeed={() => onSeedRegistry(getGaiaPrimeExpandedBatch())}
-              actionLabel="Inject to Registry"
-              variant="registry"
-            />
-
+            {/* NEW/PROMOTED FIXTURES AT TOP */}
             <FixtureCard
               title="Timestamp: Aethelgard"
               desc="Historical timeline of a city across 3 eras (Foundation, Golden Age, Ruin). Tests time-travel navigation."
@@ -134,6 +77,7 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
               onSeed={() => onSeedTimeline?.()}
               actionLabel="Seed Timeline"
               variant="registry"
+              theme="cyan"
             />
 
             <FixtureCard
@@ -147,10 +91,95 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
               variant="registry"
               theme="ruby"
             />
+
+            <FixtureCard
+              title="Arrows: Triangle War"
+              desc="Three countries (A, B, C) with a reified war and simple treaties. Tests temporal link arrows and multi-era navigation."
+              itemsCount={15}
+              category="Navigation Test"
+              icon={History}
+              onSeed={() => onSeedTriangleWar?.()}
+              actionLabel="Seed Triangle War"
+              variant="registry"
+              theme="cyan"
+            />
+
+            <FixtureCard
+              title="Fractal: Unification Era"
+              desc="Recursive Tier 3 containers (Century -> War -> Battle). Tests infinite nesting and fractal state inheritance."
+              itemsCount={4}
+              category="Recursive Graph"
+              icon={History}
+              onSeed={() => onSeedFractalWar?.()}
+              actionLabel="Seed Fractal Graph"
+              variant="registry"
+              theme="ruby"
+            />
+
+            <FixtureCard
+              title="Manifesto: Memory Thief"
+              desc="Protocol blocks for a high-fidelity 'Save the Cat' story. Seeds the writing forge with thesis, arc delta, and latent world units."
+              itemsCount={5}
+              category="Drafting Blocks"
+              icon={PenTool}
+              theme="ruby"
+              onSeed={() => onSeedManifesto?.(dbFixtures.getManifestoBatch())}
+              actionLabel="Seed Story Forge"
+            />
+
+            <FixtureCard
+              title="Manuscript: Resonance"
+              desc="Already completed manuscript hierarchy (Polished). Includes chapters, scenes, and embedded drafting history."
+              itemsCount={6}
+              category="Completed Work"
+              icon={BookOpen}
+              theme="ruby"
+              onSeed={() =>
+                onSeedRefinery(dbFixtures.getManuscriptBatch(), 'GAIA_RESONANCE_POLISHED')
+              }
+            />
+
+            <FixtureCard
+              title="Kernel: Gaia Prime (v2)"
+              desc="Comprehensive expanded planetary lore. Multiple regions, nested organizations, and bio-tech character scry-nodes."
+              itemsCount={14}
+              category="World Building"
+              icon={Globe}
+              onSeed={() => onSeedRefinery(dbFixtures.getGaiaPrimeBatch(), 'GAIA_CORE_EXPANDED')}
+            />
+
+            <FixtureCard
+              title="World: Oros Shattered"
+              desc="Classic Oros hierarchical map featuring floating islands and semantic hunt-logic."
+              itemsCount={15}
+              category="High Fantasy"
+              onSeed={() => onSeedRefinery(dbFixtures.getOrosBatch(), 'OROS_WORLD_SEVENTH_ERA')}
+            />
+
+            <FixtureCard
+              title="Syndicate Intel"
+              desc="Cyberpunk associations focused on semantic links between hackers, illegal tech, and criminal organizations."
+              itemsCount={7}
+              category="Cyberpunk"
+              onSeed={() =>
+                onSeedRefinery(dbFixtures.getSyndicateBatch(), 'SYNDICATE_INTEL_SCRAPE')
+              }
+            />
+
+            <FixtureCard
+              title="Inject: Deep Lore"
+              desc="Direct injection of Gaia fixture to the global registry (bypassing refinery)."
+              itemsCount={12}
+              category="Internal Dev"
+              icon={Database}
+              onSeed={() => onSeedRegistry(dbFixtures.getGaiaPrimeBatch())}
+              actionLabel="Inject to Registry"
+              variant="registry"
+            />
           </div>
         </section>
 
-        {/* Dev Tools Section */}
+        {/* Causal Prototyping Section */}
         <section className="space-y-8">
           <div className="flex items-center gap-4 border-b border-nexus-800 pb-4">
             <Terminal size={20} className="text-nexus-muted" />
@@ -159,30 +188,16 @@ export const PlaygroundFeature: React.FC<PlaygroundFeatureProps> = ({
             </h2>
           </div>
 
-          <div className="p-8 bg-nexus-900/50 border border-nexus-800 rounded-[32px] flex flex-col items-center justify-center text-center space-y-6">
-            <div className="p-4 bg-nexus-800 rounded-full">
-              <Box size={40} className="text-nexus-muted opacity-40" />
+          <div className="grid grid-cols-1 gap-8">
+            <div className="p-1 bg-nexus-800/20 border border-nexus-800 rounded-[40px] overflow-hidden shadow-2xl">
+              <ContextPlayground />
             </div>
-            <h3 className="text-xl font-display font-bold text-nexus-text uppercase">
-              Custom Scry Logic
-            </h3>
-            <p className="text-xs text-nexus-muted font-serif italic max-w-sm">
-              "Development space for future neural weights and reification testing."
-            </p>
-            <button
-              disabled
-              className="px-8 py-3 rounded-2xl border border-nexus-800 text-nexus-muted text-[10px] font-black uppercase tracking-widest opacity-50"
-            >
-              Locked: v5.2 Core Required
-            </button>
           </div>
         </section>
       </div>
     </div>
   );
 };
-
-import { LucideIcon } from 'lucide-react';
 
 interface FixtureCardProps {
   title: string;

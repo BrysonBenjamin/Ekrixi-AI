@@ -11,6 +11,12 @@ export enum NexusType {
   MANIFESTO_BLOCK = 'MANIFESTO_BLOCK',
 }
 
+export enum LinkTier {
+  TIER_1 = 1, // Semantic (Atomic)
+  TIER_2 = 2, // Descriptive (Reified/Prose)
+  TIER_3 = 3, // Temporal (Container/Recursive)
+}
+
 export enum NexusCategory {
   CHARACTER = 'CHARACTER',
   LOCATION = 'LOCATION',
@@ -21,6 +27,7 @@ export enum NexusCategory {
   ORGANIZATION = 'ORGANIZATION',
   STORY = 'STORY',
   WORLD = 'WORLD',
+  STATE = 'STATE', // Temporal Snapshot
 }
 
 export enum StoryType {
@@ -44,6 +51,7 @@ export enum ContainmentType {
   FACTION = 'FACTION',
   PLOT_ARC = 'PLOT_ARC',
   MANUSCRIPT = 'MANUSCRIPT',
+  AGGREGATED_LINK = 'AGGREGATED_LINK',
 }
 
 export enum DefaultLayout {

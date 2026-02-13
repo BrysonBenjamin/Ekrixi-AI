@@ -208,6 +208,18 @@ export const GraphIntegrityService = {
     const links = Object.values(registry).filter(isLink);
 
     links.forEach((link) => {
+      // 0. IGNORE TEMPORAL SNAPSHOTS
+      // Links that are part of a historical record (source or target having a base_node_id)
+      // should be exempt from standard integrity checks as they represent valid historical states.
+      const sourceNode = registry[link.source_id];
+      const targetNode = registry[link.target_id];
+
+      const isTemporalSnapshot =
+        (sourceNode as any)?.time_data?.base_node_id ||
+        (targetNode as any)?.time_data?.base_node_id;
+
+      if (isTemporalSnapshot) return;
+
       const tempRegistry = { ...registry };
       // 1. Remove the link itself to check if a DIFFERENT path exists
       delete tempRegistry[link.id];
