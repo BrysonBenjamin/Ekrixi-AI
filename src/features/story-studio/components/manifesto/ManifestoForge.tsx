@@ -29,7 +29,6 @@ import { StudioBlock, BlockType } from '../../types';
 import { NexusObject, isLink, SimpleNote } from '../../../../types';
 import { generateId } from '../../../../utils/ids';
 import { StudioSpineAgent } from '../StudioSpineAgent';
-import { getSeedStoryManifesto } from '../../../playground/fixtures/story_manifesto_fixture';
 import StudioBlockEditor from './StudioBlockEditor';
 import { TheoryGuideModal } from './TheoryGuideModal';
 
@@ -293,13 +292,6 @@ export const ManifestoForge: React.FC<ManifestoForgeProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-4">
                   {isGlobal ? (
                     <>
-                      <TemplateCard
-                        title="The Memory Thief"
-                        framework="SAVE THE CAT"
-                        desc="High-fidelity beats for a memory-based mystery economy. Focuses on the internal guilt of the archivist."
-                        colorClass="nexus-ruby"
-                        onClick={() => onSeedTemplate?.(getSeedStoryManifesto())}
-                      />
                       <TemplateCard
                         title="Resonance Shift"
                         framework="HERO'S JOURNEY"

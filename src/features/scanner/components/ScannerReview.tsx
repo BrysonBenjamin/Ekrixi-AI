@@ -1,6 +1,15 @@
 import React from 'react';
-import { CheckCircle, Trash2, Box, Link2, ChevronRight, Share2, ShieldAlert } from 'lucide-react';
-import { NexusObject, isLink, SimpleNote } from '../../../types';
+import {
+  CheckCircle,
+  Trash2,
+  Box,
+  Link2,
+  ChevronRight,
+  Share2,
+  ShieldAlert,
+  GitMerge,
+} from 'lucide-react';
+import { NexusObject, isLink, SimpleNote, isM2M, isBinaryLink } from '../../../types';
 import { ExtractedItem } from '../ScannerFeature';
 import { IntegrityBadge } from '../../integrity/components/IntegrityBadge';
 import { IntegrityPathTrace } from '../../integrity/components/IntegrityPathTrace';
@@ -19,7 +28,8 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
   onCancel,
 }) => {
   const nodes = items.filter((i) => !isLink(i));
-  const links = items.filter((i) => isLink(i));
+  const binaryLinks = items.filter((i) => isBinaryLink(i));
+  const m2mHubs = items.filter((i) => isM2M(i));
 
   // For PathTrace to work in Scanner, we need a local registry of the extracted items
   const localRegistry = React.useMemo(() => {
@@ -37,7 +47,9 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
     onCommit(approved);
   };
 
-  const totalConflicts = links.filter((l) => l.conflict && l.conflict.status !== 'APPROVED').length;
+  const totalConflicts = binaryLinks.filter(
+    (l) => l.conflict && l.conflict.status !== 'APPROVED',
+  ).length;
 
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500 max-w-6xl mx-auto">
@@ -51,8 +63,9 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
           </h2>
           <p className="text-xs md:text-sm text-nexus-muted mt-2 font-medium">
             Discovered <span className="text-nexus-text font-bold">{nodes.length}</span> atomic
-            units and <span className="text-nexus-text font-bold">{links.length}</span>{' '}
-            associations.
+            units, <span className="text-nexus-text font-bold">{binaryLinks.length}</span>{' '}
+            associations, and <span className="text-nexus-text font-bold">{m2mHubs.length}</span>{' '}
+            hubs.
           </p>
         </div>
 
@@ -83,7 +96,7 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 flex-1 overflow-hidden min-h-0 pb-4 md:pb-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-6 flex-1 overflow-hidden min-h-0 pb-4 md:pb-10">
         <div className="flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-5 px-2">
             <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.3em] flex items-center gap-2.5">
@@ -106,19 +119,38 @@ export const ScannerReview: React.FC<ScannerReviewProps> = ({
         <div className="flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-5 px-2">
             <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.3em] flex items-center gap-2.5">
-              <Link2 size={14} className="text-nexus-arcane" /> Logic Streams ({links.length})
+              <Link2 size={14} className="text-nexus-arcane" /> Logic Streams ({binaryLinks.length})
             </span>
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-3">
-            {links.map((link) => (
+            {binaryLinks.map((link) => (
               <ReviewCard
                 key={link.id}
                 title={link.verb}
                 category="ASSOCIATION"
                 isLink
+                qualifiers={(link as any).qualifiers}
                 conflict={link.conflict}
                 localRegistry={localRegistry}
                 onRemove={() => handleRemove(link.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-5 px-2">
+            <span className="text-[10px] font-display font-black text-nexus-muted uppercase tracking-[0.3em] flex items-center gap-2.5">
+              <GitMerge size={14} className="text-amber-500" /> Complex Hubs ({m2mHubs.length})
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-3">
+            {m2mHubs.map((hub) => (
+              <HubReviewCard
+                key={hub.id}
+                hub={hub}
+                onRemove={() => handleRemove(hub.id)}
+                localRegistry={localRegistry}
               />
             ))}
           </div>
@@ -133,6 +165,7 @@ interface ReviewCardProps {
   category?: string;
   gist?: string;
   isLink?: boolean;
+  qualifiers?: Record<string, string | number | boolean>;
   conflict?: ExtractedItem['conflict'];
   localRegistry?: Record<string, NexusObject>;
   onRemove: () => void;
@@ -143,12 +176,14 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
   category,
   gist,
   isLink,
+  qualifiers,
   conflict,
   localRegistry,
   onRemove,
 }) => {
   const isRedundant = conflict?.status === 'REDUNDANT';
   const isImplied = conflict?.status === 'IMPLIED';
+  const hasQualifiers = qualifiers && Object.keys(qualifiers).length > 0;
 
   return (
     <div
@@ -195,6 +230,19 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
               "{gist}"
             </p>
           )}
+
+          {hasQualifiers && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {Object.entries(qualifiers!).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="text-[9px] px-2 py-0.5 bg-nexus-800/60 border border-nexus-700/30 rounded-full font-mono text-nexus-muted"
+                >
+                  {k}: {String(v)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <button
@@ -221,6 +269,82 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+interface HubReviewCardProps {
+  hub: NexusObject;
+  onRemove: () => void;
+  localRegistry: Record<string, NexusObject>;
+}
+
+const HubReviewCard: React.FC<HubReviewCardProps> = ({ hub, onRemove, localRegistry }) => {
+  const hubData = hub as unknown as {
+    global_verb: string;
+    participants: { node_id: string; role_id: string; verb: string }[];
+    title?: string;
+    qualifiers?: Record<string, string | number | boolean>;
+  };
+
+  const hasQualifiers = hubData.qualifiers && Object.keys(hubData.qualifiers).length > 0;
+
+  return (
+    <div className="group relative border border-amber-500/30 rounded-[28px] p-5 flex flex-col gap-4 transition-all hover:bg-nexus-900 shadow-sm bg-amber-500/5 hover:border-amber-500/50">
+      <div className="flex items-start gap-5">
+        <div className="w-12 h-12 rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 shadow-sm transition-colors">
+          <GitMerge size={20} />
+        </div>
+
+        <div className="flex-1 min-w-0 pt-0.5">
+          <div className="flex items-center gap-3 mb-1.5">
+            <h3 className="text-sm font-display font-black uppercase tracking-tight truncate text-nexus-text">
+              {hubData.global_verb || 'M2M Hub'}
+            </h3>
+            <span className="text-[8px] font-mono font-black bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full text-amber-500 uppercase tracking-widest">
+              HUB
+            </span>
+          </div>
+          <div className="space-y-1 mt-2">
+            {hubData.participants.slice(0, 3).map((p, idx) => {
+              const pNode = localRegistry[p.node_id] as SimpleNote | undefined;
+              return (
+                <div key={idx} className="flex items-center gap-2 text-[10px]">
+                  <span className="text-amber-500/70 font-mono">{p.role_id}:</span>
+                  <span className="text-nexus-muted truncate flex-1">
+                    {pNode?.title || p.node_id.slice(0, 8)}
+                  </span>
+                </div>
+              );
+            })}
+            {hubData.participants.length > 3 && (
+              <div className="text-[9px] text-nexus-muted/50 italic pl-1">
+                +{hubData.participants.length - 3} more participants
+              </div>
+            )}
+          </div>
+
+          {hasQualifiers && (
+            <div className="flex flex-wrap gap-1 mt-3">
+              {Object.entries(hubData.qualifiers!).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="text-[9px] px-2 py-0.5 bg-nexus-800/60 border border-nexus-700/30 rounded-full font-mono text-nexus-muted"
+                >
+                  {k}: {String(v)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onRemove}
+          className="p-2.5 text-nexus-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 active:scale-90 shrink-0"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
     </div>
   );
 };

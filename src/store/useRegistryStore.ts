@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { NexusObject } from '../types';
 import { DataService } from '../core/services/DataService';
+import { RegistryValidator } from '../core/utils/RegistryValidator';
+import { getParentIdentityId } from '../core/utils/nexus-accessors';
 
 interface RegistryState {
   registry: Record<string, NexusObject>;
@@ -86,9 +88,36 @@ export const useRegistryStore = create<RegistryState>((set, get) => ({
     const currentRegistry = get().registry;
     const existingObject = currentRegistry[id];
 
-    const objectToSave = existingObject
+    let objectToSave = existingObject
       ? ({ ...existingObject, ...updates } as NexusObject)
       : (updates as NexusObject);
+
+    // TEMPORAL INFERENCE LOGIC
+    // If this object is a snapshot or affects temporal structure, infer hierarchy
+    const baseId =
+      getParentIdentityId(objectToSave) ||
+      ('time_state' in objectToSave && objectToSave.time_state?.is_historical_snapshot ? null : id);
+
+    if (baseId) {
+      // 1. Create a hypothetical registry with this update
+      const tempRegistry = { ...currentRegistry, [id]: objectToSave };
+
+      // 2. Infer hierarchy for this base identity
+      const inferredRegistry = RegistryValidator.inferTemporalHierarchy(tempRegistry, baseId);
+
+      // 3. Find all snapshots that changed (their time_children) and batch save them
+      const changedObjects: NexusObject[] = [];
+      Object.keys(inferredRegistry).forEach((oid) => {
+        if (inferredRegistry[oid] !== currentRegistry[oid]) {
+          changedObjects.push(inferredRegistry[oid]);
+        }
+      });
+
+      if (changedObjects.length > 0) {
+        await DataService.batchCreateOrUpdate(universeId, changedObjects);
+        return;
+      }
+    }
 
     await DataService.createOrUpdateNexusObject(universeId, objectToSave);
   },

@@ -7,9 +7,10 @@ import {
   isReified,
   NexusType,
   SimpleNote,
-  AggregatedSemanticLink,
+  AggregatedSimpleLink,
 } from '../../../types';
-import { VisibleNode } from '../../drilldown/DrilldownFeature';
+import { VisibleNode } from '../../drilldown/hooks/useDrilldownRegistry';
+import { useRegistryIndexes } from '../../drilldown/hooks/useRegistryIndexes';
 import { ChevronRight, Home, Compass } from 'lucide-react';
 
 interface RefineryDrilldownProps {
@@ -48,6 +49,9 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
   onEstablishLink,
   onDelete,
 }) => {
+  // Build registry indexes for DrilldownCanvas
+  const indexes = useRegistryIndexes(registry);
+
   // Logic to calculate visible nodes based on local registry
   const visibleNodesRegistry = useMemo(() => {
     const subRegistry: Record<string, VisibleNode> = {};
@@ -81,7 +85,7 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
       const isNode = !isLink(obj) || isReified(obj);
       if (isNode) {
         visited.set(id, depth);
-        subRegistry[id] = { ...obj, depth, pathType } as VisibleNode;
+        subRegistry[id] = { ...obj, depth, pathType, activeTemporalId: undefined } as VisibleNode;
       }
 
       if (isContainer(obj)) {
@@ -95,8 +99,8 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
       }
 
       if (isReified(obj)) {
-        const sId = (obj as AggregatedSemanticLink).source_id;
-        const tId = (obj as AggregatedSemanticLink).target_id;
+        const sId = (obj as AggregatedSimpleLink).source_id;
+        const tId = (obj as AggregatedSimpleLink).target_id;
         if (sId)
           queue.push({
             id: sId,
@@ -194,10 +198,10 @@ export const RefineryDrilldown: React.FC<RefineryDrilldownProps> = ({
           onReifyLink={onReifyLink}
           onReifyNode={onReifyNode}
           onReifyNodeToLink={onReifyNodeToLink}
-          onReparent={onReparent}
           onEstablishLink={onEstablishLink}
           onDelete={onDelete}
           focusId={focusId || undefined}
+          indexes={indexes}
         />
       </main>
     </div>

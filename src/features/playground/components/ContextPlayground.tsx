@@ -8,42 +8,46 @@ import { dbFixtures } from '../../../core/services/dbFixtures';
 import { ThinkingProcessViewer } from '../../../components/shared/ThinkingProcessViewer';
 import { ContextPill } from '../../../components/shared/ContextPill';
 import { useRegistryStore } from '../../../store/useRegistryStore';
-import { NexusType, SimpleNote, NexusCategory } from '../../../types';
-import { getPlaygroundMockRegistry } from '../fixtures/playground_mock_fixture';
+import { NexusType, NexusNote, NexusCategory, NexusObject } from '../../../types';
+import { FixtureSelector } from './FixtureSelector';
+import { PlaygroundFixture } from '../types/fixtures';
 
 // --- MOCK DATA ---
-const mockNote = (partial: Partial<SimpleNote>): SimpleNote => ({
-  id: partial.id || 'mock',
-  internal_weight: 1,
-  total_subtree_mass: 1,
-  created_at: new Date().toISOString(),
-  last_modified: new Date().toISOString(),
-  link_ids: [],
-  aliases: [],
-  tags: [],
-  prose_content: '',
-  is_ghost: false,
-  _type: NexusType.SIMPLE_NOTE,
-  category_id: NexusCategory.CONCEPT,
-  title: 'Mock',
-  gist: '',
-  ...partial,
-});
+const mockNote = (partial: Partial<NexusNote>): NexusNote =>
+  ({
+    id: partial.id || 'mock',
+    internal_weight: 1,
+    total_subtree_mass: 1,
+    created_at: new Date().toISOString(),
+    last_modified: new Date().toISOString(),
+    link_ids: [],
+    aliases: [],
+    tags: [],
+    prose_content: '',
+    is_ghost: false,
+    _type: NexusType.SIMPLE_NOTE,
+    category_id: NexusCategory.CONCEPT,
+    title: 'Mock',
+    gist: '',
+    ...partial,
+  }) as NexusNote;
 
 export const ContextPlayground: React.FC = () => {
   const { registry } = useRegistryStore();
+  const [simulatedRegistry, setSimulatedRegistry] = useState<Record<string, NexusObject> | null>(
+    null,
+  );
   const [weightedMentions, setWeightedMentions] = useState<WeightedContextUnit[]>([]);
   const [lastAssemblyTrace, setLastAssemblyTrace] = useState<ThinkingProcessStep[] | null>(null);
   const [generatedPrompt, setGeneratedPrompt] = useState('');
 
-  // --- Mock Data Init (If Registry is empty/loading) ---
-  // In a real scenario, registry comes from FireStore.
-  // This fallback ensures the playground works even if the user hasn't loaded data.
-  const displayRegistry = Object.keys(registry).length > 0 ? registry : getPlaygroundMockRegistry();
+  // --- State Resolution ---
+  // If we have a simulated registry, use it. Otherwise use the real one.
+  const displayRegistry = simulatedRegistry || (Object.keys(registry).length > 0 ? registry : {});
 
   const handleAddMention = (id: string) => {
     if (weightedMentions.some((m) => m.id === id)) return;
-    setWeightedMentions([...weightedMentions, { id, score: 5 }]); // Defualt score 5
+    setWeightedMentions([...weightedMentions, { id, score: 10 }]); // Default score 10
   };
 
   const handleUpdateMention = (updated: WeightedContextUnit) => {
@@ -52,6 +56,13 @@ export const ContextPlayground: React.FC = () => {
 
   const handleRemoveMention = (id: string) => {
     setWeightedMentions(weightedMentions.filter((m) => m.id !== id));
+  };
+
+  const handleSimulate = (fixture: PlaygroundFixture) => {
+    setSimulatedRegistry(fixture.getObjects());
+    setWeightedMentions([]); // Reset mentions for new scenario
+    setLastAssemblyTrace(null);
+    setGeneratedPrompt('');
   };
 
   const runAssembly = () => {
@@ -111,7 +122,7 @@ export const ContextPlayground: React.FC = () => {
                     onClick={() => handleAddMention(node.id)}
                     className="px-3 py-1.5 rounded-lg border border-nexus-700 bg-nexus-900 hover:bg-nexus-800 text-xs font-bold text-nexus-muted hover:text-nexus-text transition-colors"
                   >
-                    + {(node as SimpleNote).title || node.id}
+                    + {(node as NexusNote).title || node.id}
                   </button>
                 ))}
             </div>
@@ -125,65 +136,23 @@ export const ContextPlayground: React.FC = () => {
           </button>
 
           <div className="pt-6 border-t border-nexus-800">
-            <h3 className="text-xs font-bold uppercase text-nexus-muted tracking-widest mb-3">
-              Test Fixtures
-            </h3>
-            <button
-              onClick={() => {
-                const universeId = useRegistryStore.getState().activeUniverseId;
-                if (universeId) {
-                  dbFixtures.seedTimelineScenario(universeId);
-                  alert(
-                    'Timeline Scenario Seeded! Go to Timeline view to see "The Eternal City of Aethelgard".',
-                  );
-                } else {
-                  alert(
-                    'No active universe found. Please go to Settings and load/create a universe first.',
-                  );
-                }
-              }}
-              className="w-full py-3 bg-nexus-800 text-nexus-muted hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-700 transition-all text-xs border border-nexus-700 hover:border-nexus-600 mb-3"
-            >
-              Load Timeline Demo Data
-            </button>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xs font-bold uppercase text-nexus-muted tracking-widest">
+                Scenario Laboratory
+              </h3>
+              {simulatedRegistry && (
+                <button
+                  onClick={() => setSimulatedRegistry(null)}
+                  className="text-[10px] text-nexus-ruby hover:text-white font-bold uppercase transition-colors"
+                >
+                  Reset to Real DB
+                </button>
+              )}
+            </div>
 
-            <button
-              onClick={() => {
-                const universeId = useRegistryStore.getState().activeUniverseId;
-                if (universeId) {
-                  dbFixtures.seedWarScenario(universeId);
-                  alert(
-                    'War Scenario Seeded! Search for "The Variance War" to see the temporal conflict.',
-                  );
-                } else {
-                  alert(
-                    'No active universe found. Please go to Settings and load/create a universe first.',
-                  );
-                }
-              }}
-              className="w-full py-3 bg-nexus-950/50 text-nexus-ruby hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-ruby transition-all text-xs border border-nexus-ruby/30 hover:border-nexus-ruby shadow-lg shadow-nexus-ruby/10 mb-3"
-            >
-              Load War Scenario (Conflicts)
-            </button>
-
-            <button
-              onClick={() => {
-                const universeId = useRegistryStore.getState().activeUniverseId;
-                if (universeId) {
-                  dbFixtures.seedTriangleWarScenario(universeId);
-                  alert(
-                    'Triangle War Seeded! Search for "Country A" to test time navigation arrows.',
-                  );
-                } else {
-                  alert(
-                    'No active universe found. Please go to Settings and load/create a universe first.',
-                  );
-                }
-              }}
-              className="w-full py-3 bg-nexus-950/50 text-nexus-accent hover:text-white font-bold uppercase tracking-widest rounded-xl hover:bg-nexus-accent transition-all text-xs border border-nexus-accent/30 hover:border-nexus-accent shadow-lg shadow-nexus-accent/10"
-            >
-              Load Triangle War (Arrows Test)
-            </button>
+            <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <FixtureSelector onSimulate={handleSimulate} />
+            </div>
           </div>
         </div>
 

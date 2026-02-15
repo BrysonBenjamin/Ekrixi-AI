@@ -2,23 +2,33 @@ import { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import {
   NexusObject,
+  NexusNote,
   isLink,
   isReified,
   NexusType,
-  TraitLink,
-  SimpleNote,
-  AggregatedSemanticLink,
-  AggregatedHierarchicalLink,
+  AggregatedSimpleLink,
+  NexusCategory,
+  NexusLink,
+  isBinaryLink,
+  isM2M,
 } from '../../../types';
 import { VisibleNode } from './useDrilldownRegistry';
 import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
-import { LinkTier } from '../../../core/types/enums';
+import {
+  getTimeState,
+  getParentIdentityId,
+  getEffectiveDate,
+  isHistoricalSnapshot,
+} from '../../../core/utils/nexus-accessors';
+import { RegistryIndexes } from './useRegistryIndexes';
 
 export interface SimulationNode extends d3.SimulationNodeDatum {
   id: string;
   object: VisibleNode;
   x?: number;
   y?: number;
+  vx?: number;
+  vy?: number;
 }
 
 export interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
@@ -29,6 +39,7 @@ export interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
   verbInverse?: string;
   isReified: boolean;
   isStructuralLine?: boolean;
+  isM2M?: boolean;
   type: NexusType;
   originalSourceId?: string;
   originalTargetId?: string;
@@ -40,6 +51,7 @@ interface UseDrilldownSimulationProps {
   fullRegistry: Record<string, NexusObject>;
   focusId?: string;
   simulatedDate?: { year: number; month: number; day: number };
+  indexes: RegistryIndexes;
 }
 
 export const useDrilldownSimulation = ({
@@ -47,6 +59,7 @@ export const useDrilldownSimulation = ({
   fullRegistry,
   focusId,
   simulatedDate,
+  indexes,
 }: UseDrilldownSimulationProps) => {
   const [nodes, setNodes] = useState<SimulationNode[]>([]);
   const [links, setLinks] = useState<SimulationLink[]>([]);
@@ -57,7 +70,7 @@ export const useDrilldownSimulation = ({
 
   const simData = useMemo(() => {
     const activeNodes: SimulationNode[] = (Object.values(registry) as VisibleNode[])
-      .filter((obj) => (obj as any).category_id !== 'STATE') // HIDE STATE NODES
+      .filter((obj) => (obj as NexusNote).category_id !== NexusCategory.STATE) // HIDE STATE NODES (keep graph clean)
       .map((obj) => ({
         id: obj.id,
         object: obj,
@@ -66,21 +79,22 @@ export const useDrilldownSimulation = ({
     const activeLinks: SimulationLink[] = [];
 
     // Helper to check if a link is temporally active
-    const checkTemporalStatus = (link: any, date?: { year: number }) => {
+    const checkTemporalStatus = (link: NexusObject, date?: { year: number }) => {
       if (!date) return true; // No date simulation = always active
-      const linkYear =
-        link.temporal_bounds?.effective_date?.year || link.time_data?.year || -Infinity;
-      const linkEndYear = link.temporal_bounds?.valid_until?.year || Infinity;
+      const linkDate = getEffectiveDate(link);
+      const linkYear = linkDate?.year ?? -Infinity;
+      const ts = getTimeState(link);
+      const linkEndYear = ts?.valid_until?.year ?? Infinity;
       return linkYear <= date.year && date.year <= linkEndYear;
     };
 
     // Inject Bubbled Links (State Node -> Parent Logic)
     // This allows a link to "France (1800)" to appear as a link to "France" in the main view.
-    // We convert the SimulationNode[] back to SimpleNote[] for the service
-    const activeSimpleNotes = (Object.values(registry) as VisibleNode[]).map(
-      (n) => n as unknown as SimpleNote,
-    );
-    const bubbledLinks = TimeDimensionService.getBubbledLinks(fullRegistry, activeSimpleNotes);
+    const activeNexusNotes = (Object.values(registry) as VisibleNode[])
+      .filter((n) => !isLink(n)) // Ensure only notes passed
+      .map((n) => n as unknown as NexusNote);
+
+    const bubbledLinks = TimeDimensionService.getBubbledLinks(fullRegistry, activeNexusNotes);
 
     bubbledLinks.forEach((bLink, idx) => {
       // Avoid duplicates if a real link already exists
@@ -91,9 +105,6 @@ export const useDrilldownSimulation = ({
       );
       if (exists) return;
 
-      // For bubbled links, we assume they are active if the state node was active
-      // But since we are hiding state nodes, we need to defer to the link's own bounds if we can find the original link
-      // For now, bubbled links are "Active" because getBubbledLinks only returns active states.
       activeLinks.push({
         id: `bubbled-${bLink.source}-${bLink.target}-${idx}`,
         source: bLink.source,
@@ -105,26 +116,22 @@ export const useDrilldownSimulation = ({
         originalSourceId: bLink.source, // Approximate
         originalTargetId: bLink.target,
         isTemporalActive: true, // Bubbled links are inherently active because they come from active states
-      } as any);
+      } as SimulationLink);
     });
 
-    (Object.values(fullRegistry) as NexusObject[]).forEach((obj) => {
-      if (!isLink(obj)) return;
+    indexes.allLinks.forEach((obj) => {
+      // Skip temporal reified skins for now, handled below
+      if (isHistoricalSnapshot(obj)) return;
 
-      if ((obj as any).time_state?.parent_identity_id || (obj as any).time_data?.base_node_id)
-        return; // Skip temporal reified skins for now, handled below
-      const link = obj as any;
+      const link = obj; // isLink(obj) is true
       const sId = link.source_id;
       const tId = link.target_id;
 
-      const sBaseId =
-        (fullRegistry[sId] as any)?.time_state?.parent_identity_id ||
-        (fullRegistry[sId] as any)?.time_data?.base_node_id ||
-        sId;
-      const tBaseId =
-        (fullRegistry[tId] as any)?.time_state?.parent_identity_id ||
-        (fullRegistry[tId] as any)?.time_data?.base_node_id ||
-        tId;
+      // Resolve Base IDs
+      const sObj = fullRegistry[sId];
+      const tObj = fullRegistry[tId];
+      const sBaseId = getParentIdentityId(sObj) || sId;
+      const tBaseId = getParentIdentityId(tObj) || tId;
 
       // 1. Both endpoints (base nodes) must be in visible registry
       if (!registry[sBaseId] || !registry[tBaseId]) return;
@@ -142,47 +149,61 @@ export const useDrilldownSimulation = ({
       if (!isSourceValid || !isTargetValid) return;
 
       // 3. Temporal Filtering (Backup): Link must not be in the future relative to the era
-      // Now checking valid_until range!
       const isTemporalActive = checkTemporalStatus(link, simulatedDate);
 
-      if (isReified(obj) && registry[obj.id]) {
-        const reified = obj as AggregatedSemanticLink;
+      if (isReified(obj) && registry[obj.id] && isBinaryLink(obj)) {
+        const reified = obj as AggregatedSimpleLink;
 
         // --- Granularity Shifting Logic ---
-        // If this is a nested reified link (has parent_container_id),
-        // only show it if the parent is the one in focus.
-        if (reified.parent_container_id && reified.parent_container_id !== focusId) {
-          // Check if parent is also in registry. If it is, and we aren't focusing it, hide the child to keep graph clean.
-          if (registry[reified.parent_container_id]) return;
-        }
+        // If this is a nested reified link (has parent_container_id is not in interface but might exist in data?)
+        // NexusNote/Link interface doesn't show parent_container_id, relying on graph topology.
+        // Assuming containment logic is handled by Children IDs in v2.
 
         // Reified structural lines are active if the Reified Node itself is temporally consistent
+        const sSourceObj = fullRegistry[reified.source_id];
+        const sTargetObj = fullRegistry[reified.target_id];
+
         activeLinks.push({
           id: `${obj.id}-structural-s`,
-          source:
-            (fullRegistry[reified.source_id] as SimpleNote)?.time_state?.parent_identity_id ||
-            (fullRegistry[reified.source_id] as SimpleNote)?.time_data?.base_node_id ||
-            reified.source_id,
+          source: getParentIdentityId(sSourceObj) || reified.source_id,
           target: obj.id,
           verb: link.verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
           isTemporalActive: true,
-        } as any);
+        } as SimulationLink);
+
         activeLinks.push({
           id: `${obj.id}-structural-t`,
           source: obj.id,
-          target:
-            (fullRegistry[reified.target_id] as SimpleNote)?.time_state?.parent_identity_id ||
-            (fullRegistry[reified.target_id] as SimpleNote)?.time_data?.base_node_id ||
-            reified.target_id,
+          target: getParentIdentityId(sTargetObj) || reified.target_id,
           verb: link.verb,
           isReified: true,
           isStructuralLine: true,
           type: obj._type as NexusType,
           isTemporalActive: true,
-        } as any);
+        } as SimulationLink);
+      } else if (isReified(obj) && registry[obj.id] && isM2M(obj)) {
+        // M2M Hub-and-spoke: one structural line per participant → hub
+        const hub = obj as unknown as {
+          participants: { node_id: string; role_id: string; verb: string }[];
+        };
+        for (const p of hub.participants) {
+          const baseId = getParentIdentityId(fullRegistry[p.node_id]) || p.node_id;
+          if (!registry[baseId]) continue;
+          activeLinks.push({
+            id: `${obj.id}-m2m-${p.node_id}`,
+            source: baseId,
+            target: obj.id,
+            verb: p.verb,
+            isReified: true,
+            isStructuralLine: true,
+            isM2M: true,
+            type: obj._type as NexusType,
+            isTemporalActive: true,
+          } as SimulationLink);
+        }
       } else if (!isReified(obj)) {
         activeLinks.push({
           id: obj.id,
@@ -196,12 +217,12 @@ export const useDrilldownSimulation = ({
           originalSourceId: sId,
           originalTargetId: tId,
           isTemporalActive: isTemporalActive, // Pass this down
-        } as any);
+        } as SimulationLink);
       }
     });
 
     return { nodes: activeNodes, links: activeLinks };
-  }, [registry, fullRegistry, simulatedDate, focusId]);
+  }, [registry, fullRegistry, simulatedDate, focusId, indexes]);
 
   useEffect(() => {
     if (!simData.nodes.length) {
@@ -226,8 +247,26 @@ export const useDrilldownSimulation = ({
         node.x = prevPos.x;
         node.y = prevPos.y;
       } else {
-        node.x = ((idx * 50) % 200) - 100;
-        node.y = ((idx * 50 * 0.7) % 200) - 100;
+        // Directed initial placement: Seed positions logically but less "exploded"
+        const depth = node.object.depth || 0;
+        const siblings = simData.nodes.filter((n) => (n.object.depth || 0) === depth);
+        const sibIdx = siblings.indexOf(node);
+
+        // Slightly tighter horizontal spread
+        node.x = (sibIdx - siblings.length / 2) * 1600;
+
+        // PathType based layering - reduced vertical steps
+        if (node.object.pathType === 'ancestor') {
+          node.y = -depth * 2500 - 1500;
+        } else if (node.object.pathType === 'descendant') {
+          node.y = depth * 2500 + 1500;
+        } else {
+          // Focus / Lateral
+          node.y = (idx % 2 === 0 ? 1 : -1) * 300;
+        }
+
+        node.vx = 0;
+        node.vy = 0;
       }
     });
 
@@ -258,11 +297,11 @@ export const useDrilldownSimulation = ({
         d3
           .forceLink<SimulationNode, SimulationLink>(simData.links)
           .id((d) => d.id)
-          .distance((d) => (d.isStructuralLine ? 1500 : 2500))
-          .strength((d) => (d.isStructuralLine ? 1.0 : 0.6)),
+          .distance((d) => (d.isStructuralLine ? 1400 : 2200)) // Reduced from 1800/3000
+          .strength((d) => (d.isStructuralLine ? 1.0 : 0.45)),
       )
-      .force('charge', d3.forceManyBody().strength(-150000))
-      .force('collide', d3.forceCollide().radius(700).iterations(8))
+      .force('charge', d3.forceManyBody().strength(-180000)) // Reduced from -300000
+      .force('collide', d3.forceCollide().radius(1000).iterations(10)) // Reduced from 1200
       .force(
         'radial',
         d3
@@ -270,25 +309,27 @@ export const useDrilldownSimulation = ({
             (d) => {
               if (d.id === focusId) return 0;
               const absDepth = Math.abs(d.object.depth);
-              return d.object.pathType === 'ancestor' ? absDepth * 1800 : absDepth * 2800;
+              // Root view ring - reduced from 8000
+              if (!focusId) return 5500;
+              return d.object.pathType === 'ancestor' ? absDepth * 1800 : absDepth * 3200;
             },
             0,
             0,
           )
-          .strength(1.2),
+          .strength(focusId ? 1.0 : 0.4),
       )
       .force(
         'centering',
-        d3.forceX().strength((d) => (d.id === focusId ? 0.6 : 0.05)),
+        d3.forceX().strength((d) => (d.id === focusId ? 0.6 : 0.02)),
       )
       .force(
         'centering-y',
-        d3.forceY().strength((d) => (d.id === focusId ? 0.6 : 0.05)),
+        d3.forceY().strength((d) => (d.id === focusId ? 0.6 : 0.02)),
       );
 
     simulation
       .alpha(idsChanged ? 1 : 0.3)
-      .alphaDecay(0.02)
+      .alphaDecay(focusId ? 0.02 : 0.035)
       .restart();
     simulationRef.current = simulation;
 

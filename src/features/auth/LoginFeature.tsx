@@ -31,21 +31,7 @@ export const LoginFeature: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleSeedFixtures = async () => {
-    setIsSubmitting(true);
-    try {
-      if (!user) {
-        await signInGuest();
-      }
-      await dbFixtures.seedDemoUniverse();
-      setStep('SUCCESS');
-      setTimeout(() => navigate('/nexus'), 1500);
-    } catch (err) {
-      console.error('Failed to seed fixtures', err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  // handleSeedFixtures removed
 
   // Initial step determination
   useEffect(() => {
@@ -150,16 +136,6 @@ export const LoginFeature: React.FC = () => {
                     <Zap size={16} className="text-amber-400" />
                     Browse as Guest
                   </button>
-
-                  {import.meta.env.DEV && (
-                    <button
-                      onClick={handleSeedFixtures}
-                      className="flex w-full items-center justify-center gap-3 rounded-lg border border-cyan-100 bg-cyan-50/30 px-4 py-3 text-sm font-semibold text-cyan-700 transition-all hover:bg-cyan-50 hover:border-cyan-200 active:scale-[0.98]"
-                    >
-                      <Sparkles size={16} className="text-cyan-500" />
-                      Seed Demo Universe
-                    </button>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 border border-slate-100">

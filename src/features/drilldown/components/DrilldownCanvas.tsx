@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { Link2, X } from 'lucide-react';
-import { NexusObject, isContainer, SimpleNote } from '../../../types';
+import { NexusObject, isContainer, NexusNote } from '../../../types';
 import { VisibleNode } from '../hooks/useDrilldownRegistry';
 import { DrilldownContextMenu } from './DrilldownContextMenu';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
 import { useDrilldownSimulation } from '../hooks/useDrilldownSimulation';
 import { DrilldownLink } from './DrilldownLink';
 import { DrilldownNodeWrapper } from './DrilldownNodeWrapper';
+import { RegistryIndexes } from '../hooks/useRegistryIndexes';
 
 interface DrilldownCanvasProps {
   registry: Record<string, VisibleNode>;
@@ -28,7 +29,7 @@ interface DrilldownCanvasProps {
     targetTemporalId?: string,
   ) => void;
   onManifestSnapshot?: (nodeId: string, year: number, month?: number, day?: number) => void;
-  onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
+  // onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void; // Unused
   integrityFocus?: { linkId: string; path?: string[]; mode: 'CENTER' | 'DRILL' } | null;
   getTimeNavigation?: (id: string) => {
     nextId?: string;
@@ -37,6 +38,7 @@ interface DrilldownCanvasProps {
     onPrev?: () => void;
   } | null;
   simulatedDate?: { year: number; month: number; day: number };
+  indexes: RegistryIndexes;
 }
 
 export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
@@ -50,11 +52,12 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
   onReifyNode,
   onReifyNodeToLink,
   onEstablishLink,
-  onReparent,
+
   onManifestSnapshot,
   integrityFocus,
   getTimeNavigation,
   simulatedDate,
+  indexes,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<SVGSVGElement>(null);
@@ -79,6 +82,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
     fullRegistry,
     focusId,
     simulatedDate,
+    indexes,
   });
 
   useEffect(() => {
@@ -106,8 +110,9 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
     setDragOverNodeId(null);
     const sourceId = e.dataTransfer.getData('text/plain');
     const oldParentId = e.dataTransfer.getData('application/nexus-parent-id');
-    if (sourceId && sourceId !== targetId && onReparent) {
-      onReparent(sourceId, targetId, oldParentId);
+    if (sourceId && sourceId !== targetId) {
+      // onReparent intentionally removed for V2 refactor
+      console.warn('Reparenting temporarily disabled in Drilldown V2');
     }
   };
 
@@ -148,19 +153,20 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
 
       if (overlappingLinks.length > 1) {
         // Logic: Default to the closest one to the current year rounded down
-        // Which means: find links where start_year <= current_year
-        // Then pick the one with start_year closest to current_year
         const currentYear = simulatedDate.year;
 
         const bestLink = overlappingLinks.reduce((best, current) => {
-          const bestStart = (best as any).temporal_bounds?.effective_date?.year || -Infinity;
-          const currentStart = (current as any).temporal_bounds?.effective_date?.year || -Infinity;
+          const bestObj = fullRegistry[best.id];
+          const currentObj = fullRegistry[current.id];
+
+          const bestStart = (bestObj as any)?.time_state?.effective_date?.year || -Infinity;
+          const currentStart = (currentObj as any)?.time_state?.effective_date?.year || -Infinity;
 
           // We want max start date that is <= currentYear
           const bestDiff = currentYear - bestStart;
           const currentDiff = currentYear - currentStart;
 
-          if (currentDiff < 0) return best; // Current is in future, ignore if possible (unless best is also future?)
+          if (currentDiff < 0) return best; // Current is in future, ignore
           if (bestDiff < 0) return current; // Best was active in future, current is valid now
 
           return currentDiff < bestDiff ? current : best;
@@ -197,7 +203,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 duration-500">
           <div className="px-6 py-3 bg-nexus-accent text-white rounded-full font-display font-black text-[10px] uppercase tracking-[0.4em] shadow-2xl flex items-center gap-4">
             <Link2 size={16} /> Establish Connection Origin:{' '}
-            {(registry[linkingSourceId] as SimpleNote).title}
+            {(registry[linkingSourceId] as NexusNote).title}
             <button
               onClick={() => setLinkingSourceId(null)}
               className="p-1 hover:bg-white/20 rounded-full transition-colors"
@@ -295,6 +301,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
                 onDrop={handleDrop}
                 onInspect={onInspect}
                 timeNavigation={getTimeNavigation?.(node.id)}
+                indexes={indexes}
               />
             ))}
           </g>
@@ -324,7 +331,7 @@ export const DrilldownCanvas: React.FC<DrilldownCanvasProps> = ({
               onReifyNodeToLink={onReifyNodeToLink}
               onStartLink={setLinkingSourceId}
               onEstablishLink={onEstablishLink}
-              onReparent={onReparent}
+              // onReparent={onReparent}
               onManifestSnapshot={onManifestSnapshot}
               simulatedYear={simulatedDate?.year}
             />

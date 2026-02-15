@@ -7,6 +7,7 @@ interface InspectorPanelProps {
   selectedObject: NexusObject | null;
   registry: Record<string, NexusObject>;
   onUpdate: (updates: Partial<NexusObject>) => void;
+  onUpdateObject?: (id: string, updates: Partial<NexusObject>) => void;
   onClose: () => void;
   onOpenWiki?: (id: string) => void;
   onSelect?: (id: string) => void;
@@ -17,6 +18,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   selectedObject,
   registry,
   onUpdate,
+  onUpdateObject,
   onClose,
   onOpenWiki,
   onSelect,
@@ -34,6 +36,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           object={selectedObject}
           registry={registry}
           onUpdate={onUpdate}
+          onUpdateObject={onUpdateObject}
           onClose={onClose}
           onOpenWiki={onOpenWiki}
           onSelect={onSelect}

@@ -68,7 +68,7 @@ export const ContextPill: React.FC<ContextPillProps> = ({ unit, registry, onUpda
     .filter(
       (n) =>
         n &&
-        (n._type === 'SIMPLE_NOTE' || n._type === 'CONTAINER_NOTE') &&
+        n._type === 'SIMPLE_NOTE' &&
         n.id !== unit.id &&
         !unit.children?.some((c) => c.id === n.id),
     )

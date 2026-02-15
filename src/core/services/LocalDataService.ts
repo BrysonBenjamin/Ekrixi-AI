@@ -1,4 +1,4 @@
-import { NexusObject, SimpleLink, SimpleNote } from '../types';
+import { NexusObject, NexusLink, NexusNote, NexusType } from '../types';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
 import { IDataService, Universe, UniverseUpdates } from '../types/data-service';
 
@@ -110,14 +110,14 @@ export const LocalDataService: IDataService = {
   // --- Transactions ---
   async reifyLinkToNote(
     universeId: string,
-    linkToReify: SimpleLink,
-    newNoteData: Omit<SimpleNote, '_type' | 'id'>,
-  ): Promise<SimpleNote | null> {
-    const newNote: SimpleNote = {
+    linkToReify: NexusLink,
+    newNoteData: Omit<NexusNote, '_type' | 'id'>,
+  ): Promise<NexusNote | null> {
+    const newNote: NexusNote = {
       ...newNoteData,
       id: crypto.randomUUID(),
-      _type: 'SIMPLE_NOTE',
-    } as SimpleNote;
+      _type: NexusType.SIMPLE_NOTE,
+    } as NexusNote;
 
     await this.createOrUpdateNexusObject(universeId, newNote as NexusObject);
     return newNote;

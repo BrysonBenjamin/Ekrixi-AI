@@ -3,57 +3,31 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Package,
   ArrowLeft,
-  AlertCircle,
   FlaskConical,
   ChevronRight,
   Compass,
   ListTree,
+  RotateCcw,
+  RotateCw,
 } from 'lucide-react';
-import {
-  NexusObject,
-  isContainer,
-  NexusType,
-  isLink,
-  ContainerNote,
-  ContainmentType,
-  DefaultLayout,
-  isReified,
-  NexusCategory,
-  HierarchyType,
-  NexusGraphUtils,
-  SimpleNote,
-  HierarchicalLink,
-} from '../../types';
-import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
-import { HierarchyExplorer } from './components/HierarchyExplorer';
-import { StructureVisualizer } from './components/StructureVisualizer';
+
+import { NexusObject, SimpleNote } from '../../types';
+import { useMCPScanner } from '../scanner/hooks/useMCPScanner';
+import { RefineryOperation } from '../../core/services/MCPScannerClient';
+import { RefineryInbox } from './components/RefineryInbox';
+import { useSessionStore } from '../../store/useSessionStore';
+import { MCPStatusBadge } from '../shared/MCPStatusBadge';
+import { HierarchyExplorer } from '../shared/structure/components/HierarchyExplorer';
+
+import { StructureVisualizer } from '../shared/structure/components/StructureVisualizer';
 import { RefineryDrilldown } from './components/RefineryDrilldown';
-import { InspectorPanel } from '../shared/inspector/InspectorPanel';
+import { InspectorSidebar } from '../shared/inspector/InspectorSidebar';
 import { generateId } from '../../utils/ids';
+import { useRefineryHandlers } from './hooks/useRefineryHandlers';
+import { useRefineryHistory } from './hooks/useRefineryHistory';
+import type { RefineryFeatureProps, ViewMode, Toast } from './types';
 
-export interface RefineryBatch {
-  id: string;
-  name: string;
-  timestamp: string;
-  items: NexusObject[];
-  status: 'pending' | 'processed' | 'committed';
-  source: 'SCANNER' | 'IMPORT' | 'GENERATOR';
-}
-
-type ViewMode = 'STRUCTURE' | 'RELATIONS' | 'INSPECTOR';
-
-interface Toast {
-  id: string;
-  message: string;
-  type: 'error' | 'success' | 'info';
-}
-
-interface RefineryFeatureProps {
-  batches: RefineryBatch[];
-  onUpdateBatch: (batchId: string, items: NexusObject[]) => void;
-  _onDeleteBatch: (id: string) => void;
-  onCommitBatch: (batchId: string, items: NexusObject[]) => void;
-}
+export type { RefineryBatch } from './types';
 
 export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
   batches,
@@ -61,16 +35,71 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
   onCommitBatch,
 }) => {
   const { batchId: activeBatchId } = useParams<{ batchId: string }>();
+  const activeUniverseId = useSessionStore((state) => state.activeUniverseId);
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<'STRUCTURE' | 'EXPLORER'>('STRUCTURE');
-  const [showInspector, setShowInspector] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localQueue, setLocalQueue] = useState<NexusObject[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const addToast = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
+    const id = generateId();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  };
+
   const lastLoadedBatchId = useRef<string | null>(null);
   const [drillStack, setDrillStack] = useState<string[]>([]);
   const currentDrillFocusId = drillStack.length > 0 ? drillStack[drillStack.length - 1] : null;
+
+  // MCP integration — fire-and-forget sync
+  const { refineBatch, commitBatch, isReady: mcpReady, state: mcpState } = useMCPScanner();
+
+  const syncToMCP = useCallback(
+    (ops: RefineryOperation[]) => {
+      if (!mcpReady || !activeBatchId) return;
+      refineBatch(activeBatchId, ops).catch(() => {
+        // MCP sync is best-effort; local state is source of truth
+      });
+    },
+    [mcpReady, activeBatchId, refineBatch],
+  );
+
+  // Undo/Redo History
+  const { canUndo, canRedo, pushState, undo, redo } = useRefineryHistory();
+
+  // Keyboard Shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          if (canRedo) {
+            e.preventDefault();
+            const result = redo(localQueue);
+            if (result) {
+              setLocalQueue(result.items);
+              if (activeBatchId) onUpdateBatch(activeBatchId, result.items);
+              syncToMCP(result.ops);
+              addToast('Redo', 'info');
+            }
+          }
+        } else {
+          if (canUndo) {
+            e.preventDefault();
+            const result = undo(localQueue);
+            if (result) {
+              setLocalQueue(result.items);
+              if (activeBatchId) onUpdateBatch(activeBatchId, result.items);
+              syncToMCP(result.ops);
+              addToast('Undo', 'info');
+            }
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeBatchId, canUndo, canRedo, localQueue, onUpdateBatch, redo, syncToMCP, undo]);
 
   useEffect(() => {
     if (activeBatchId && activeBatchId !== lastLoadedBatchId.current) {
@@ -79,7 +108,6 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
         queueMicrotask(() => {
           setLocalQueue(batch.items);
           setDrillStack([]);
-          setShowInspector(false);
         });
         lastLoadedBatchId.current = activeBatchId;
       }
@@ -99,309 +127,28 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
     return localQueue.find((item) => item.id === selectedId) || null;
   }, [selectedId, localQueue]);
 
-  const addToast = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
-    const id = generateId();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
-  };
-
-  const handleUpdateItem = useCallback(
-    (id: string, updates: Partial<NexusObject>) => {
-      const nextQueue = localQueue.map((item) => {
-        if (item.id === id) {
-          return { ...item, ...updates, last_modified: new Date().toISOString() } as NexusObject;
-        }
-        return item;
-      });
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-    },
-    [localQueue, activeBatchId, onUpdateBatch],
-  );
-
-  const handleAddChild = useCallback(
-    (parentId: string) => {
-      const newNode = NexusGraphUtils.createNode('New Unit', NexusType.SIMPLE_NOTE);
-      const parent = localQueue.find((i) => i.id === parentId);
-      if (!parent || (isLink(parent) && !isReified(parent))) return;
-
-      // Upgrade parent to container if it isn't one
-      const updatedParent: NexusObject = isContainer(parent)
-        ? ({ ...parent, children_ids: [...parent.children_ids, newNode.id] } as ContainerNote)
-        : ({
-            ...parent,
-            _type:
-              parent._type === NexusType.STORY_NOTE
-                ? NexusType.STORY_NOTE
-                : NexusType.CONTAINER_NOTE,
-            children_ids: [newNode.id],
-            containment_type: ContainmentType.FOLDER,
-            is_collapsed: false,
-            default_layout: DefaultLayout.GRID,
-          } as ContainerNote);
-
-      const hierarchyLink: HierarchicalLink = {
-        id: generateId(),
-        _type: NexusType.HIERARCHICAL_LINK,
-        source_id: parentId,
-        target_id: newNode.id,
-        verb: 'contains',
-        verb_inverse: 'part of',
-        hierarchy_type: HierarchyType.PARENT_OF,
-        created_at: new Date().toISOString(),
-        last_modified: new Date().toISOString(),
-        link_ids: [],
-        internal_weight: 1.0,
-        total_subtree_mass: 0,
-      };
-
-      const nextQueue = [
-        ...localQueue.filter((i) => i.id !== parentId),
-        updatedParent,
-        newNode,
-        hierarchyLink,
-      ];
-      setLocalQueue(nextQueue);
-      setSelectedId(newNode.id);
-      setShowInspector(true);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-      addToast('Sub-unit established.', 'success');
-    },
-    [localQueue, activeBatchId, onUpdateBatch],
-  );
-
-  const handleReparent = useCallback(
-    (sourceId: string, targetId: string, oldParentId?: string, isReference: boolean = false) => {
-      if (sourceId === targetId) {
-        addToast('Self-Reference Blocked: A unit cannot contain itself.', 'error');
-        return;
-      }
-
-      const target = localQueue.find((i) => i.id === targetId);
-      if (target && isContainer(target) && target.children_ids.includes(sourceId)) {
-        addToast('Duplicate Reference: Unit already exists in target.', 'info');
-        return;
-      }
-
-      if (targetId !== 'root' && GraphIntegrityService.detectCycle(targetId, sourceId, registry)) {
-        addToast('Cycle Detected: Operation Aborted.', 'error');
-        return;
-      }
-
-      let nextQueue = [...localQueue];
-
-      // 1. Remove from old parent
-      if (!isReference && oldParentId) {
-        if (oldParentId === 'root') {
-          nextQueue = nextQueue.map((i) =>
-            i.id === sourceId
-              ? ({
-                  ...i,
-                  tags: (i as SimpleNote).tags?.filter((t: string) => t !== '__is_root__') || [],
-                } as NexusObject)
-              : i,
-          );
-        } else {
-          nextQueue = nextQueue.map((i) => {
-            if (i.id === oldParentId && isContainer(i)) {
-              return {
-                ...i,
-                children_ids: i.children_ids.filter((id) => id !== sourceId),
-              } as ContainerNote;
-            }
-            return i;
-          });
-          // Remove the old hierarchical link
-          nextQueue = nextQueue.filter(
-            (i) =>
-              !(
-                isLink(i) &&
-                i._type === NexusType.HIERARCHICAL_LINK &&
-                i.source_id === oldParentId &&
-                i.target_id === sourceId
-              ),
-          );
-        }
-      }
-
-      // 2. Add to new target
-      if (targetId === 'root') {
-        nextQueue = nextQueue.map((i) =>
-          i.id === sourceId
-            ? ({
-                ...i,
-                tags: Array.from(new Set([...((i as SimpleNote).tags || []), '__is_root__'])),
-              } as NexusObject)
-            : i,
-        );
-      } else {
-        nextQueue = nextQueue.map((i) => {
-          if (i.id === targetId) {
-            if (isContainer(i))
-              return {
-                ...i,
-                children_ids: Array.from(new Set([...i.children_ids, sourceId])),
-              } as NexusObject;
-            return {
-              ...i,
-              _type:
-                i._type === NexusType.STORY_NOTE ? NexusType.STORY_NOTE : NexusType.CONTAINER_NOTE,
-              children_ids: [sourceId],
-              containment_type: ContainmentType.FOLDER,
-              is_collapsed: false,
-              default_layout: DefaultLayout.GRID,
-            } as ContainerNote;
-          }
-          return i;
-        });
-        const shadowLink = NexusGraphUtils.createShadowLink(targetId, sourceId);
-        nextQueue.push(shadowLink);
-      }
-
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-      addToast('Unit Relocated.', 'success');
-    },
-    [localQueue, registry, activeBatchId, onUpdateBatch],
-  );
-
-  const handleReifyLink = useCallback(
-    (linkId: string) => {
-      const nextQueue = localQueue.map((item) => {
-        if (item.id !== linkId || !isLink(item) || isReified(item)) return item;
-        const source = localQueue.find((i) => i.id === item.source_id);
-        const target = localQueue.find((i) => i.id === item.target_id);
-
-        return {
-          ...item,
-          _type:
-            item._type === NexusType.HIERARCHICAL_LINK
-              ? NexusType.AGGREGATED_HIERARCHICAL_LINK
-              : NexusType.AGGREGATED_SEMANTIC_LINK,
-          is_reified: true,
-          title: `${('title' in (source || {}) ? (source as SimpleNote).title : 'Origin') || 'Origin'} → ${('title' in (target || {}) ? (target as SimpleNote).title : 'Terminal') || 'Terminal'}`,
-          gist: `Logic: ${item.verb}`,
-          category_id: NexusCategory.META,
-          children_ids: [],
-          containment_type: ContainmentType.FOLDER,
-          is_collapsed: false,
-          default_layout: DefaultLayout.GRID,
-          last_modified: new Date().toISOString(),
-        } as NexusObject;
-      });
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-      addToast('Link promoted to logic unit.', 'success');
-    },
-    [localQueue, activeBatchId, onUpdateBatch],
-  );
-
-  const handleReifyNode = useCallback(
-    (nodeId: string) => {
-      const nextQueue = localQueue.map((item) => {
-        if (item.id !== nodeId || isLink(item) || isContainer(item)) return item;
-        return {
-          ...item,
-          _type: NexusType.CONTAINER_NOTE,
-          containment_type: ContainmentType.FOLDER,
-          is_collapsed: false,
-          default_layout: DefaultLayout.GRID,
-          children_ids: [],
-          last_modified: new Date().toISOString(),
-        } as NexusObject;
-      });
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-      addToast('Unit promoted to structural container.', 'success');
-    },
-    [localQueue, activeBatchId, onUpdateBatch],
-  );
-
-  const handleReifyNodeToLink = useCallback(
-    (nodeId: string, sourceId: string, targetId: string) => {
-      const node = localQueue.find((i) => i.id === nodeId);
-      if (!node || isLink(node)) return;
-
-      const filteredQueue = localQueue.filter((item) => {
-        if (isLink(item)) {
-          const isSBridge =
-            (item.source_id === nodeId && item.target_id === sourceId) ||
-            (item.source_id === sourceId && item.target_id === nodeId);
-          const isTBridge =
-            (item.source_id === nodeId && item.target_id === targetId) ||
-            (item.source_id === targetId && item.target_id === nodeId);
-          return !isSBridge && !isTBridge;
-        }
-        return true;
-      });
-
-      const nextQueue = filteredQueue.map((item) => {
-        if (item.id === nodeId) {
-          return {
-            ...item,
-            _type: NexusType.AGGREGATED_SEMANTIC_LINK,
-            is_reified: true,
-            source_id: sourceId,
-            target_id: targetId,
-            verb: 'governs',
-            verb_inverse: 'governed by',
-            containment_type: ContainmentType.FOLDER,
-            children_ids: [],
-            is_collapsed: false,
-            default_layout: DefaultLayout.GRID,
-            last_modified: new Date().toISOString(),
-          } as NexusObject;
-        }
-        return item;
-      });
-
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-      addToast('Unit promoted to Causal Stream.', 'success');
-    },
-    [localQueue, activeBatchId, onUpdateBatch],
-  );
-
-  const handleEstablishLink = useCallback(
-    (sourceId: string, targetId: string, verb: string = 'binds') => {
-      const source = localQueue.find((i) => i.id === sourceId);
-      const target = localQueue.find((i) => i.id === targetId);
-      if (!source || !target || sourceId === targetId) return;
-
-      const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(
-        source,
-        target,
-        NexusType.SEMANTIC_LINK,
-        verb,
-      );
-
-      const nextQueue = [
-        ...localQueue.filter((i) => i.id !== sourceId && i.id !== targetId),
-        updatedSource,
-        updatedTarget,
-        link,
-      ];
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-      addToast('Semantic connection established.', 'success');
-    },
-    [localQueue, activeBatchId, onUpdateBatch],
-  );
-
-  const handleDeleteItem = useCallback(
-    (id: string) => {
-      const nextQueue = localQueue.filter((item) => item.id !== id);
-      setLocalQueue(nextQueue);
-      if (activeBatchId) onUpdateBatch(activeBatchId, nextQueue);
-
-      if (selectedId === id) {
-        setSelectedId(null);
-        setShowInspector(false);
-      }
-      addToast('Unit Purged from Batch.', 'info');
-    },
-    [localQueue, selectedId, activeBatchId, onUpdateBatch],
-  );
+  // ── Extracted handlers (update, addChild, reparent, reify, establish, delete) ──
+  const {
+    handleUpdateItem,
+    handleAddChild,
+    handleReparent,
+    handleReifyLink,
+    handleReifyNode,
+    handleReifyNodeToLink,
+    handleEstablishLink,
+    handleDeleteItem,
+  } = useRefineryHandlers({
+    localQueue,
+    setLocalQueue,
+    registry,
+    activeBatchId,
+    selectedId,
+    setSelectedId,
+    onUpdateBatch,
+    syncToMCP,
+    pushState,
+    addToast,
+  });
 
   const handleDrilldownAction = (id: string) => {
     setDrillStack((prev) => {
@@ -417,134 +164,133 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
   return (
     <div className="flex flex-col h-full bg-nexus-950 overflow-hidden relative">
       {!activeBatchId ? (
-        <div className="p-8 md:p-12 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-12">
-            <h1 className="text-4xl font-display font-black uppercase text-nexus-text tracking-tighter">
-              Refinery <span className="text-nexus-accent">Inbox</span>
-            </h1>
-            <div className="flex items-center gap-4 text-xs md:text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
-              Intel Ready: {batches.length} BATCHES
-            </div>
-          </div>
-
-          {batches.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-700">
-              <div className="p-10 bg-nexus-900 rounded-[64px] border border-nexus-800 shadow-2xl relative">
-                <Package size={80} className="text-nexus-muted opacity-20" />
-                <div className="absolute -top-4 -right-4 w-12 h-12 bg-nexus-accent rounded-2xl flex items-center justify-center text-white shadow-lg animate-bounce">
-                  <FlaskConical size={24} />
-                </div>
-              </div>
-              <div className="text-center space-y-3">
-                <h3 className="text-2xl font-display font-bold text-nexus-text uppercase">
-                  Extraction Buffer Empty
-                </h3>
-                <p className="text-sm text-nexus-muted font-serif italic max-w-sm mx-auto opacity-70">
-                  "No unprocessed scry data found. Use the Playground to inject development fixtures
-                  or the Scanner for lore extraction."
-                </p>
-              </div>
-              <div className="flex gap-4">
-                <button
-                  disabled
-                  className="px-8 py-4 bg-nexus-900 border border-nexus-800 rounded-3xl text-[10px] font-black uppercase tracking-widest text-nexus-muted opacity-50"
-                >
-                  Open Scanner
-                </button>
-                <div className="text-nexus-accent animate-pulse px-2 flex items-center">
-                  <ChevronRight />
-                </div>
-                <div className="p-1 rounded-3xl bg-nexus-accent/10 border border-nexus-accent/20">
-                  <button
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent('nexus-navigate', { detail: 'PLAYGROUND' }),
-                      )
-                    }
-                    className="px-8 py-4 bg-nexus-accent text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-nexus-accent/20 hover:brightness-110 transition-all active:scale-95"
-                  >
-                    Go to Playground
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {batches.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => navigate(`/refinery/${b.id}`)}
-                  className="group p-8 bg-nexus-900 border border-nexus-800 rounded-[40px] text-left hover:border-nexus-accent hover:translate-y-[-4px] transition-all duration-500 shadow-xl"
-                >
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-3 bg-nexus-950 rounded-2xl border border-nexus-800 text-nexus-muted group-hover:text-nexus-accent transition-colors">
-                      <Package size={20} />
-                    </div>
-                    <div className="text-xs md:text-[10px] font-mono font-black text-nexus-muted uppercase tracking-widest opacity-40">
-                      {b.source}
-                    </div>
-                  </div>
-                  <div className="text-xl font-display font-bold text-nexus-text mb-2 truncate group-hover:text-nexus-accent transition-colors">
-                    {b.name}
-                  </div>
-                  <div className="text-xs md:text-[10px] text-nexus-muted uppercase font-black tracking-widest">
-                    {b.items.length} Structural Units
-                  </div>
-                  <div className="mt-8 flex items-center justify-between text-[9px] font-black text-nexus-muted uppercase tracking-widest opacity-30 group-hover:opacity-100 transition-opacity">
-                    <span>Initialize Scry</span>
-                    <ChevronRight size={14} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <RefineryInbox
+          batches={batches}
+          onSelectBatch={(id) => navigate(`/refinery/${id}`)}
+          onNavigateToPlayground={() =>
+            window.dispatchEvent(new CustomEvent('nexus-navigate', { detail: 'PLAYGROUND' }))
+          }
+        />
       ) : (
         <div className="flex flex-col h-full">
+          {/* ───── HEADER ───── */}
           <header className="h-16 border-b border-nexus-800 bg-nexus-900 flex items-center justify-between px-6 shrink-0 z-40">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/refinery')}
-                className="text-nexus-muted hover:text-nexus-text flex items-center gap-3 font-display font-black text-[10px] uppercase tracking-widest transition-all"
+                className="text-nexus-muted hover:text-nexus-text flex items-center gap-2 font-display font-black text-[10px] uppercase tracking-widest transition-all"
               >
-                <ArrowLeft size={16} /> Back to Inbox
+                <ArrowLeft size={16} />
+                <span className="hidden sm:inline">Inbox</span>
               </button>
 
-              <div className="flex bg-nexus-950 border border-nexus-800 rounded-full p-1 shadow-inner">
-                <button
-                  onClick={() => setActiveView('STRUCTURE')}
-                  className={`px-4 py-1.5 rounded-full text-[9px] font-display font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeView === 'STRUCTURE' ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
-                >
-                  <ListTree size={12} /> H-Tree
-                </button>
-                <button
-                  onClick={() => setActiveView('EXPLORER')}
-                  className={`px-4 py-1.5 rounded-full text-[9px] font-display font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeView === 'EXPLORER' ? 'bg-nexus-accent text-white shadow-lg' : 'text-nexus-muted hover:text-nexus-text'}`}
-                >
-                  <Compass size={12} /> Oracle
-                </button>
-              </div>
+              {/* Batch Selector Dropdown */}
+              {batches.length > 1 && (
+                <div className="relative">
+                  <select
+                    value={activeBatchId || ''}
+                    onChange={(e) => navigate(`/refinery/${e.target.value}`)}
+                    className="appearance-none bg-nexus-950 border border-nexus-800 rounded-full px-4 py-1.5 text-[10px] font-display font-black uppercase tracking-widest text-nexus-text cursor-pointer hover:border-nexus-600 transition-colors pr-8"
+                  >
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronRight
+                    size={12}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-nexus-muted pointer-events-none"
+                  />
+                </div>
+              )}
+
+              {/* Breadcrumb */}
+              {drillStack.length > 0 && (
+                <div className="hidden md:flex items-center gap-1 text-[9px] font-mono text-nexus-muted">
+                  <button
+                    onClick={() => setDrillStack([])}
+                    className="hover:text-nexus-text transition-colors"
+                  >
+                    Root
+                  </button>
+                  {drillStack.map((id) => (
+                    <React.Fragment key={id}>
+                      <ChevronRight size={10} className="opacity-30" />
+                      <button
+                        onClick={() => {
+                          const idx = drillStack.indexOf(id);
+                          setDrillStack((prev) => prev.slice(0, idx + 1));
+                        }}
+                        className="hover:text-nexus-accent transition-colors truncate max-w-[100px]"
+                      >
+                        {(registry[id] as SimpleNote)?.title || id.slice(0, 6)}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-4">
-              <span className="hidden md:flex text-[10px] font-black uppercase text-nexus-essence items-center gap-2 bg-nexus-essence/5 border border-nexus-essence/20 px-3 py-1.5 rounded-full">
-                <AlertCircle size={12} /> Integrity Shield Active
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 mr-2 border-r border-nexus-800 pr-3">
+                <button
+                  disabled={!canUndo}
+                  onClick={() => {
+                    const result = undo(localQueue);
+                    if (result) {
+                      setLocalQueue(result.items);
+                      if (activeBatchId) onUpdateBatch(activeBatchId, result.items);
+                      syncToMCP(result.ops);
+                      addToast('Undo', 'info');
+                    }
+                  }}
+                  className={`p-1.5 rounded-md transition-colors ${canUndo ? 'text-nexus-text hover:bg-nexus-800' : 'text-nexus-800 cursor-not-allowed'}`}
+                  title="Undo (Ctrl+Z)"
+                >
+                  <RotateCcw size={14} />
+                </button>
+                <button
+                  disabled={!canRedo}
+                  onClick={() => {
+                    const result = redo(localQueue);
+                    if (result) {
+                      setLocalQueue(result.items);
+                      if (activeBatchId) onUpdateBatch(activeBatchId, result.items);
+                      syncToMCP(result.ops);
+                      addToast('Redo', 'info');
+                    }
+                  }}
+                  className={`p-1.5 rounded-md transition-colors ${canRedo ? 'text-nexus-text hover:bg-nexus-800' : 'text-nexus-800 cursor-not-allowed'}`}
+                  title="Redo (Ctrl+Shift+Z)"
+                >
+                  <RotateCw size={14} />
+                </button>
+              </div>
+              <MCPStatusBadge status={mcpState.status} compact />
               <button
-                onClick={() => onCommitBatch(activeBatchId!, localQueue)}
-                className="bg-nexus-accent text-white px-8 py-2 rounded-full font-display font-black text-[10px] uppercase tracking-widest shadow-lg shadow-nexus-accent/20 hover:brightness-110 active:scale-95 transition-all"
+                onClick={async () => {
+                  if (!activeBatchId) return;
+                  await commitBatch(activeBatchId, activeUniverseId || 'default');
+                  addToast('Batch committed to Registry.', 'success');
+                  // Optional: navigate back to inbox or clear state
+                }}
+                className="bg-nexus-accent text-white px-6 py-2 rounded-full font-display font-black text-[10px] uppercase tracking-widest shadow-lg shadow-nexus-accent/20 hover:brightness-110 active:scale-95 transition-all"
               >
-                COMMIT TO REGISTRY
+                Commit
               </button>
             </div>
           </header>
+
+          {/* ───── THREE-PANEL BODY ───── */}
           <div className="flex-1 flex overflow-hidden relative">
+            {/* LEFT: Hierarchy Sidebar */}
             <div
               className={`
-                            ${selectedId ? 'hidden md:flex' : 'flex'} 
-                            flex-col h-full shrink-0 z-20 transition-all duration-300 relative shadow-2xl
-                            w-full md:w-auto
-                        `}
+                ${selectedId ? 'hidden md:flex' : 'flex'} 
+                flex-col h-full shrink-0 z-20 transition-all duration-300 relative shadow-2xl
+                w-full md:w-auto
+              `}
             >
               <HierarchyExplorer
                 items={localQueue}
@@ -557,23 +303,41 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
               />
             </div>
 
+            {/* CENTER: Canvas */}
             <main
               className={`
-                            ${!selectedId ? 'hidden md:block' : 'block'} 
-                            flex-1 bg-[#050508] relative overflow-hidden h-full
-                        `}
+                ${!selectedId ? 'hidden md:block' : 'block'} 
+                flex-1 bg-[#050508] relative overflow-hidden h-full min-w-0
+              `}
             >
-              {/* Mobile "Back" Header for Details View */}
+              {/* Mobile "Back" Header */}
               <div className="md:hidden h-12 bg-nexus-900 border-b border-nexus-800 flex items-center px-4 shrink-0">
                 <button
                   onClick={() => {
                     setSelectedId(null);
-                    setShowInspector(false);
                   }}
                   className="flex items-center gap-2 text-xs font-bold text-nexus-muted hover:text-nexus-text"
                 >
                   <ArrowLeft size={14} /> Back to List
                 </button>
+              </div>
+
+              {/* Canvas Mode Toggle (inline, top-right) */}
+              <div className="absolute top-4 right-4 z-30">
+                <div className="flex bg-nexus-950/80 backdrop-blur-sm border border-nexus-800 rounded-full p-0.5 shadow-lg">
+                  <button
+                    onClick={() => setActiveView('STRUCTURE')}
+                    className={`px-3 py-1 rounded-full text-[8px] font-display font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${activeView === 'STRUCTURE' ? 'bg-nexus-accent/20 text-nexus-accent' : 'text-nexus-muted hover:text-nexus-text'}`}
+                  >
+                    <ListTree size={10} /> Tree
+                  </button>
+                  <button
+                    onClick={() => setActiveView('EXPLORER')}
+                    className={`px-3 py-1 rounded-full text-[8px] font-display font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${activeView === 'EXPLORER' ? 'bg-nexus-accent/20 text-nexus-accent' : 'text-nexus-muted hover:text-nexus-text'}`}
+                  >
+                    <Compass size={10} /> Semantic
+                  </button>
+                </div>
               </div>
 
               {activeView === 'EXPLORER' ? (
@@ -591,7 +355,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   onResetStack={() => setDrillStack([])}
                   onSelect={setSelectedId}
                   onViewModeChange={(mode: ViewMode) => {
-                    if (mode === 'INSPECTOR') setShowInspector(true);
+                    if (mode === 'INSPECTOR') setSelectedId(selectedId);
                   }}
                   onReifyLink={handleReifyLink}
                   onReifyNode={handleReifyNode}
@@ -607,7 +371,7 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   onSelect={setSelectedId}
                   onAddChild={handleAddChild}
                   onViewModeChange={(mode: ViewMode) => {
-                    if (mode === 'INSPECTOR') setShowInspector(true);
+                    if (mode === 'INSPECTOR') setSelectedId(selectedId);
                   }}
                   onDrilldown={handleDrilldownAction}
                   onDelete={handleDeleteItem}
@@ -618,20 +382,33 @@ export const RefineryFeature: React.FC<RefineryFeatureProps> = ({
                   onReparent={handleReparent}
                 />
               )}
-
-              <InspectorPanel
-                isOpen={showInspector}
-                selectedObject={selectedObject}
-                registry={registry}
-                onUpdate={(updates) => handleUpdateItem(selectedId!, updates)}
-                onClose={() => setShowInspector(false)}
-              />
             </main>
+
+            {/* RIGHT: Inspector (always visible on desktop when item selected) */}
+            <aside
+              className={`
+                hidden md:block shrink-0 h-full overflow-hidden transition-all duration-300
+                ${selectedObject ? 'w-[380px]' : 'w-0'}
+              `}
+            >
+              {selectedObject && (
+                <InspectorSidebar
+                  object={selectedObject}
+                  registry={registry}
+                  onUpdate={(updates) => handleUpdateItem(selectedId!, updates)}
+                  onClose={() => setSelectedId(null)}
+                  onDelete={handleDeleteItem}
+                  onSelect={setSelectedId}
+                  embedded
+                />
+              )}
+            </aside>
           </div>
         </div>
       )}
 
       <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-[1000]">
+        <MCPStatusBadge status={mcpState.status} compact />
         {toasts.map((t) => (
           <div
             key={t.id}

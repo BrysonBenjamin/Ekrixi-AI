@@ -1,4 +1,4 @@
-import { NexusObject, SimpleLink, SimpleNote } from '../types';
+import { NexusObject, NexusLink, NexusNote } from '../types';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
 
 export interface Universe {
@@ -39,9 +39,9 @@ export interface IDataService {
   // Transactions
   reifyLinkToNote(
     universeId: string,
-    linkToReify: SimpleLink,
-    newNoteData: Omit<SimpleNote, '_type' | 'id'>,
-  ): Promise<SimpleNote | null>;
+    linkToReify: NexusLink,
+    newNoteData: Omit<NexusNote, '_type' | 'id'>,
+  ): Promise<NexusNote | null>;
 
   // Universe Management
   createUniverse(name: string, description: string, ownerId: string): Promise<string>;

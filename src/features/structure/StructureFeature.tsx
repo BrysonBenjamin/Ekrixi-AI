@@ -6,26 +6,44 @@ import {
   NexusCategory,
   isLink,
   isContainer,
-  ContainmentType,
-  DefaultLayout,
   HierarchyType,
   isReified,
   SimpleNote,
-  ContainerNote,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
 import { NexusDeletionService, DeletionProfile } from '../../core/services/NexusDeletionService';
-import { StructureVisualizer } from './components/StructureVisualizer';
-import { HierarchyExplorer } from '../refinery/components/HierarchyExplorer';
+import { StructureVisualizer } from '../shared/structure/components/StructureVisualizer';
+import { HierarchyExplorer } from '../shared/structure/components/HierarchyExplorer';
 import { UserCircle2, LayoutPanelLeft } from 'lucide-react';
 import { useTutorial } from '../../components/shared/tutorial/TutorialSystem';
 import { InspectorPanel } from '../shared/inspector/InspectorPanel';
+import { TimelineControl } from './components/TimelineControl';
+import { getTemporalRegistry } from './utils/temporalUtils';
 
 interface StructureFeatureProps {
   registry: Record<string, NexusObject>;
   onRegistryUpdate: React.Dispatch<React.SetStateAction<Record<string, NexusObject>>>;
   onNavigateToWiki?: (id: string) => void;
 }
+
+// Helper to extract keyframes from registry
+const extractKeyframes = (registry: Record<string, NexusObject>) => {
+  const dates = new Set<string>();
+  Object.values(registry).forEach((obj) => {
+    if (obj.created_at) dates.add(obj.created_at.split('T')[0]);
+    if ((obj as any).time_state?.effective_date) {
+      const { year, month = 1, day = 1 } = (obj as any).time_state.effective_date;
+      dates.add(new Date(year, month - 1, day).toISOString().split('T')[0]);
+    }
+  });
+  return Array.from(dates)
+    .sort()
+    .map((d) => ({
+      date: new Date(d),
+      label: 'Snapshot',
+      id: d,
+    }));
+};
 
 export const StructureFeature: React.FC<StructureFeatureProps> = ({
   registry,
@@ -37,11 +55,10 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
   const [showSidebar, setShowSidebar] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
 
-  useTutorial();
+  // Temporal State
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  const selectedObject = useMemo(() => {
-    return selectedId ? registry[selectedId] : null;
-  }, [selectedId, registry]);
+  useTutorial();
 
   const handleUpdateItem = useCallback(
     (updates: Partial<NexusObject>) => {
@@ -71,7 +88,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
       if (isLink(obj) && !isReified(obj)) return;
       const sn = obj as SimpleNote;
       const isStory = sn._type === NexusType.STORY_NOTE;
-      const isAuthor = sn.is_author_note;
+      const isAuthor = sn._type === NexusType.AUTHOR_NOTE;
 
       // Strictly exclude Story units from Structural views
       if (!isStory && (!isAuthor || showAuthorNotes)) {
@@ -100,6 +117,17 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
     return next;
   }, [registry, showAuthorNotes]);
 
+  // Apply Temporal Filtering
+  const displayedRegistry = useMemo(() => {
+    return getTemporalRegistry(filteredRegistry, currentDate);
+  }, [filteredRegistry, currentDate]);
+
+  const selectedObject = useMemo(() => {
+    return selectedId ? displayedRegistry[selectedId] : null;
+  }, [selectedId, displayedRegistry]);
+
+  const keyframes = useMemo(() => extractKeyframes(registry), [registry]);
+
   const handleAddChild = useCallback(
     (parentId: string) => {
       const newNode = NexusGraphUtils.createNode('New Unit', NexusType.SIMPLE_NOTE);
@@ -109,17 +137,18 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
 
         // Omni-container logic: Promote any leaf node to container status upon child addition
         const updatedParent: NexusObject = isContainer(parent)
-          ? ({ ...parent, children_ids: [...parent.children_ids, newNode.id] } as ContainerNote)
+          ? ({
+              ...parent,
+              children_ids: [...(parent.children_ids || []), newNode.id],
+            } as SimpleNote)
           : ({
               ...parent,
               _type:
                 parent._type === NexusType.STORY_NOTE
                   ? NexusType.STORY_NOTE
-                  : NexusType.CONTAINER_NOTE,
+                  : NexusType.SIMPLE_NOTE,
               children_ids: [newNode.id],
-              containment_type: ContainmentType.FOLDER,
               is_collapsed: false,
-              default_layout: DefaultLayout.GRID,
             } as NexusObject);
 
         const { link, updatedSource, updatedTarget } = NexusGraphUtils.createLink(
@@ -154,16 +183,14 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           _type:
             link._type === NexusType.HIERARCHICAL_LINK
               ? NexusType.AGGREGATED_HIERARCHICAL_LINK
-              : NexusType.AGGREGATED_SEMANTIC_LINK,
+              : NexusType.AGGREGATED_SIMPLE_LINK,
           is_reified: true,
           title: `${(source as SimpleNote).title || 'Origin'} → ${(target as SimpleNote).title || 'Terminal'}`,
           gist: `Logic: ${link.verb}`,
           prose_content: `Relationship between ${(source as SimpleNote).title} and ${(target as SimpleNote).title}.`,
           category_id: NexusCategory.META,
           children_ids: [],
-          containment_type: ContainmentType.FOLDER,
           is_collapsed: false,
-          default_layout: DefaultLayout.GRID,
           is_ghost: false,
           aliases: [],
           tags: ['reified'],
@@ -186,11 +213,10 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         if (!node || isLink(node) || isContainer(node)) return prev;
         const updatedNode: NexusObject = {
           ...(node as SimpleNote),
-          _type: NexusType.CONTAINER_NOTE,
-          containment_type: ContainmentType.FOLDER,
-          is_collapsed: false,
-          default_layout: DefaultLayout.GRID,
+          // Keep original type unless upgrading from something specific?
+          // Usually just ensuring it has children_ids makes it a container-capable node
           children_ids: [],
+          is_collapsed: false,
           tags: [...((node as SimpleNote).tags || []), 'promoted-logic'],
         };
         return { ...prev, [nodeId]: updatedNode };
@@ -222,16 +248,14 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         });
         const reifiedUnit: NexusObject = {
           ...(node as SimpleNote),
-          _type: NexusType.AGGREGATED_SEMANTIC_LINK,
+          _type: NexusType.AGGREGATED_SIMPLE_LINK,
           is_reified: true,
           source_id: sourceId,
           target_id: targetId,
           verb: 'governs',
           verb_inverse: 'governed by',
-          containment_type: ContainmentType.FOLDER,
           children_ids: [],
           is_collapsed: false,
-          default_layout: DefaultLayout.GRID,
         };
         next[nodeId] = reifiedUnit;
         return next;
@@ -258,9 +282,9 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         Object.keys(next).forEach((k) => {
           const o = next[k];
           if (isContainer(o)) {
-            const cn = o as ContainerNote;
-            const updatedChildren = cn.children_ids.filter((cid) => !candidates.has(cid));
-            if (updatedChildren.length !== cn.children_ids.length) {
+            const cn = o as SimpleNote;
+            const updatedChildren = (cn.children_ids || []).filter((cid) => !candidates.has(cid));
+            if (updatedChildren.length !== (cn.children_ids?.length || 0)) {
               next[k] = { ...cn, children_ids: updatedChildren };
             }
           }
@@ -295,10 +319,10 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
           } else {
             const op = next[oldParentId];
             if (op && isContainer(op)) {
-              const cn = op as ContainerNote;
+              const cn = op as SimpleNote;
               next[oldParentId] = {
                 ...cn,
-                children_ids: cn.children_ids.filter((id) => id !== sourceId),
+                children_ids: (cn.children_ids || []).filter((id) => id !== sourceId),
               };
             }
             Object.keys(next).forEach((k) => {
@@ -328,23 +352,22 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         if (!targetNode || isLink(targetNode)) return next;
 
         // Promote to container if not already one
+        // In Schema v2, any SimpleNote can be a container if it has children_ids
         if (!isContainer(targetNode)) {
           next[targetId] = {
             ...targetNode,
             _type:
               targetNode._type === NexusType.STORY_NOTE
                 ? NexusType.STORY_NOTE
-                : NexusType.CONTAINER_NOTE,
+                : NexusType.SIMPLE_NOTE,
             children_ids: [sourceId],
-            containment_type: ContainmentType.FOLDER,
             is_collapsed: false,
-            default_layout: DefaultLayout.GRID,
           } as NexusObject;
         } else {
-          const cn = targetNode as ContainerNote;
+          const cn = targetNode as SimpleNote;
           next[targetId] = {
             ...cn,
-            children_ids: Array.from(new Set([...cn.children_ids, sourceId])),
+            children_ids: Array.from(new Set([...(cn.children_ids || []), sourceId])),
           };
         }
 
@@ -383,7 +406,7 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
         {showSidebar && (
           <div
             id="structure-sidebar"
-            className="h-full border-r border-nexus-800 animate-in slide-in-from-left duration-300"
+            className="h-full border-r border-nexus-800 animate-in slide-in-from-left duration-300 w-[300px] shrink-0"
           >
             <HierarchyExplorer
               items={Object.values(filteredRegistry)}
@@ -394,29 +417,36 @@ export const StructureFeature: React.FC<StructureFeatureProps> = ({
             />
           </div>
         )}
-        <main className="flex-1 relative overflow-hidden bg-nexus-950">
-          <StructureVisualizer
-            registry={filteredRegistry}
-            selectedId={selectedId}
-            onSelect={(id) => {
-              setSelectedId(id);
-              setShowInspector(true);
-            }}
-            onAddChild={handleAddChild}
-            onDelete={handleDeleteUnit}
-            onReparent={handleReparent}
-            onInspect={onNavigateToWiki}
-            onReifyLink={handleReifyLink}
-            onReifyNode={handleReifyNode}
-            onReifyNodeToLink={handleReifyNodeToLink}
-          />
-          <InspectorPanel
-            isOpen={showInspector}
-            selectedObject={selectedObject}
-            registry={registry}
-            onUpdate={handleUpdateItem}
-            onClose={() => setShowInspector(false)}
-            onOpenWiki={onNavigateToWiki}
+        <main className="flex-1 relative overflow-hidden bg-nexus-950 flex flex-col min-w-0">
+          <div className="flex-1 relative">
+            <StructureVisualizer
+              registry={displayedRegistry}
+              selectedId={selectedId}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setShowInspector(true);
+              }}
+              onAddChild={handleAddChild}
+              onDelete={handleDeleteUnit}
+              onReparent={handleReparent}
+              onInspect={onNavigateToWiki}
+              onReifyLink={handleReifyLink}
+              onReifyNode={handleReifyNode}
+              onReifyNodeToLink={handleReifyNodeToLink}
+            />
+            <InspectorPanel
+              isOpen={showInspector}
+              selectedObject={selectedObject}
+              registry={displayedRegistry}
+              onUpdate={handleUpdateItem}
+              onClose={() => setShowInspector(false)}
+              onOpenWiki={onNavigateToWiki}
+            />
+          </div>
+          <TimelineControl
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            keyframes={keyframes}
           />
         </main>
       </div>

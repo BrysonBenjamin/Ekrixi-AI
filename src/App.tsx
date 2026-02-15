@@ -28,6 +28,7 @@ import { useRegistryStore } from './store/useRegistryStore';
 import { useUIStore } from './store/useUIStore';
 import { useRefineryStore } from './store/useRefineryStore';
 import { useSessionStore } from './store/useSessionStore';
+import { useRefinerySync } from './features/refinery/hooks/useRefinerySync';
 import { IntroOverlay } from './features/universe-generator/components/IntroOverlay';
 import { useLLM } from './features/system/hooks/useLLM';
 import gsap from 'gsap';
@@ -64,6 +65,9 @@ export default function App(): React.ReactNode {
     updateBatchItems,
     removeBatch: deleteRefineryBatch,
   } = useRefineryStore();
+
+  // MCP Sync
+  useRefinerySync();
 
   const { activeUniverseId, updateUniverseMeta, initializeUniversesListener } = useSessionStore();
   const { user: firebaseUser, loading: authLoading } = useAuth();
@@ -219,7 +223,7 @@ export default function App(): React.ReactNode {
         _type:
           link._type === NexusType.HIERARCHICAL_LINK
             ? NexusType.AGGREGATED_HIERARCHICAL_LINK
-            : NexusType.AGGREGATED_SEMANTIC_LINK,
+            : NexusType.AGGREGATED_SIMPLE_LINK,
         is_reified: true,
         title: `${('title' in source ? (source as any).title : 'Origin') || 'Origin'} → ${('title' in target ? (target as any).title : 'Terminal') || 'Terminal'}`,
         gist: `Logic: ${link.verb}`,
@@ -252,41 +256,7 @@ export default function App(): React.ReactNode {
             path="/playground"
             element={
               <ProtectedRoute>
-                <PlaygroundFeature
-                  onSeedRefinery={(items, name) => handleBatchToRefinery(items, 'IMPORT', name)}
-                  onSeedRegistry={(items) => addToRegistry(items)}
-                  onSeedManifesto={(blocks) => {
-                    window.dispatchEvent(
-                      new CustomEvent('nexus-seed-manifesto', { detail: blocks }),
-                    );
-                    navigate('/studio');
-                  }}
-                  onSeedTimeline={() => {
-                    if (activeUniverseId) {
-                      dbFixtures.seedTimelineScenario(activeUniverseId);
-                      // Optional: Navigate to timeline or show toast
-                      navigate('/timeline');
-                    }
-                  }}
-                  onSeedWar={() => {
-                    if (activeUniverseId) {
-                      dbFixtures.seedWarScenario(activeUniverseId);
-                      navigate('/explore');
-                    }
-                  }}
-                  onSeedTriangleWar={() => {
-                    if (activeUniverseId) {
-                      dbFixtures.seedTriangleWarScenario(activeUniverseId);
-                      navigate('/explore');
-                    }
-                  }}
-                  onSeedFractalWar={() => {
-                    if (activeUniverseId) {
-                      dbFixtures.seedFractalWarScenario(activeUniverseId);
-                      navigate('/explore');
-                    }
-                  }}
-                />
+                <PlaygroundFeature />
               </ProtectedRoute>
             }
           />

@@ -77,8 +77,7 @@ export const AuthorsNotesWidget: React.FC<AuthorsNotesWidgetProps> = ({
   // Helper to get linked chapters for a note
   const getLinkedChapters = (noteId: string) => {
     const links = items.filter(
-      (i) =>
-        i._type === NexusType.SEMANTIC_LINK && (i as unknown as SimpleLink).source_id === noteId,
+      (i) => i._type === NexusType.SIMPLE_LINK && (i as unknown as SimpleLink).source_id === noteId,
     ) as unknown as SimpleLink[];
     return links
       .map((link) => chapters.find((ch) => ch.id === link.target_id))
@@ -122,7 +121,7 @@ export const AuthorsNotesWidget: React.FC<AuthorsNotesWidgetProps> = ({
     if (actualTargetId) {
       nextItems.push({
         id: generateId(),
-        _type: NexusType.SEMANTIC_LINK,
+        _type: NexusType.SIMPLE_LINK,
         source_id: noteId,
         target_id: actualTargetId,
         verb: 'governs',
@@ -156,7 +155,7 @@ export const AuthorsNotesWidget: React.FC<AuthorsNotesWidgetProps> = ({
     // Create link to current context
     nextItems.push({
       id: generateId(),
-      _type: NexusType.SEMANTIC_LINK,
+      _type: NexusType.SIMPLE_LINK,
       source_id: noteId,
       target_id: targetId,
       verb: 'governs',
@@ -175,7 +174,7 @@ export const AuthorsNotesWidget: React.FC<AuthorsNotesWidgetProps> = ({
     const now = new Date().toISOString();
     const existingLink = items.find(
       (i) =>
-        i._type === NexusType.SEMANTIC_LINK &&
+        i._type === NexusType.SIMPLE_LINK &&
         (i as unknown as SimpleLink).source_id === noteId &&
         (i as unknown as SimpleLink).target_id === chapterId,
     );
@@ -187,7 +186,7 @@ export const AuthorsNotesWidget: React.FC<AuthorsNotesWidgetProps> = ({
       // Add the link
       const newLink: SimpleLink = {
         id: generateId(),
-        _type: NexusType.SEMANTIC_LINK,
+        _type: NexusType.SIMPLE_LINK,
         source_id: noteId,
         target_id: chapterId,
         verb: 'governs',

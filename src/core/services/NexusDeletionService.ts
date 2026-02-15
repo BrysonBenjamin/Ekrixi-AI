@@ -1,4 +1,4 @@
-import { NexusObject, isLink, isContainer, NexusType, ContainerNote } from '../../types';
+import { NexusObject, isLink, isContainer, NexusType, NexusNote } from '../../types';
 
 /**
  * DeletionProfile defines the "Blast Radius" of a deletion operation.
@@ -44,7 +44,6 @@ export const NexusDeletionService = {
     const all = Object.values(registry) as (NexusObject & {
       source_id?: string;
       target_id?: string;
-      time_data?: any;
     })[];
 
     while (queue.length > 0) {
@@ -54,7 +53,8 @@ export const NexusDeletionService = {
       if (profile === DeletionProfile.STRUCTURAL_CASCADE || profile === DeletionProfile.HOLISTIC) {
         const obj = registry[currentId];
         if (obj && isContainer(obj)) {
-          (obj as ContainerNote).children_ids.forEach((cid) => {
+          const children = (obj as NexusNote).children_ids || [];
+          children.forEach((cid) => {
             if (!toDelete.has(cid)) {
               toDelete.add(cid);
               queue.push(cid);
@@ -63,13 +63,14 @@ export const NexusDeletionService = {
         }
       }
 
-      // 2. Temporal Snapshot Cascade
+      // 2. Temporal Snapshot Cascade — uses time_state.parent_identity_id
       if (profile === DeletionProfile.TEMPORAL_CAUSAL || profile === DeletionProfile.HOLISTIC) {
         all.forEach((obj) => {
-          if (obj.time_data?.base_node_id === currentId) {
+          const note = obj as NexusNote;
+          if (note.time_state?.parent_identity_id === currentId) {
             if (!toDelete.has(obj.id)) {
               toDelete.add(obj.id);
-              queue.push(obj.id); // Snapshots might be reified links with their own snapshots
+              queue.push(obj.id);
             }
           }
         });
@@ -86,7 +87,7 @@ export const NexusDeletionService = {
               obj._type === NexusType.HIERARCHICAL_LINK ||
               obj._type === NexusType.AGGREGATED_HIERARCHICAL_LINK;
 
-            // Decision Logic for and including this link in the deletion set:
+            // Decision Logic for including this link in the deletion set:
             let shouldDeleteLink = false;
 
             if (profile === DeletionProfile.HOLISTIC) {

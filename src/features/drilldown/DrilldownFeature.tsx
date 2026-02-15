@@ -1,5 +1,6 @@
-import React, { useMemo, useCallback } from 'react';
-import { NexusObject, isLink, SimpleNote, SimpleLink } from '../../types';
+import React, { useMemo } from 'react';
+import type { NexusObject } from '../../types';
+import { applyTemporalOverride } from '../../core/utils/nexus-accessors';
 import { DrilldownCanvas } from './components/DrilldownCanvas';
 import { ShieldAlert } from 'lucide-react';
 import { IntegrityAssistant } from '../integrity/components/IntegrityAssistant';
@@ -10,6 +11,7 @@ import { DrilldownFooter } from './components/DrilldownFooter';
 import { useDrilldownHandlers } from './hooks/useDrilldownHandlers';
 import { useDrilldownRegistry } from './hooks/useDrilldownRegistry';
 import { useRegistryStore } from '../../store/useRegistryStore';
+import { useRegistryIndexes } from './hooks/useRegistryIndexes';
 
 interface DrilldownFeatureProps {
   registry: Record<string, NexusObject>;
@@ -63,7 +65,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
     handleReifyNode,
     handleReifyNodeToLink,
     handleEstablishLink,
-    handleReparent,
+    // handleReparent,
     handleDelete,
     handleManifestSnapshot,
   } = useDrilldownHandlers({
@@ -74,11 +76,14 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
     simulatedDate,
   });
 
+  const indexes = useRegistryIndexes(registry);
+
   const { visibleNodesRegistry } = useDrilldownRegistry({
     registry,
     currentContainerId,
     showAuthorNotes,
     activeTimeOverrides,
+    indexes,
   });
 
   const selectedObject = useMemo(() => {
@@ -88,18 +93,7 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
 
     const overrideId = activeTimeOverrides[selectedId];
     if (overrideId && registry[overrideId]) {
-      const timeNode = registry[overrideId] as SimpleNote;
-      return {
-        ...baseObj,
-        title: timeNode.title,
-        gist: timeNode.gist,
-        prose_content: timeNode.prose_content,
-        tags: timeNode.tags,
-        time_data: timeNode.time_data,
-        // Support temporal labels for reified links
-        verb: (timeNode as any).verb || (baseObj as any).verb,
-        verb_inverse: (timeNode as any).verb_inverse || (baseObj as any).verb_inverse,
-      };
+      return applyTemporalOverride(baseObj, registry[overrideId]);
     }
     return baseObj;
   }, [selectedId, registry, activeTimeOverrides]);
@@ -132,17 +126,18 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
           onReifyNode={handleReifyNode}
           onReifyNodeToLink={handleReifyNodeToLink}
           onEstablishLink={handleEstablishLink}
-          onReparent={handleReparent}
           onManifestSnapshot={handleManifestSnapshot}
           integrityFocus={integrityFocus}
           getTimeNavigation={lookupTimeNav}
           simulatedDate={simulatedDate}
+          indexes={indexes}
         />
         <InspectorPanel
           isOpen={showInspector}
           selectedObject={selectedObject}
           registry={registry}
-          onUpdate={handleUpdateItem}
+          onUpdate={(updates) => handleUpdateItem(selectedId!, updates)}
+          onUpdateObject={handleUpdateItem}
           onClose={() => setShowInspector(false)}
           onOpenWiki={onSelectNote}
           onSelect={setSelectedId}
@@ -158,26 +153,25 @@ export const DrilldownFeature: React.FC<DrilldownFeatureProps> = ({
       {/* Integrity Controls - Overlaid */}
       <div className="absolute bottom-10 right-10 pointer-events-none flex flex-col gap-3 z-30">
         <div className="pointer-events-auto flex flex-col gap-3">
-          <button
+          {/* <button
             onClick={() => setIsIntegrityOpen(!isIntegrityOpen)}
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg border backdrop-blur-md ${
-              isIntegrityOpen
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                : 'bg-nexus-800/80 border-nexus-700/50 text-nexus-400 hover:text-amber-400 hover:border-amber-500/40'
-            }`}
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg border backdrop-blur-md ${isIntegrityOpen
+              ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+              : 'bg-nexus-800/80 border-nexus-700/50 text-nexus-400 hover:text-amber-400 hover:border-amber-500/40'
+              }`}
             title="Integrity Assistant"
           >
             <ShieldAlert size={28} />
-          </button>
+          </button> */}
         </div>
       </div>
-      <IntegrityAssistant
+      {/* <IntegrityAssistant
         isOpen={isIntegrityOpen}
         onClose={() => setIsIntegrityOpen(false)}
         registry={registry}
-        onResolve={onResolveAnomaly || (() => {})}
-        onFocusAnomaly={onSetIntegrityFocus || (() => {})}
-      />
+        onResolve={onResolveAnomaly || (() => { })}
+        onFocusAnomaly={onSetIntegrityFocus || (() => { })}
+      /> */}
     </div>
   );
 };

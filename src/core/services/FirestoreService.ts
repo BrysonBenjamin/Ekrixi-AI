@@ -18,16 +18,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { config } from '../../config';
-import {
-  NexusObject,
-  SimpleLink,
-  SimpleNote,
-  NexusType,
-  NexusCategory,
-  ContainmentType,
-  DefaultLayout,
-  isLink,
-} from '../../types';
+import { NexusObject, NexusLink, NexusNote, NexusType, NexusCategory, isLink } from '../../types';
 import { Universe, UniverseUpdates } from '../types/data-service';
 import { ChatSession, MessageNode } from '../../features/universe-generator/types';
 
@@ -156,6 +147,39 @@ export const FirestoreService = {
     universeId: string,
     callback: (nexusObjects: NexusObject[]) => void,
   ): () => void {
+    const user = auth.currentUser;
+    console.log(
+      `[FirestoreService] listenToAllNexusObjects called for universe: ${universeId}. User: ${user?.uid}`,
+    );
+
+    // Diagnostic check: Verify access rights explicitly before listening
+    // This is async but we need to return a sync unsubscribe.
+    // We'll fire and forget the check, logging if it fails.
+    if (user) {
+      getDoc(getUniverseDocRef(universeId))
+        .then((snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const participants = data?.participants || [];
+            console.log(
+              `[FirestoreService] Universe ${universeId} participants:`,
+              participants,
+              'User in list?',
+              participants.includes(user.uid),
+            );
+          } else {
+            console.warn(
+              `[FirestoreService] Universe ${universeId} doc does not exist or is unreadable.`,
+            );
+          }
+        })
+        .catch((err) => {
+          console.error(`[FirestoreService] Failed to fetch universe doc for diagnostics:`, err);
+        });
+    } else {
+      console.warn(`[FirestoreService] No authenticated user found when listening to universe.`);
+    }
+
     const q = query(getNexusObjectsCollectionRef(universeId));
     const unsubscribe = onSnapshot(
       q,
@@ -174,10 +198,10 @@ export const FirestoreService = {
 
   async reifyLinkToNote(
     universeId: string,
-    linkToReify: SimpleLink,
-    newNoteData: Omit<SimpleNote, '_type' | 'id'>,
-  ): Promise<SimpleNote | null> {
-    let newNote: SimpleNote | null = null;
+    linkToReify: NexusLink,
+    newNoteData: Omit<NexusNote, '_type' | 'id'>,
+  ): Promise<NexusNote | null> {
+    let newNote: NexusNote | null = null;
     const nexusObjectsRef = getNexusObjectsCollectionRef(universeId);
 
     try {
@@ -207,13 +231,9 @@ export const FirestoreService = {
           tags: [],
           is_ghost: false,
           category_id: NexusCategory.WORLD,
-          containment_type: ContainmentType.FOLDER,
-          default_layout: DefaultLayout.GRID,
-          is_collapsed: false,
-          children_ids: [],
           gist: newNoteData.gist || '',
           prose_content: newNoteData.prose_content || '',
-        } as SimpleNote;
+        } as NexusNote;
 
         const newNoteDocRef = getNexusObjectDocRef(universeId, newNoteId);
 
@@ -642,7 +662,7 @@ export const FirestoreService = {
           if (isSourceAffected || isTargetAffected) {
             const peerId = isSourceAffected ? obj.target_id : obj.source_id;
             const peer = allObjects.find((o) => o.id === peerId);
-            if (peer && (peer as SimpleNote).is_author_note) {
+            if (peer && peer._type === NexusType.AUTHOR_NOTE) {
               toDelete.add(obj.id);
               toDelete.add(peer.id);
             }

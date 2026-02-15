@@ -1,20 +1,16 @@
+// ============================================================
+// Ekrixi Schema v2 — Enums
+// ============================================================
+
 export enum NexusType {
   SIMPLE_NOTE = 'SIMPLE_NOTE',
-  CONTAINER_NOTE = 'CONTAINER_NOTE',
+  AUTHOR_NOTE = 'AUTHOR_NOTE',
   STORY_NOTE = 'STORY_NOTE',
   SIMPLE_LINK = 'SIMPLE_LINK',
-  SEMANTIC_LINK = 'SEMANTIC_LINK',
   HIERARCHICAL_LINK = 'HIERARCHICAL_LINK',
-  AGGREGATED_SEMANTIC_LINK = 'AGGREGATED_SEMANTIC_LINK',
+  AGGREGATED_SIMPLE_LINK = 'AGGREGATED_SIMPLE_LINK',
   AGGREGATED_HIERARCHICAL_LINK = 'AGGREGATED_HIERARCHICAL_LINK',
-  TIME_LINK = 'TIME_LINK',
   MANIFESTO_BLOCK = 'MANIFESTO_BLOCK',
-}
-
-export enum LinkTier {
-  TIER_1 = 1, // Semantic (Atomic)
-  TIER_2 = 2, // Descriptive (Reified/Prose)
-  TIER_3 = 3, // Temporal (Container/Recursive)
 }
 
 export enum NexusCategory {
@@ -45,26 +41,27 @@ export enum NarrativeStatus {
   POLISHED = 'POLISHED',
 }
 
-export enum ContainmentType {
-  FOLDER = 'FOLDER',
-  REGION = 'REGION',
-  FACTION = 'FACTION',
-  PLOT_ARC = 'PLOT_ARC',
-  MANUSCRIPT = 'MANUSCRIPT',
-  AGGREGATED_LINK = 'AGGREGATED_LINK',
-}
-
-export enum DefaultLayout {
-  FORCE_DIRECTED = 'FORCE_DIRECTED',
-  MAP = 'MAP',
-  TREE = 'TREE',
-  GRID = 'GRID',
-  TIMELINE = 'TIMELINE',
-}
-
 export enum HierarchyType {
   PARENT_OF = 'PARENT_OF',
   PART_OF = 'PART_OF',
 }
 
 export type ConflictStatus = 'APPROVED' | 'IMPLIED' | 'REDUNDANT';
+
+export enum ContainmentType {
+  CALCULATED = 'CALCULATED',
+  FOLDER = 'FOLDER',
+  PLOT_ARC = 'PLOT_ARC',
+  MANUSCRIPT = 'MANUSCRIPT',
+  BOOK = 'BOOK',
+  CHAPTER = 'CHAPTER',
+  SCENE = 'SCENE',
+}
+
+export enum DefaultLayout {
+  GRID = 'GRID',
+  LIST = 'LIST',
+  BOARD = 'BOARD',
+  TIMELINE = 'TIMELINE',
+  TREE = 'TREE',
+}

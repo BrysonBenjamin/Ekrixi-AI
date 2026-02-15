@@ -1,5 +1,14 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { NexusObject, SimpleNote, SimpleLink, NexusType } from '../../../types';
+import type { NexusObject, NexusNote, NexusLink } from '../../../types';
+
+import {
+  buildTimeStackMap,
+  resolveActiveOverrides,
+  getParentIdentityId,
+  getEffectiveDate,
+  isHistoricalSnapshot,
+  type SimDate,
+} from '../../../core/utils/nexus-accessors';
 
 interface UseDrilldownStateProps {
   registry: Record<string, NexusObject>;
@@ -8,7 +17,7 @@ interface UseDrilldownStateProps {
 
 export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStateProps) => {
   const [navStack, setNavStack] = useState<string[]>([]);
-  const [simulatedDate, setSimulatedDate] = useState<{ year: number; month: number; day: number }>({
+  const [simulatedDate, setSimulatedDate] = useState<SimDate>({
     year: 2026,
     month: 1,
     day: 1,
@@ -20,92 +29,43 @@ export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStat
   const [showAuthorNotes, setShowAuthorNotes] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
   const [isIntegrityOpen, setIsIntegrityOpen] = useState(false);
 
   const currentContainerId = navStack[navStack.length - 1];
   const currentContainer = currentContainerId ? registry[currentContainerId] : null;
 
-  // Optimization: Pre-calculate time stack map to avoid O(N^2) lookup
-  const baseToTimeNodesMap = useMemo(() => {
-    const map: Record<string, SimpleNote[]> = {};
-    Object.values(registry).forEach((obj) => {
-      const note = obj as SimpleNote;
-      const baseId = note.time_data?.base_node_id;
-      if (
-        baseId &&
-        (note._type === NexusType.SIMPLE_NOTE ||
-          note._type === NexusType.STORY_NOTE ||
-          note._type === NexusType.CONTAINER_NOTE ||
-          note._type === NexusType.AGGREGATED_SEMANTIC_LINK ||
-          note._type === NexusType.AGGREGATED_HIERARCHICAL_LINK)
-      ) {
-        if (!map[baseId]) map[baseId] = [];
-        map[baseId].push(note);
-      }
-    });
+  // Build time stack map using schema v2 time_state.parent_identity_id
+  const baseToTimeNodesMap = useMemo(() => buildTimeStackMap(registry), [registry]);
 
-    // Sort each stack once
-    Object.keys(map).forEach((baseId) => {
-      map[baseId].sort((a, b) => {
-        const ay = a.time_data?.year || 0;
-        const am = a.time_data?.month || 0;
-        const ad = a.time_data?.day || 0;
-        const by = b.time_data?.year || 0;
-        const bm = b.time_data?.month || 0;
-        const bd = b.time_data?.day || 0;
-        if (ay !== by) return ay - by;
-        if (am !== bm) return am - bm;
-        return ad - bd;
-      });
-    });
-    return map;
-  }, [registry]);
+  // Derive activeTimeOverrides using optimized accessor
+  const activeTimeOverrides = useMemo(
+    () => resolveActiveOverrides(baseToTimeNodesMap, simulatedDate),
+    [baseToTimeNodesMap, simulatedDate],
+  );
 
-  // Derive activeTimeOverrides using optimized map
-  const activeTimeOverrides = useMemo(() => {
-    const overrides: Record<string, string> = {};
-    Object.keys(baseToTimeNodesMap).forEach((baseId) => {
-      const stack = baseToTimeNodesMap[baseId];
-      // Find snapshot logic (inline to avoid extra lookups)
-      const candidateNodes = stack.filter((node) => {
-        const ny = node.time_data?.year || 0;
-        const nm = node.time_data?.month || 0;
-        const nd = node.time_data?.day || 0;
-        if (ny < simulatedDate.year) return true;
-        if (ny > simulatedDate.year) return false;
-        if (nm < simulatedDate.month) return true;
-        if (nm > simulatedDate.month) return false;
-        return nd <= simulatedDate.day;
-      });
-
-      if (candidateNodes.length > 0) {
-        overrides[baseId] = candidateNodes[candidateNodes.length - 1].id;
-      }
-    });
-    return overrides;
-  }, [baseToTimeNodesMap, simulatedDate]);
-
-  // Time Dimension Logic
+  // Time Dimension Logic: stack for current container
   const timeStack = useMemo(() => {
     if (!currentContainerId) return [];
-    const current = registry[currentContainerId] as SimpleNote;
-    const baseId = current?.time_data?.base_node_id || currentContainerId;
+    const current = registry[currentContainerId] as NexusNote;
+    const baseId = getParentIdentityId(current) || currentContainerId;
     return baseToTimeNodesMap[baseId] || [];
   }, [currentContainerId, baseToTimeNodesMap, registry]);
 
+  // Time info for footer display
   const timeInfo = useMemo(() => {
     if (!currentContainer) return null;
 
     const activeId = activeTimeOverrides[currentContainer.id] || currentContainer.id;
-    const activeNode = registry[activeId] as SimpleNote;
+    const activeNode = registry[activeId] as NexusNote;
 
-    const isTimeNode = !!activeNode?.time_data?.base_node_id;
-    const baseId = isTimeNode ? activeNode.time_data!.base_node_id : currentContainer.id;
+    const isTimeNode = isHistoricalSnapshot(activeNode);
+    const baseId = isTimeNode
+      ? (getParentIdentityId(activeNode) ?? currentContainer.id)
+      : currentContainer.id;
 
     const currentIndex = timeStack.findIndex((t) => t.id === activeId);
 
-    // Nav Logic
+    // Nav Logic: prev/next in the time stack
     const prevNode =
       currentIndex > 0 ? timeStack[currentIndex - 1] : currentIndex === 0 ? registry[baseId] : null;
 
@@ -116,30 +76,34 @@ export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStat
           ? timeStack[0]
           : null;
 
+    const effectiveDate = getEffectiveDate(activeNode);
+
     return {
       isTimeNode,
-      year: isTimeNode ? activeNode.time_data!.year : simulatedDate.year,
-      month: isTimeNode ? activeNode.time_data!.month : simulatedDate.month,
-      day: isTimeNode ? activeNode.time_data!.day : simulatedDate.day,
+      year: effectiveDate?.year ?? simulatedDate.year,
+      month: effectiveDate?.month ?? simulatedDate.month,
+      day: effectiveDate?.day ?? simulatedDate.day,
       baseId,
-      prevNode: prevNode as SimpleNote | null,
-      nextNode: nextNode as SimpleNote | null,
+      prevNode: prevNode as NexusNote | null,
+      nextNode: nextNode as NexusNote | null,
       activeNode,
     };
   }, [currentContainer, timeStack, registry, activeTimeOverrides, simulatedDate]);
 
+  // Navigate to a specific time node by reading its effective_date
   const handleTimeNav = useCallback(
     (nodeId: string) => {
       if (!nodeId) return;
 
-      const targetNode = registry[nodeId] as SimpleNote;
+      const targetNode = registry[nodeId];
       if (!targetNode) return;
 
-      if (targetNode && targetNode.time_data) {
+      const effectiveDate = getEffectiveDate(targetNode);
+      if (effectiveDate) {
         setSimulatedDate({
-          year: targetNode.time_data.year,
-          month: targetNode.time_data.month || 1,
-          day: targetNode.time_data.day || 1,
+          year: effectiveDate.year,
+          month: effectiveDate.month ?? 1,
+          day: effectiveDate.day ?? 1,
         });
       } else {
         // Reset to "Blueprint" perspective (low year avoids all overrides)
@@ -149,13 +113,14 @@ export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStat
     [registry],
   );
 
+  // Lookup time navigation prev/next for a given node
   const lookupTimeNav = useCallback(
     (nodeId: string) => {
-      const node = registry[nodeId] as SimpleNote;
+      const node = registry[nodeId];
       if (!node) return null;
 
-      const isTimeNode = !!node.time_data?.base_node_id;
-      const baseId = isTimeNode ? node.time_data.base_node_id : nodeId;
+      const isTimeNode = isHistoricalSnapshot(node);
+      const baseId = isTimeNode ? (getParentIdentityId(node) ?? nodeId) : nodeId;
 
       const activeId = activeTimeOverrides[baseId] || baseId;
       const stack = baseToTimeNodesMap[baseId] || [];
@@ -166,7 +131,7 @@ export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStat
       let nextId: string | undefined;
 
       if (idx === -1) {
-        // We are at base, next is first skin
+        // We are at base, next is first snapshot
         nextId = stack[0].id;
       } else {
         if (idx === 0)
@@ -188,11 +153,12 @@ export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStat
     [registry, activeTimeOverrides, baseToTimeNodesMap, handleTimeNav],
   );
 
+  // Drilldown into a node — resolve to base identity if it's a snapshot
   const handleDrilldown = useCallback(
     (id: string) => {
       setNavStack((prev) => {
-        const node = registry[id] as SimpleNote;
-        const targetId = node?.time_data?.base_node_id || id;
+        const node = registry[id];
+        const targetId = getParentIdentityId(node) || id;
 
         if (prev.includes(targetId)) {
           const idx = prev.indexOf(targetId);
@@ -204,12 +170,14 @@ export const useDrilldownState = ({ registry, integrityFocus }: UseDrilldownStat
     [registry],
   );
 
+  // Auto-drill on integrity focus
   useEffect(() => {
     if (integrityFocus && integrityFocus.mode === 'DRILL' && registry[integrityFocus.linkId]) {
-      const link = registry[integrityFocus.linkId] as SimpleLink;
-      if (link.source_id) {
+      const link = registry[integrityFocus.linkId];
+      const endpoints = 'source_id' in link ? (link as NexusLink).source_id : null;
+      if (endpoints) {
         queueMicrotask(() => {
-          setNavStack([link.source_id]);
+          setNavStack([endpoints]);
         });
       }
     }

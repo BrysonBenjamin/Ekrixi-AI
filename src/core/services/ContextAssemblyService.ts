@@ -1,4 +1,5 @@
-import { NexusObject, NexusType, SimpleNote } from '../../types';
+import { NexusObject, NexusNote } from '../../types';
+import { isNote } from '../utils/nexus';
 import { ThinkingProcessStep, GovernedSearchResult } from './ArangoSearchService';
 import { TimeDimensionService } from './TimeDimensionService';
 
@@ -40,23 +41,23 @@ export class ContextAssemblyService {
     // Resolve IDs to actual objects and handle children expansion
     // We now also handle Time Snapshots
     const resolvedItems: {
-      note: SimpleNote;
+      note: NexusNote;
       score: number;
       isChild: boolean;
       parentId?: string;
-      timeState?: SimpleNote; // The specific time-slice node if applicable
+      timeState?: NexusNote; // The specific time-slice node if applicable
       effectiveYear?: number;
     }[] = [];
 
     weightedUnits.forEach((mention) => {
-      const root = registry[mention.id] as SimpleNote;
+      const root = registry[mention.id] as NexusNote;
       if (root) {
         // Check for Time Dimension
         // Default to far future (9999) to get latest state if no year specified
         const targetYear = mention.contextYear !== undefined ? mention.contextYear : 9999;
         const snapshot = TimeDimensionService.getSnapshot(registry, root.id, targetYear);
 
-        let timeStateNode: SimpleNote | undefined;
+        let timeStateNode: NexusNote | undefined;
         let effectiveYear: number | undefined;
 
         // Only treat as time state if we actually got a different node back, OR if we asked for a specific year
@@ -81,7 +82,7 @@ export class ContextAssemblyService {
         // Process children if any
         if (mention.children) {
           mention.children.forEach((child) => {
-            const childNote = registry[child.id] as SimpleNote;
+            const childNote = registry[child.id] as NexusNote;
             if (childNote) {
               resolvedItems.push({
                 note: childNote,
@@ -101,10 +102,8 @@ export class ContextAssemblyService {
     // Get non-prioritized units to fill context if needed
     const prioritizedIds = new Set(resolvedItems.map((i) => i.note.id));
     const allUnits = Object.values(registry).filter(
-      (o) =>
-        (o._type === NexusType.SIMPLE_NOTE || o._type === NexusType.CONTAINER_NOTE) &&
-        !prioritizedIds.has(o.id),
-    ) as SimpleNote[];
+      (o) => isNote(o) && !prioritizedIds.has(o.id),
+    ) as NexusNote[];
 
     processSteps.push({
       stage: 'VECTOR_RETRIEVAL',

@@ -26,9 +26,7 @@ import {
 import { EntitySeed } from '../ScannerFeature';
 import { NexusCategory, NexusObject, SimpleNote } from '../../../types';
 import { generateId } from '../../../utils/ids';
-import { useLLM } from '../../system/hooks/useLLM';
-import { GEMINI_MODELS } from '../../../core/llm';
-import { safeParseJson } from '../../../utils/json';
+import { useMCPScanner } from '../hooks/useMCPScanner';
 import { TimeDimensionService } from '../../../core/services/TimeDimensionService';
 
 interface PreprocessorAgentProps {
@@ -44,7 +42,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
   onFinalize,
   onCancel,
 }) => {
-  const { generateContent, isReady } = useLLM();
+  const { detectEntities, expandEntity, isReady } = useMCPScanner();
   const [seeds, setSeeds] = useState<EntitySeed[]>([]);
   const [activeSeedId, setActiveSeedId] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Array<{ text: string; type: string }>>([]);
@@ -61,32 +59,16 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
 
   const workbenchRef = useRef<HTMLDivElement>(null);
 
-  // Initial detection pass
+  // Initial detection pass via MCP
   useEffect(() => {
     const detectInitial = async () => {
       if (!isReady || !text) return;
 
       try {
-        const response = await generateContent({
-          model: GEMINI_MODELS.FLASH,
-          systemInstruction:
-            'Identify ALL common nouns and proper nouns in the text. Return a JSON list of strings.',
-          generationConfig: {
-            responseMimeType: 'application/json',
-          },
-          contents: [{ role: 'user', parts: [{ text: text.slice(0, 20000) }] }],
-        });
-        try {
-          const result = await response.response;
-          const entities = safeParseJson(result.text() || '[]', []);
-          if (Array.isArray(entities)) {
-            console.log('Scanner detected entities:', entities);
-            setHighlights(entities.map((e: string) => ({ text: String(e), type: 'CANDIDATE' })));
-          } else {
-            console.error('Scanner failed to parse entities array:', entities);
-          }
-        } catch (e) {
-          console.error('Malformed entities JSON', e);
+        const result = await detectEntities(text.slice(0, 20000));
+        if (result && result.entities.length > 0) {
+          console.log('Scanner detected entities via MCP:', result.entities);
+          setHighlights(result.entities.map((e) => ({ text: e.title, type: 'CANDIDATE' })));
         }
       } catch (err) {
         console.error('Initial detection failed', err);
@@ -95,7 +77,7 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
       }
     };
     detectInitial();
-  }, [text, isReady, generateContent]);
+  }, [text, isReady, detectEntities]);
 
   const activeSeed = useMemo(() => seeds.find((s) => s.id === activeSeedId), [seeds, activeSeedId]);
 
@@ -206,41 +188,17 @@ export const PreprocessorAgent: React.FC<PreprocessorAgentProps> = ({
     if (!target) return;
     setIsExpanding(seedId);
     try {
-      const response = await generateContent({
-        model: GEMINI_MODELS.FLASH,
-        systemInstruction: `Suggest organizational sub-containers for "${target.title}". 
-                - FOCUS ON CONTAINERS: Large subfolders for hierarchy.
-                - MANDATORY: Include one 'Author's Note' (isAuthorNote: true).
-                - Return JSON list of {title, category, gist, isAuthorNote}.`,
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-        contents: [
-          { role: 'user', parts: [{ text: `Original Context Fragment: ${text.slice(0, 5000)}` }] },
-        ],
-      });
-      try {
-        const result = await response.response;
-        const suggestions = safeParseJson(result.text() || '[]', []);
-        if (Array.isArray(suggestions)) {
-          const sanitized = suggestions.map(
-            (s: {
-              title: string;
-              category?: NexusCategory;
-              gist: string;
-              isAuthorNote?: boolean;
-            }) => ({
-              ...s,
-              category: s.category || NexusCategory.CONCEPT,
-              isAuthorNote: !!s.isAuthorNote,
-            }),
-          );
-          setSeeds((prev) =>
-            prev.map((s) => (s.id === seedId ? { ...s, suggestedChildren: sanitized } : s)),
-          );
-        }
-      } catch (e) {
-        console.error('Malformed expansion suggestions JSON', e);
+      const result = await expandEntity(target.title, text.slice(0, 5000), target.category);
+      if (result && result.suggestions.length > 0) {
+        const sanitized = result.suggestions.map((s) => ({
+          title: s.title,
+          category: s.category || NexusCategory.CONCEPT,
+          gist: s.gist,
+          isAuthorNote: !!s.isAuthorNote,
+        }));
+        setSeeds((prev) =>
+          prev.map((s) => (s.id === seedId ? { ...s, suggestedChildren: sanitized } : s)),
+        );
       }
     } catch (err) {
       console.error('Expansion failed', err);

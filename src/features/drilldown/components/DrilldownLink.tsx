@@ -1,8 +1,9 @@
 import React from 'react';
 import { SimulationLink, SimulationNode } from '../hooks/useDrilldownSimulation';
-import { NexusObject } from '../../../types';
+import { NexusObject, isLink } from '../../../types';
 import { VisibleNode } from '../hooks/useDrilldownRegistry';
 import { IntegrityReport } from '../../integrity/GraphIntegrityService';
+import { isHistoricalSnapshot } from '../../../core/utils/nexus-accessors';
 
 interface DrilldownLinkProps {
   link: SimulationLink;
@@ -30,6 +31,18 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
 }) => {
   const sourceNode = link.source as SimulationNode;
   const targetNode = link.target as SimulationNode;
+
+  // Extract qualifiers from the original link object
+  const linkObj =
+    link.id.startsWith('bubbled-') || link.id.includes('-structural-') || link.id.includes('-m2m-')
+      ? null
+      : ((registry[link.id] as unknown as NexusObject | undefined) ?? null);
+  const qualifiers =
+    linkObj && isLink(linkObj)
+      ? (linkObj as unknown as { qualifiers?: Record<string, string | number | boolean> })
+          .qualifiers
+      : undefined;
+  const hasQualifiers = qualifiers && Object.keys(qualifiers).length > 0;
 
   if (
     sourceNode.x === undefined ||
@@ -120,6 +133,9 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
   // Only show arrows for active links to reduce noise on inactive/dim ones
   const showArrow = isTemporalActive && !link.isStructuralLine;
 
+  const isHistoricalContext =
+    isHistoricalSnapshot(visualSource.object) || isHistoricalSnapshot(visualTarget.object);
+
   return (
     <g
       key={link.id}
@@ -146,14 +162,7 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
           strokeWidth={
             link.isStructuralLine ? 16 : isAnomalyFocus ? 20 : isPartOfAnomalyPath ? 16 : 8
           }
-          strokeDasharray={
-            link.isStructuralLine
-              ? 'none'
-              : (visualSource.object as any).time_data?.base_node_id ||
-                  (visualTarget.object as any).time_data?.base_node_id
-                ? '4 4'
-                : 'none'
-          }
+          strokeDasharray={link.isStructuralLine ? 'none' : isHistoricalContext ? '4 4' : 'none'}
           className={`${
             link.isStructuralLine ? 'structural-path-flow opacity-60' : 'link-path-flow'
           } pointer-events-none`}
@@ -178,8 +187,8 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
           <foreignObject
             x={midX - 150}
             y={midY - 60}
-            width="300"
-            height="120"
+            width="340"
+            height={hasQualifiers ? '160' : '120'}
             className="overflow-visible pointer-events-auto"
           >
             <div className="w-full h-full flex items-center justify-center">
@@ -205,6 +214,25 @@ export const DrilldownLink: React.FC<DrilldownLinkProps> = ({
                           : ''}
                   {displayVerb}
                 </span>
+                {hasQualifiers && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Object.entries(qualifiers!)
+                      .slice(0, 4)
+                      .map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="text-[9px] px-2 py-0.5 bg-nexus-800/80 border border-nexus-700/50 rounded-full text-nexus-muted font-mono"
+                        >
+                          {k}: {String(v)}
+                        </span>
+                      ))}
+                    {Object.keys(qualifiers!).length > 4 && (
+                      <span className="text-[9px] text-nexus-muted/50 font-mono">
+                        +{Object.keys(qualifiers!).length - 4}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </foreignObject>

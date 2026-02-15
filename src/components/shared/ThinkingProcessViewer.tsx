@@ -33,7 +33,7 @@ export const ThinkingProcessViewer: React.FC<ThinkingProcessViewerProps> = ({ re
           <span
             className={`text-sm font-medium ${result.is_filtered_out ? 'text-red-300' : 'text-emerald-100'}`}
           >
-            {result.node.title || result.node.id}
+            {getNodeLabel(result.node)}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -137,4 +137,17 @@ function StepIcon({ stage }: { stage: ThinkingProcessStep['stage'] }) {
     default:
       return <div className="w-1.5 h-1.5 bg-current rounded-full" />;
   }
+}
+
+function getNodeLabel(node: GovernedSearchResult['node']): string {
+  // Check for title (NexusNote, Reified Links, or plain objects with title)
+  if ('title' in node && typeof node.title === 'string') {
+    return node.title;
+  }
+  // Check for link properties
+  if ('verb' in node && typeof node.verb === 'string') {
+    return `Link: ${node.verb}`;
+  }
+  // Fallback to ID
+  return node.id;
 }

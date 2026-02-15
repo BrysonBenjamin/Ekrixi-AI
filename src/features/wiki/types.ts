@@ -1,6 +1,6 @@
 import { NexusObject, NexusCategory, NexusType, HierarchyType } from '../../types';
 
-export type WikiViewMode = 'NOTE' | 'ENCYCLOPEDIA';
+export type WikiViewMode = 'NOTE' | 'ENCYCLOPEDIA' | 'EDITOR';
 
 export interface WikiEditData {
   _type?: NexusType;

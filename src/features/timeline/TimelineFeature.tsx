@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { NexusObject, SimpleNote } from '../../types';
+import { NexusObject, NexusNote } from '../../types';
 import { TimeDimensionService } from '../../core/services/TimeDimensionService';
+import { getParentIdentityId, getTimeState } from '../../core/utils/nexus-accessors';
+import { isNote, isReified } from '../../core/utils/nexus';
 import { ArrowLeft, Calendar, History, ShieldCheck, Compass, GitCommit } from 'lucide-react';
 
 interface TimelineFeatureProps {
@@ -17,13 +19,9 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
   const historicalEntities = useMemo(() => {
     if (nodeId) return [];
     return Object.values(registry)
-      .filter(
-        (node) =>
-          (node._type === 'SIMPLE_NOTE' || node._type === 'STORY_NOTE') &&
-          !(node as SimpleNote).time_data?.base_node_id,
-      )
+      .filter((node) => (isNote(node) || isReified(node)) && !getParentIdentityId(node))
       .map((node) => ({
-        node: node as SimpleNote,
+        node: node as NexusNote,
         stack: TimeDimensionService.getTimeStack(registry, node.id),
       }))
       .filter((item) => item.stack.length > 0)
@@ -32,8 +30,8 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
 
   const baseNodeId = useMemo(() => {
     if (!nodeId || !registry[nodeId]) return null;
-    const node = registry[nodeId] as SimpleNote;
-    return node.time_data?.base_node_id || nodeId;
+    const node = registry[nodeId];
+    return getParentIdentityId(node) || nodeId;
   }, [nodeId, registry]);
 
   const timeStack = useMemo(() => {
@@ -71,35 +69,39 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
                 </p>
               </div>
             ) : (
-              historicalEntities.map(({ node, stack }) => (
-                <button
-                  key={node.id}
-                  onClick={() => navigate(`/timeline/${node.id}`)}
-                  className="flex flex-col text-left bg-nexus-900 border border-nexus-800 rounded-2xl p-6 hover:border-indigo-500/50 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)] transition-all group"
-                >
-                  <div className="flex items-center justify-between w-full mb-4">
-                    <div className="px-2 py-1 bg-indigo-500/10 text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded">
-                      {stack.length} States
+              historicalEntities.map(({ node, stack }) => {
+                const startTs = getTimeState(stack[0]);
+                const lastTs = getTimeState(stack[stack.length - 1]);
+                return (
+                  <button
+                    key={node.id}
+                    onClick={() => navigate(`/timeline/${node.id}`)}
+                    className="flex flex-col text-left bg-nexus-900 border border-nexus-800 rounded-2xl p-6 hover:border-indigo-500/50 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)] transition-all group"
+                  >
+                    <div className="flex items-center justify-between w-full mb-4">
+                      <div className="px-2 py-1 bg-indigo-500/10 text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded">
+                        {stack.length} States
+                      </div>
+                      <ArrowLeft
+                        size={16}
+                        className="text-nexus-muted group-hover:text-indigo-400 transition-colors rotate-180"
+                      />
                     </div>
-                    <ArrowLeft
-                      size={16}
-                      className="text-nexus-muted group-hover:text-indigo-400 transition-colors rotate-180"
-                    />
-                  </div>
 
-                  <h3 className="text-xl font-display font-bold mb-2 group-hover:text-white transition-colors">
-                    {node.title}
-                  </h3>
-                  <p className="text-sm text-nexus-muted line-clamp-2 mb-6 font-serif italic">
-                    {node.gist || 'No abstract available.'}
-                  </p>
+                    <h3 className="text-xl font-display font-bold mb-2 group-hover:text-white transition-colors">
+                      {node.title}
+                    </h3>
+                    <p className="text-sm text-nexus-muted line-clamp-2 mb-6 font-serif italic">
+                      {node.gist || 'No abstract available.'}
+                    </p>
 
-                  <div className="mt-auto pt-4 border-t border-nexus-800 group-hover:border-nexus-700 w-full flex justify-between items-center text-[10px] font-mono text-nexus-muted uppercase tracking-wider">
-                    <span>Earliest: {stack[0].time_data?.year}</span>
-                    <span>Latest: {stack[stack.length - 1].time_data?.year}</span>
-                  </div>
-                </button>
-              ))
+                    <div className="mt-auto pt-4 border-t border-nexus-800 group-hover:border-nexus-700 w-full flex justify-between items-center text-[10px] font-mono text-nexus-muted uppercase tracking-wider">
+                      <span>Earliest: {startTs?.effective_date?.year ?? '???'}</span>
+                      <span>Latest: {lastTs?.effective_date?.year ?? '???'}</span>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </main>
@@ -145,7 +147,7 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
               </span>
             </div>
             <h1 className="text-lg font-display font-black uppercase tracking-widest">
-              {(baseNode as SimpleNote).title || 'Untitled Entity'}
+              {(baseNode as NexusNote).title || 'Untitled Entity'}
             </h1>
           </div>
         </div>
@@ -176,10 +178,10 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
                   Immutable Base
                 </span>
                 <h2 className="text-2xl font-display font-black mb-2">
-                  {(baseNode as SimpleNote).title}
+                  {(baseNode as NexusNote).title}
                 </h2>
                 <p className="text-nexus-muted font-serif italic leading-relaxed max-w-2xl">
-                  {(baseNode as SimpleNote).gist}
+                  {(baseNode as NexusNote).gist}
                 </p>
 
                 <div className="mt-6 flex gap-4">
@@ -199,7 +201,8 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
 
           {/* Time Stack */}
           {timeStack.map((node, index) => {
-            const sn = node as SimpleNote;
+            const sn = node as NexusNote;
+            const ts = getTimeState(sn);
             return (
               <div key={node.id} className="relative pl-12 md:pl-20">
                 <div className="absolute left-[-4px] md:left-[4px] top-6 w-2.5 h-2.5 rounded-full bg-nexus-800 border border-indigo-500/50 z-10" />
@@ -210,7 +213,10 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
                       <div className="flex items-center gap-3 mb-2">
                         <div className="flex items-center gap-2 text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded">
                           <Calendar size={12} />
-                          <span className="text-xs font-bold font-mono">{sn.time_data?.year}</span>
+                          <span className="text-xs font-bold font-mono">
+                            {ts?.effective_date?.year}
+                            {ts?.valid_until && ` – ${ts.valid_until.year}`}
+                          </span>
                         </div>
                         {index === 0 && (
                           <span className="text-[9px] font-bold text-nexus-muted uppercase tracking-widest">
@@ -241,13 +247,6 @@ export const TimelineFeature: React.FC<TimelineFeatureProps> = ({ registry, onSe
                       <ArrowLeft size={16} className="rotate-180" />
                     </button>
                   </div>
-
-                  {/* Simple Diff / Changes Indicator (Placeholder for now) */}
-                  {/* 
-                                    <div className="mt-4 pt-4 border-t border-nexus-800/50 flex gap-4 text-[10px] text-nexus-muted uppercase tracking-widest">
-                                        <span>+ Modified Content</span>
-                                    </div>
-                                    */}
                 </div>
               </div>
             );

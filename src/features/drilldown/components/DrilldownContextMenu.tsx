@@ -1,32 +1,23 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-/* Added ChevronRight to the lucide-react import list */
-import {
-  Link2,
-  Trash2,
-  X,
-  Share2,
-  Search,
-  Sparkles,
-  Plus,
-  Database,
-  Compass,
-  GitBranch,
-  ChevronRight,
-  Calendar,
-  LucideIcon,
-} from 'lucide-react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Link2, Trash2, Share2, Search, Sparkles, Plus, Compass, GitBranch } from 'lucide-react';
 import {
   NexusObject,
+  NexusNote,
+  NexusLink,
   isLink,
   isReified,
   isContainer,
-  SimpleNote,
-  SemanticLink,
-  HierarchicalLink,
-  TraitLink,
+  isNote,
 } from '../../../types';
 import { VisibleNode } from '../hooks/useDrilldownRegistry';
 import { GraphIntegrityService } from '../../integrity/GraphIntegrityService';
+import { isHistoricalSnapshot } from '../../../core/utils/nexus-accessors';
+
+// Sub-components
+import { MenuItem } from './context-menu/MenuItem';
+import { LinkSearchMenu } from './context-menu/LinkSearchMenu';
+import { ReifyPromotionMenu } from './context-menu/ReifyPromotionMenu';
+import { ScryEraSelectMenu } from './context-menu/ScryEraSelectMenu';
 
 interface DrilldownContextMenuProps {
   object: NexusObject;
@@ -50,7 +41,6 @@ interface DrilldownContextMenuProps {
     targetTemporalId?: string,
   ) => void;
   onManifestSnapshot?: (nodeId: string, year: number, month?: number, day?: number) => void;
-  onReparent?: (sourceId: string, targetId: string, oldParentId?: string) => void;
   simulatedYear?: number;
   simulatedDate?: { year: number; month: number; day: number };
 }
@@ -77,7 +67,6 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
   onStartLink,
   onEstablishLink,
   onManifestSnapshot,
-  onReparent,
   simulatedYear,
   simulatedDate,
 }) => {
@@ -88,24 +77,26 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
     {},
   );
   const [useTimeAnchor, setUseTimeAnchor] = useState(true);
-  const [scryDate, setScryDate] = useState<{
-    year: number;
-    month?: number;
-    day?: number;
-  }>({
-    year: simulatedYear || 2160,
+  const [scryDate, setScryDate] = useState<{ year: number; month?: number; day?: number }>({
+    year: simulatedYear || 2026,
     month: simulatedDate?.month,
     day: simulatedDate?.day,
   });
 
   const reified = isReified(object);
   const isL = isLink(object) && !reified;
-  const title =
-    'title' in object
-      ? (object as SimpleNote).title
-      : 'verb' in object
-        ? (object as SemanticLink).verb
-        : 'Untitled Unit';
+
+  const getObjectTitle = useCallback(
+    (obj: NexusObject): string => {
+      if (isNote(obj)) return obj.title;
+      if (isLink(obj)) return obj.verb;
+      if (reified && 'title' in obj) return (obj as unknown as NexusNote).title || 'Reified Unit';
+      return 'Untitled Unit';
+    },
+    [reified],
+  );
+
+  const title = getObjectTitle(object);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -117,57 +108,17 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  // Neighbors for complex reification
   const neighbors = useMemo(() => {
     if (isLink(object)) return [];
     return (Object.values(registry) as NexusObject[])
-      .filter((l) => {
-        if (!isLink(l)) return false;
-        return l.source_id === object.id || l.target_id === object.id;
-      })
+      .filter((l) => isLink(l) && (l.source_id === object.id || l.target_id === object.id))
       .map((l) => {
-        const link = l as SemanticLink | HierarchicalLink;
+        const link = l as NexusLink;
         const neighborId = link.source_id === object.id ? link.target_id : link.source_id;
         return registry[neighborId];
       })
       .filter(Boolean);
   }, [object, registry]);
-
-  const suggestions = useMemo(() => {
-    if (menuState !== 'LINK_SEARCH' || !searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return (Object.values(registry) as NexusObject[])
-      .filter(
-        (n) =>
-          (!isLink(n) || isReified(n)) &&
-          n.id !== object.id &&
-          (
-            ('title' in n ? (n as SimpleNote).title : '') ||
-            ('verb' in n ? (n as TraitLink).verb : '')
-          )
-            .toLowerCase()
-            .includes(q),
-      )
-      .slice(0, 5);
-  }, [searchQuery, registry, object.id, menuState]);
-
-  const handleEstablishLinkWithTarget = (targetId: string) => {
-    if (onEstablishLink) {
-      const sourceTemporalId = (object as VisibleNode).activeTemporalId;
-      const targetNode = registry[targetId] as VisibleNode;
-      const targetTemporalId = targetNode?.activeTemporalId;
-
-      onEstablishLink(
-        object.id,
-        targetId,
-        'mentions',
-        useTimeAnchor,
-        sourceTemporalId,
-        targetTemporalId,
-      );
-    }
-    onClose();
-  };
 
   const isEligibleForNodeReify = useMemo(() => {
     if (isLink(object) || reified || isContainer(object)) return false;
@@ -188,6 +139,10 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
       onClose();
     }
   };
+
+  const isSnapshot = isHistoricalSnapshot(object);
+
+  const resetToDefault = () => setMenuState('DEFAULT');
 
   return (
     <div
@@ -292,7 +247,7 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
               </>
             )}
 
-            {!(object as SimpleNote).time_data?.base_node_id && (
+            {!isSnapshot && (
               <MenuItem
                 icon={Sparkles}
                 label="Scry Era"
@@ -318,267 +273,56 @@ export const DrilldownContextMenu: React.FC<DrilldownContextMenuProps> = ({
         )}
 
         {menuState === 'LINK_SEARCH' && (
-          <div className="p-2 animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-[9px] font-display font-black text-nexus-accent uppercase tracking-widest flex items-center gap-2">
-                <Sparkles size={10} /> Neural Registry
-              </span>
-              <button
-                onClick={() => setMenuState('DEFAULT')}
-                className="text-nexus-muted hover:text-white"
-              >
-                <X size={12} />
-              </button>
-            </div>
-            <div className="relative mb-2">
-              <Database
-                size={10}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-nexus-muted"
-              />
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Designation..."
-                className="w-full bg-nexus-950 border border-nexus-800 rounded-xl py-2 pl-7 pr-3 text-[10px] text-white outline-none focus:border-nexus-accent transition-all shadow-inner"
-              />
-            </div>
-            <div className="space-y-1 overflow-y-auto max-h-[160px] no-scrollbar">
-              {suggestions.map((node) => {
-                const nodeTitle =
-                  'title' in node
-                    ? (node as SimpleNote).title
-                    : 'verb' in node
-                      ? (node as SemanticLink).verb
-                      : 'Unknown';
-                const category =
-                  'category_id' in node ? (node as SimpleNote).category_id : 'REIFIED';
-
-                return (
-                  <button
-                    key={node.id}
-                    onClick={() => handleEstablishLinkWithTarget(node.id)}
-                    className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-nexus-900 border border-transparent hover:border-nexus-accent/40 transition-all text-left group"
-                  >
-                    <div className="w-6 h-6 rounded-lg bg-nexus-950 border border-nexus-800 flex items-center justify-center text-[9px] font-black text-nexus-accent group-hover:bg-nexus-accent group-hover:text-white transition-all">
-                      {category?.charAt(0) || 'U'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-bold truncate text-nexus-text">
-                        {nodeTitle}
-                      </div>
-                      <div className="text-[7px] opacity-40 uppercase font-mono">
-                        {category || 'REIFIED'}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            {simulatedYear && (
-              <div className="mt-3 pt-3 border-t border-nexus-800/50 flex items-center justify-between px-2">
-                <span className="text-[8px] font-mono font-black text-nexus-muted uppercase tracking-widest">
-                  Temporal Anchor
-                </span>
-                <button
-                  onClick={() => setUseTimeAnchor(!useTimeAnchor)}
-                  className={`px-2 py-1 rounded-lg border text-[8px] font-black uppercase transition-all ${useTimeAnchor ? 'bg-nexus-accent/10 border-nexus-accent/40 text-nexus-accent shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : 'bg-nexus-800 border-nexus-700 text-nexus-muted'}`}
-                >
-                  {useTimeAnchor ? `ERA: ${simulatedYear}` : 'OFF'}
-                </button>
-              </div>
-            )}
-          </div>
+          <LinkSearchMenu
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onBack={resetToDefault}
+            onClose={onClose}
+            onSelect={(targetId) => {
+              const sourceTemporalId = (object as VisibleNode).activeTemporalId;
+              const targetNode = registry[targetId] as VisibleNode;
+              onEstablishLink?.(
+                object.id,
+                targetId,
+                'mentions',
+                useTimeAnchor,
+                sourceTemporalId,
+                targetNode?.activeTemporalId,
+              );
+              onClose();
+            }}
+            registry={registry}
+            excludeId={object.id}
+            useTimeAnchor={useTimeAnchor}
+            setUseTimeAnchor={setUseTimeAnchor}
+            simulatedYear={simulatedYear}
+            getObjectTitle={getObjectTitle}
+          />
         )}
 
         {(menuState === 'REIFY_CHOOSE_SOURCE' || menuState === 'REIFY_CHOOSE_TARGET') && (
-          <div className="p-2 animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="flex items-center justify-between mb-4 px-2">
-              <span className="text-[9px] font-display font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
-                <Share2 size={12} />{' '}
-                {menuState === 'REIFY_CHOOSE_SOURCE' ? 'Choose Origin' : 'Choose Terminal'}
-              </span>
-              <button
-                onClick={() => setMenuState('DEFAULT')}
-                className="text-nexus-muted hover:text-white transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <div className="space-y-1.5 overflow-y-auto max-h-[200px] no-scrollbar">
-              {neighbors
-                .filter((n) => n.id !== reifySelection.sourceId)
-                .map((node) => {
-                  const nodeTitle =
-                    'title' in node
-                      ? (node as SimpleNote).title
-                      : 'verb' in node
-                        ? (node as SemanticLink).verb
-                        : 'Unknown';
-                  const category =
-                    'category_id' in node ? (node as SimpleNote).category_id : 'REIFIED';
-
-                  return (
-                    <button
-                      key={node.id}
-                      onClick={() => handleReifyChoice(node.id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-nexus-950/40 border border-nexus-800 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all text-left group"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-nexus-900 border border-nexus-800 flex items-center justify-center shrink-0 group-hover:border-amber-500/30">
-                        <div className="text-[10px] font-black text-nexus-muted group-hover:text-amber-500">
-                          {category?.charAt(0)}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-bold text-nexus-text group-hover:text-white truncate">
-                          {nodeTitle}
-                        </div>
-                        <div className="text-[7px] opacity-40 uppercase tracking-widest">
-                          {category}
-                        </div>
-                      </div>
-                      <ChevronRight
-                        size={12}
-                        className="text-nexus-muted group-hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all"
-                      />
-                    </button>
-                  );
-                })}
-            </div>
-            <button
-              onClick={() => setMenuState('DEFAULT')}
-              className="w-full mt-4 py-2.5 text-[9px] font-display font-black text-nexus-muted uppercase tracking-widest hover:text-nexus-text transition-colors"
-            >
-              Abort Promotion
-            </button>
-          </div>
+          <ReifyPromotionMenu
+            menuState={menuState}
+            onBack={resetToDefault}
+            neighbors={neighbors}
+            reifySelection={reifySelection}
+            handleReifyChoice={handleReifyChoice}
+            getObjectTitle={getObjectTitle}
+          />
         )}
 
         {menuState === 'SCRY_ERA_SELECT' && (
-          <div className="p-2 animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="flex items-center justify-between mb-4 px-2">
-              <span className="text-[9px] font-display font-black text-fuchsia-400 uppercase tracking-widest flex items-center gap-2">
-                <Sparkles size={12} /> Target Date
-              </span>
-              <button
-                onClick={() => setMenuState('DEFAULT')}
-                className="text-nexus-muted hover:text-white transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="space-y-3 px-1">
-              <div className="space-y-1">
-                <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
-                  Year
-                </label>
-                <input
-                  type="number"
-                  value={scryDate.year}
-                  onChange={(e) =>
-                    setScryDate({ ...scryDate, year: parseInt(e.target.value) || 0 })
-                  }
-                  className="w-full bg-nexus-950 border border-nexus-800 rounded-lg px-3 py-2 text-[11px] font-mono text-nexus-text outline-none focus:border-fuchsia-500/50"
-                  autoFocus
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
-                    Month
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="12"
-                    placeholder="MM"
-                    value={scryDate.month || ''}
-                    onChange={(e) =>
-                      setScryDate({
-                        ...scryDate,
-                        month: parseInt(e.target.value) || undefined,
-                      })
-                    }
-                    className="w-full bg-nexus-950 border border-nexus-800 rounded-lg px-3 py-2 text-[11px] font-mono text-nexus-text outline-none focus:border-fuchsia-500/50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[7px] font-mono font-bold text-nexus-muted/60 uppercase ml-1">
-                    Day
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    placeholder="DD"
-                    value={scryDate.day || ''}
-                    onChange={(e) =>
-                      setScryDate({
-                        ...scryDate,
-                        day: parseInt(e.target.value) || undefined,
-                      })
-                    }
-                    className="w-full bg-nexus-950 border border-nexus-800 rounded-lg px-3 py-2 text-[11px] font-mono text-nexus-text outline-none focus:border-fuchsia-500/50"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    onManifestSnapshot?.(object.id, scryDate.year, scryDate.month, scryDate.day);
-                    onClose();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-nexus-accent/10 border border-nexus-accent/20 text-nexus-accent hover:bg-nexus-accent hover:text-white transition-all text-[10px] font-display font-black uppercase tracking-widest shadow-lg"
-                >
-                  Manifest Snapshot
-                </button>
-              </div>
-            </div>
-          </div>
+          <ScryEraSelectMenu
+            scryDate={scryDate}
+            setScryDate={setScryDate}
+            onBack={resetToDefault}
+            onManifest={() => {
+              onManifestSnapshot?.(object.id, scryDate.year, scryDate.month, scryDate.day);
+              onClose();
+            }}
+          />
         )}
       </div>
     </div>
   );
 };
-
-interface MenuItemProps {
-  icon: LucideIcon;
-  label: string;
-  desc?: string;
-  onClick: () => void;
-  color?: string;
-}
-
-const MenuItem: React.FC<MenuItemProps> = ({
-  icon: Icon,
-  label,
-  desc,
-  onClick,
-  color = 'text-nexus-muted',
-}) => (
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      onClick();
-    }}
-    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-white/[0.04] rounded-2xl transition-all group text-left"
-  >
-    <div
-      className={`p-2 rounded-xl bg-nexus-950 border border-nexus-800 transition-colors group-hover:border-nexus-700 shadow-sm ${color}`}
-    >
-      <Icon size={16} />
-    </div>
-    <div className="flex-1 min-w-0">
-      <div className="text-[12px] font-display font-black text-nexus-text group-hover:text-white transition-colors truncate">
-        {label}
-      </div>
-      {desc && (
-        <div className="text-[8px] font-mono font-bold uppercase tracking-widest text-nexus-muted group-hover:text-nexus-400 truncate mt-0.5">
-          {desc}
-        </div>
-      )}
-    </div>
-  </button>
-);

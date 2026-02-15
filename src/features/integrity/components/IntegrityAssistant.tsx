@@ -17,7 +17,7 @@ import {
   ArrowLeft,
   LucideIcon,
 } from 'lucide-react';
-import { NexusObject, SimpleNote, SemanticLink, HierarchicalLink } from '../../../types';
+import { NexusObject, SimpleNote, NexusHierarchicalLink, NexusLink } from '../../../types';
 import { GraphIntegrityService, IntegrityReport } from '../GraphIntegrityService';
 
 interface IntegrityAssistantProps {
@@ -45,7 +45,7 @@ export const IntegrityAssistant: React.FC<IntegrityAssistantProps> = ({
     return Object.entries(report)
       .filter(([_, info]) => info.status !== 'APPROVED')
       .map(([id, info]) => ({
-        link: registry[id] as SemanticLink | HierarchicalLink,
+        link: registry[id] as NexusLink | NexusHierarchicalLink,
         info,
       }));
   }, [registry]);

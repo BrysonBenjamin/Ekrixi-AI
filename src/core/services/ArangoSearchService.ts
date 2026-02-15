@@ -1,4 +1,4 @@
-import { NexusObject } from '../../../types';
+import { NexusObject } from '../../types';
 
 export interface ThinkingProcessStep {
   stage:

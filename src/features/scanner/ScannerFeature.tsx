@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Database, BrainCircuit } from 'lucide-react';
-import { safeParseJson } from '../../utils/json';
 import {
   NexusObject,
   NexusType,
   NexusCategory,
   isLink,
-  // Added isContainer to imports to resolve narrowing issues and allow access to children_ids property
-  isContainer,
-  ContainmentType,
-  DefaultLayout,
   HierarchyType,
   ConflictStatus,
-  HierarchicalLink,
-  ContainerNote,
+  isBinaryLink,
+  isM2M,
+  Participant,
+  NexusLink,
 } from '../../types';
 import { GraphIntegrityService } from '../integrity/GraphIntegrityService';
+import { GraphOperations } from '../../core/services/GraphOperations';
 import { generateId } from '../../utils/ids';
-import { useLLM } from '../system/hooks/useLLM';
-import { GEMINI_MODELS } from '../../core/llm';
+import { useMCPScanner } from './hooks/useMCPScanner';
+import { MCPStatusBadge } from '../shared/MCPStatusBadge';
 import { ScannerHeader } from './components/ScannerHeader';
 import { ScannerInput } from './components/ScannerInput';
 import { ScannerProcessing } from './components/ScannerProcessing';
@@ -89,7 +87,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
   initialText = '',
   onClearPendingText,
 }) => {
-  const { generateContent } = useLLM();
+  const { scanText, state: mcpState } = useMCPScanner();
   const [stage, setStage] = useState<ScanStage>('INPUT');
   const [statusMsg, setStatusMsg] = useState('Initializing Agents...');
   const [inputText, setInputText] = useState(initialText);
@@ -115,223 +113,101 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
     setError(null);
 
     try {
-      setStatusMsg('The Architect: Reconciling seeds with structural intel...');
+      setStatusMsg('MCP Pipeline: Extracting entities and relationships...');
 
-      // Analyze the text to find links between detected seeds and extract content for them
-      const architectResponse = await generateContent({
-        model: GEMINI_MODELS.PRO,
-        systemInstruction: `You are 'The Architect'. Your task is to extract a knowledge graph from text.
-                    1. IDENTIFY HIERARCHY: If A is a component, member, or part of B, mark as a 'HIERARCHICAL' link.
-                    2. IDENTIFY ASSOCIATIONS: If A relates to B but doesn't live inside it, mark as 'SEMANTIC'.
-                    3. EXTRACT CONTENT: For each entity, provide a concise gist and more detailed records from the text.
-                    4. Output JSON only. Format: { "links": [{ "source": "Title", "target": "Title", "verb": "contains", "type": "HIERARCHICAL" | "SEMANTIC" }], "updates": [{ "title": "Title", "gist": "Summary", "records": "Markdown content" }] }`,
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: `CONTEXT: ${inputText}\n\nTARGET ENTITIES: ${seeds.map((s) => s.title).join(', ')}`,
-              },
-            ],
-          },
-        ],
-      });
-
-      const result = await architectResponse.response;
-      const architecture = safeParseJson<ArchitectResponse>(
-        result.text() || '{"links": [], "updates": []}',
-        {
-          links: [],
-          updates: [],
-        },
-      );
-
-      const finalBatch: ExtractedItem[] = [];
-      const idMap: Record<string, string> = {};
-      const now = new Date().toISOString();
-
-      // 1. Process Seeds and suggested children
-      (seeds || []).forEach((s) => {
-        idMap[s.title.toLowerCase()] = s.id;
-        const childIds: string[] = [];
-
-        (s.suggestedChildren || []).forEach((childBlueprint) => {
-          const childId = generateId();
-          childIds.push(childId);
-          idMap[childBlueprint.title.toLowerCase()] = childId;
-
-          finalBatch.push({
-            id: childId,
-            _type: 'SIMPLE_NOTE',
-            title: childBlueprint.title,
-            gist: childBlueprint.gist,
-            category_id: childBlueprint.category,
-            is_author_note: childBlueprint.isAuthorNote,
-            created_at: now,
-            last_modified: now,
-            link_ids: [],
-            internal_weight: 1.0,
-            total_subtree_mass: 0,
-            prose_content: '',
-            is_ghost: false,
-            aliases: [],
-            tags: [],
-          } as NexusObject);
-
-          // Create hierarchical link for suggested child
-          finalBatch.push({
-            id: generateId(),
-            _type: 'HIERARCHICAL_LINK',
-            source_id: s.id,
-            target_id: childId,
-            verb: 'contains',
-            verb_inverse: 'part of',
-            hierarchy_type: HierarchyType.PARENT_OF,
-            created_at: now,
-            last_modified: now,
-            link_ids: [],
-            internal_weight: 1.0,
-            total_subtree_mass: 0,
-          } as NexusObject);
-        });
-
-        // Get content update for this seed
-        const update = architecture.updates?.find(
-          (u) => u.title.toLowerCase() === s.title.toLowerCase(),
-        );
-
-        // Determine Base Note properties if Time Data is present
-        const timeDataInfo = s.timeData
-          ? {
-              year: s.timeData.year,
-              base_node_id: s.timeData.baseId,
-            }
-          : undefined;
-
-        finalBatch.push({
-          id: s.id,
-          _type: childIds.length > 0 ? 'CONTAINER_NOTE' : 'SIMPLE_NOTE',
+      // Use MCP scanText with anchored mode — seeds become anchors
+      const result = await scanText(inputText, {
+        anchors: seeds.map((s) => ({
           title: s.title,
-          gist: update?.gist || s.gist || 'Identity established via extraction.',
-          prose_content: update?.records || '',
-          category_id: s.category,
-          is_author_note: s.isAuthorNote,
-          created_at: now,
-          last_modified: now,
-          link_ids: [],
-          internal_weight: 1.0,
-          total_subtree_mass: 0,
-          aliases: s.aliases || [],
-          tags: [],
-          is_ghost: false,
-          time_data: timeDataInfo,
-          ...(childIds.length > 0
-            ? {
-                children_ids: childIds,
-                containment_type: ContainmentType.FOLDER,
-                is_collapsed: false,
-                default_layout: DefaultLayout.GRID,
-              }
-            : {}),
-        } as NexusObject);
-
-        // If this is a Time Node, creating the TIME_LINK to the Base
-        if (s.timeData) {
-          finalBatch.push({
-            id: generateId(),
-            _type: NexusType.TIME_LINK,
-            source_id: s.timeData.baseId,
-            target_id: s.id,
-            year: s.timeData.year,
-            verb: 'has_state',
-            verb_inverse: 'state_of',
-            hierarchy_type: HierarchyType.PARENT_OF,
-            created_at: now,
-            last_modified: now,
-            link_ids: [],
-            internal_weight: 1.0,
-            total_subtree_mass: 0,
-          } as NexusObject);
-        }
+          aliases: s.aliases,
+          category: s.category,
+          gist: s.gist,
+        })),
+        registry,
       });
 
-      // 2. Resolve Links from AI Architecture
-      setStatusMsg('The Chronicler: Binding relationships...');
+      if (!result) {
+        throw new Error('MCP scan returned no result');
+      }
+
+      setStatusMsg('Building graph from batch...');
+
+      // The MCP pipeline returns a batch_id with all operations.
+      // We need to retrieve the batch objects and convert them to ExtractedItems.
+      // For the sidecar prototype, we can read directly from the batch store.
+      const { getMCPScannerClient } = await import('../../core/services/MCPScannerClient');
+      const client = getMCPScannerClient();
+      const batchObjects = client.getBatchObjects(result.batch_id);
+
+      // Convert batch objects to ExtractedItems with integrity analysis
       const tempRegistry: Record<string, NexusObject> = { ...registry };
-      finalBatch.forEach((item) => {
-        tempRegistry[item.id] = item;
-      });
+      const finalBatch: ExtractedItem[] = [];
 
-      (architecture.links || []).forEach((l) => {
-        const sId = idMap[l.source.toLowerCase()];
-        const tId = idMap[l.target.toLowerCase()];
+      for (const obj of batchObjects) {
+        tempRegistry[obj.id] = obj;
 
-        if (sId && tId && sId !== tId) {
-          const isHierarchical = l.type === 'HIERARCHICAL';
-          const linkType = isHierarchical ? NexusType.HIERARCHICAL_LINK : NexusType.SEMANTIC_LINK;
+        if (isLink(obj)) {
+          if (isM2M(obj)) {
+            // M2M hubs bypass standard binary integrity checks for now
+            // They represent complex multi-party relations which are generally deliberate
+            finalBatch.push({ ...obj, conflict: { status: 'APPROVED' } } as ExtractedItem);
+          } else if (isBinaryLink(obj)) {
+            // Run integrity analysis on binary links
+            const link = obj as NexusLink;
+            const integrity = GraphIntegrityService.analyzeLinkIntegrity(
+              link.source_id,
+              link.target_id,
+              tempRegistry,
+              link._type,
+            );
+            finalBatch.push({ ...obj, conflict: integrity } as ExtractedItem);
+          }
+        } else {
+          finalBatch.push(obj as ExtractedItem);
+        }
+      }
 
-          const integrity = GraphIntegrityService.analyzeLinkIntegrity(
-            sId,
-            tId,
+      // Apply time data from seeds — in schema v2, time links are HIERARCHICAL_LINKs with time_state
+      for (const seed of seeds) {
+        if (seed.timeData) {
+          const timeLink = GraphOperations.createHierarchicalLink(
             tempRegistry,
-            linkType,
+            seed.timeData.baseId,
+            seed.id,
+            'has_state',
+            'state_of',
+            HierarchyType.PARENT_OF,
+            {
+              is_historical_snapshot: true,
+              effective_date: { year: seed.timeData.year },
+              parent_identity_id: seed.timeData.baseId,
+            },
           );
 
-          const newLink: ExtractedItem = {
-            id: generateId(),
-            _type: linkType as NexusType.HIERARCHICAL_LINK | NexusType.SEMANTIC_LINK,
-            source_id: sId,
-            target_id: tId,
-            verb: l.verb || (isHierarchical ? 'contains' : 'relates to'),
-            verb_inverse: l.verb_inverse || (isHierarchical ? 'part of' : 'associated with'),
-            created_at: now,
-            last_modified: now,
-            link_ids: [],
-            internal_weight: 1.0,
-            total_subtree_mass: 0,
-            conflict: integrity,
-          } as ExtractedItem;
-
-          if (isHierarchical) {
-            (newLink as HierarchicalLink).hierarchy_type = HierarchyType.PARENT_OF;
-            // Also update parent's child list
-            const parent = finalBatch.find((i) => i.id === sId);
-            // Fixed: Correctly using isContainer type guard to narrow ExtractedItem and allow children_ids access
-            if (parent && isContainer(parent)) {
-              parent.children_ids = Array.from(new Set([...parent.children_ids, tId]));
-            } else if (parent && !isLink(parent)) {
-              // Upgrade to container
-              (parent as NexusObject as ContainerNote)._type = NexusType.CONTAINER_NOTE;
-              (parent as NexusObject as ContainerNote).children_ids = [tId];
-              (parent as NexusObject as ContainerNote).containment_type = ContainmentType.FOLDER;
-              (parent as NexusObject as ContainerNote).is_collapsed = false;
-              (parent as NexusObject as ContainerNote).default_layout = DefaultLayout.GRID;
-            }
+          if (timeLink) {
+            finalBatch.push(timeLink as unknown as ExtractedItem);
           }
-
-          finalBatch.push(newLink);
-          tempRegistry[newLink.id] = newLink;
         }
-      });
+      }
 
       setExtractedItems(finalBatch);
       setStage('REVIEW');
     } catch (err) {
       console.error('Scanner Processing Error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Extraction Pipeline Interrupted.';
-      let msg = errorMessage;
-      if (msg.includes('404')) msg += ' (Model not found? Check GEMINI_MODELS)';
-      if (msg.includes('400')) msg += ' (Bad Request? Check prompt/context size)';
-
-      setError(msg);
+      setError(errorMessage);
       setStage('INPUT');
     }
   };
 
   const handleCommitReview = (items: NexusObject[]) => {
+    // Ensure that any existing nodes modified by GraphOperations are also saved?
+    // Currently, GraphOperations mutates registry in place.
+    // If we commit items, we expect them to be added.
+    // Existing nodes with updated link_ids must also be saved.
+    // Strategy: We can't easily detect here which *existing* nodes were modified without tracking.
+    // For now, we rely on the fact that Scanner usually creates NEW content.
+    // Reified links from anomalies are handled separately.
     onCommitBatch(items);
     setStage('INPUT');
     setExtractedItems([]);
@@ -389,6 +265,7 @@ export const ScannerFeature: React.FC<ScannerFeatureProps> = ({
             <BrainCircuit size={12} className="text-nexus-essence" /> INTEGRITY ENGINE READY
           </span>
         </div>
+        <MCPStatusBadge status={mcpState.status} error={mcpState.error} />
       </footer>
     </div>
   );

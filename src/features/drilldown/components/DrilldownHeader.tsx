@@ -1,6 +1,6 @@
 import React from 'react';
 import { Home, ChevronRight, UserCircle2 } from 'lucide-react';
-import { NexusObject, SimpleNote } from '../../../types';
+import { NexusObject, NexusNote } from '../../../types';
 import { YearSlider } from './YearSlider';
 
 interface DrilldownHeaderProps {
@@ -47,7 +47,7 @@ export const DrilldownHeader: React.FC<DrilldownHeaderProps> = ({
               onClick={() => setNavStack(navStack.slice(0, idx + 1))}
               className={`px-4 py-2 rounded-xl text-[11px] font-display font-black uppercase tracking-[0.2em] transition-all border whitespace-nowrap ${idx === navStack.length - 1 ? 'bg-nexus-accent/5 border-nexus-accent/20 text-nexus-accent' : 'border-transparent text-nexus-muted hover:text-nexus-text'}`}
             >
-              {(registry[id] as SimpleNote)?.title}
+              {(registry[id] as NexusNote)?.title}
             </button>
           </React.Fragment>
         ))}

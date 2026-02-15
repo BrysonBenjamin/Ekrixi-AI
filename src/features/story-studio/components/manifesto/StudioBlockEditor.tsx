@@ -20,9 +20,9 @@ import { StudioSpineAgent } from '../StudioSpineAgent';
 import { NexusObject, NexusType, NexusCategory, SimpleNote } from '../../../../types';
 import { generateId } from '../../../../utils/ids';
 import {
-  getCategoryIconSvg,
   getCategoryColor,
-} from '../../../refinery/components/visualizer/NodeTemplates';
+  getCategoryIconSvg,
+} from '../../../shared/structure/components/visualizer/NodeTemplates';
 
 const StudioBlockEditor: React.FC<{
   block: StudioBlock;

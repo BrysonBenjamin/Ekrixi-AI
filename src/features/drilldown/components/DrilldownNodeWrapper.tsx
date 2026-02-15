@@ -1,8 +1,9 @@
 import React from 'react';
 import { SimulationNode } from '../hooks/useDrilldownSimulation';
-import { NexusObject, SemanticLink } from '../../../types';
+import { NexusObject, NexusLink } from '../../../types';
 import { DrillNode } from './DrillNode';
 import { IntegrityReport } from '../../integrity/GraphIntegrityService';
+import { RegistryIndexes } from '../hooks/useRegistryIndexes';
 
 interface DrilldownNodeWrapperProps {
   node: SimulationNode;
@@ -30,6 +31,7 @@ interface DrilldownNodeWrapperProps {
     onNext?: () => void;
     onPrev?: () => void;
   } | null;
+  indexes: RegistryIndexes;
 }
 
 export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
@@ -53,12 +55,12 @@ export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
   onDrop,
   onInspect,
   timeNavigation,
+  indexes,
 }) => {
   const isPartOfAnomaly =
     integrityFocus?.path?.includes(node.id) ||
-    (integrityFocus &&
-      (fullRegistry[integrityFocus.linkId] as SemanticLink).source_id === node.id) ||
-    (integrityFocus && (fullRegistry[integrityFocus.linkId] as SemanticLink).target_id === node.id);
+    (integrityFocus && (fullRegistry[integrityFocus.linkId] as NexusLink).source_id === node.id) ||
+    (integrityFocus && (fullRegistry[integrityFocus.linkId] as NexusLink).target_id === node.id);
 
   const isNodeFocus =
     node.id === focusId || linkingSourceId === node.id || lockedId === node.id || isPartOfAnomaly;
@@ -90,6 +92,7 @@ export const DrilldownNodeWrapper: React.FC<DrilldownNodeWrapperProps> = ({
           integrityReport={integrityMap[node.id]}
           onLinkClick={onInspect}
           timeNavigation={timeNavigation}
+          indexes={indexes}
         />
       </g>
     </g>

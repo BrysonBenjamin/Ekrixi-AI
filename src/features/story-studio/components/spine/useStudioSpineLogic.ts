@@ -244,7 +244,7 @@ export const useStudioSpineLogic = (
         if (targetChapterId) {
           finalItems.push({
             id: generateId(),
-            _type: NexusType.SEMANTIC_LINK,
+            _type: NexusType.SIMPLE_LINK,
             source_id: note.id,
             target_id: targetChapterId,
             verb: 'governs',

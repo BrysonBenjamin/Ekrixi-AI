@@ -8,6 +8,7 @@ import {
   ContainerNote,
   TraitLink,
 } from '../../types';
+import { isHistoricalSnapshot } from '../../core/utils/nexus-accessors';
 
 export interface IntegrityReport {
   status: ConflictStatus;
@@ -82,11 +83,10 @@ export const GraphIntegrityService = {
     const isProposedHierarchical =
       proposedType &&
       (proposedType === NexusType.HIERARCHICAL_LINK ||
-        proposedType === NexusType.AGGREGATED_HIERARCHICAL_LINK ||
-        proposedType === NexusType.CONTAINER_NOTE);
+        proposedType === NexusType.AGGREGATED_HIERARCHICAL_LINK);
     const isProposedReified =
       proposedType &&
-      (proposedType === NexusType.AGGREGATED_SEMANTIC_LINK ||
+      (proposedType === NexusType.AGGREGATED_SIMPLE_LINK ||
         proposedType === NexusType.AGGREGATED_HIERARCHICAL_LINK);
 
     // 1. Hierarchical links define the structural skeleton.
@@ -110,8 +110,10 @@ export const GraphIntegrityService = {
       return { status: 'APPROVED' };
     }
 
-    // 3. Proximity Analysis for Semantic Links
-    // Search for ANY path (hierarchical or semantic) that already bridges these units.
+    // 3. Proximity Analysis for Semantic Links (Soft Deprecated for now)
+    // We are bypassing this check to prevent annoying automatic flagging of links.
+    // The architectural hooks remain if we wish to bring this back later.
+    /*
     const queue: Array<{ id: string; dist: number; path: string[]; types: NexusType[] }> = [
       { id: sourceId, dist: 0, path: [sourceId], types: [] },
     ];
@@ -194,6 +196,7 @@ export const GraphIntegrityService = {
         });
       }
     }
+    */
 
     return { status: 'APPROVED' };
   },
@@ -213,10 +216,8 @@ export const GraphIntegrityService = {
       // should be exempt from standard integrity checks as they represent valid historical states.
       const sourceNode = registry[link.source_id];
       const targetNode = registry[link.target_id];
-
       const isTemporalSnapshot =
-        (sourceNode as any)?.time_data?.base_node_id ||
-        (targetNode as any)?.time_data?.base_node_id;
+        isHistoricalSnapshot(sourceNode) || isHistoricalSnapshot(targetNode);
 
       if (isTemporalSnapshot) return;
 
