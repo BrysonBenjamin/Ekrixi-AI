@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChatSession, MessageNode } from '../types';
 import { generateId } from '../../../utils/ids';
-import { NexusObject } from '../../../types';
+import { NexusObject, isLink } from '../../../types';
 import { useLLM } from '../../system/hooks/useLLM';
 import { DataService } from '../../../core/services/DataService';
 import { useSessionStore } from '../../../store/useSessionStore';
@@ -13,6 +13,7 @@ import {
 export const useUniverseChat = (
   registry: Record<string, NexusObject>,
   activeUniverseId?: string,
+  isCanvasMode: boolean = false,
 ) => {
   const { generateText } = useLLM();
   const { currentUser } = useSessionStore();
@@ -101,11 +102,25 @@ export const useUniverseChat = (
     return thread;
   }, []);
 
+  const updateSession = useCallback(
+    async (sessionId: string, updates: Partial<ChatSession>) => {
+      if (!activeUniverseId) return;
+
+      // Optimistic Update
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, ...updates } : s)));
+
+      // Persistence
+      await DataService.updateChatSession(activeUniverseId, sessionId, updates);
+    },
+    [activeUniverseId, setSessions],
+  );
+
   const triggerGeneration = useCallback(
     async (
       sessionId: string,
       leafId: string,
       historyNodes: MessageNode[],
+      isCanvasMode: boolean,
       explicitContext: WeightedContextUnit[] = [],
     ) => {
       if (!activeUniverseId) return;
@@ -130,22 +145,11 @@ export const useUniverseChat = (
       await DataService.addMessageToChat(activeUniverseId, sessionId, botNode, leafId);
 
       try {
-        // FORMALIZED CONTEXT ASSEMBLY
-        // Use the explicit context if provided, otherwise default to "scan" (empty list handled by service?)
-        // The service needs weightedUnits. If empty, it prioritizes nothing but still scans candidates.
         const assemblyResult = ContextAssemblyService.assembleWorldContext(
           registry,
           explicitContext,
           historyNodes[historyNodes.length - 1]?.text || 'User Query',
         );
-
-        // Log Thinking Process (Future: Visualize)
-        if (import.meta.env.DEV) {
-          console.log(
-            '[useUniverseChat] Context Assembly Thinking Process:',
-            assemblyResult.thinking_process,
-          );
-        }
 
         const knownUnits = assemblyResult.contextString;
 
@@ -153,16 +157,27 @@ export const useUniverseChat = (
           .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
           .join('\n');
 
-        const systemInstruction = `You are a professional world-building consultant and concept architect. 
-            - CONTEXT AWARENESS: You have access to the existing Knowledge Graph. 
-            - EXISTING_UNITS:
+        const systemInstruction = `You are an expert world-builder and concept architect for the Ekrixi system.
+            ${
+              isCanvasMode
+                ? `
+            **CANVAS MODE ACTIVE:** You are currently editing a document on the right. 
+            - Your chat output (left) should be a briefly professional confirmation (1-2 sentences).
+            - You MUST wrap your actual document updates in a \`---CANVAS_START---\` and \`---CANVAS_END---\` block.
+            - Inside the canvas block, provide the COMPLETE updated Markdown.
+            - **CRITICAL LINK RULE:** In the CANVAS block, ONLY use the [[Entity Name]] syntax for entities that already exist in the provided Context. Do NOT use brackets for new or potential entities in the document block.
+            `
+                : `
+            - Provide helpful, concept-rich advice.
+            `
+            }
+            
+            - CONTEXT:
             ${knownUnits || 'No units defined yet.'}
             
-            - GOAL: Help the user brainstorm and refine lore. If they mention an existing unit (using @ or name), use the data above.
-            - Tone: Conversational, helpful, direct. 
-            - Style: Use Markdown.
-            - USE "[[Title]]" SYNTAX for any references to entities, concepts, or story nodes. These become clickable links.
-            - Interaction: Ask one targeted question at the end to help establish a new unit.`;
+            - RULES:
+            - ALWAYS use [[Title]] syntax in your CHAT responses to reference entities.
+            - Be concise but high-fidelity.`;
 
         const fullText = await generateText(
           `Current Project Context:\n\n${historyText}\n\nAssistant:`,
@@ -171,28 +186,108 @@ export const useUniverseChat = (
 
         let currentText = '';
         const chars = fullText.split('');
-        const chunkAmount = 30; // Larger chunks for speed
-        const revealInterval = 50;
+        const chunkAmount = 35;
+        const revealInterval = 40;
 
         const interval = setInterval(async () => {
           if (chars.length > 0) {
             const chunk = chars.splice(0, chunkAmount).join('');
             currentText += chunk;
 
-            // LOCAL OPTIMISTIC UPDATE for streaming
+            // Update chat state (filtering out the canvas block from the visible chat bubble)
+            let visibleChatText = currentText;
+            if (currentText.includes('---CANVAS_START---')) {
+              const parts = currentText.split('---CANVAS_START---');
+              visibleChatText = parts[0].trim();
+            }
+
             setActiveSessionMessages((prev) => ({
               ...prev,
-              [botId]: { ...prev[botId], text: currentText },
+              [botId]: { ...prev[botId], text: visibleChatText },
             }));
+
+            // If we have a complete canvas block, we can start pushing it (optimistic)
+            if (
+              currentText.includes('---CANVAS_START---') &&
+              currentText.includes('---CANVAS_END---')
+            ) {
+              const canvasContent = currentText
+                .split('---CANVAS_START---')[1]
+                .split('---CANVAS_END---')[0]
+                .trim();
+              if (canvasContent) {
+                // We don't push to Firestore here to avoid extreme writes,
+                // but we could trigger a local side effect if needed.
+              }
+            }
           } else {
             clearInterval(interval);
             setIsLoading(false);
 
-            // FINAL SAVE to Firestore
+            // POST-PROCESS DUAL OUTPUT
+            let finalChatText = currentText;
+            let canvasUpdate: string | null = null;
+
+            if (currentText.includes('---CANVAS_START---')) {
+              const parts = currentText.split('---CANVAS_START---');
+              finalChatText = parts[0].trim();
+              if (parts[1].includes('---CANVAS_END---')) {
+                canvasUpdate = parts[1].split('---CANVAS_END---')[0].trim();
+
+                // FILTER: Only keep brackets for existing entities in the Canvas
+                const existingTitles = new Set(
+                  Object.values(registry)
+                    .filter((obj) => !isLink(obj)) // Assuming isLink is defined elsewhere or a helper
+                    .map((obj) => (obj as any).title),
+                );
+
+                canvasUpdate = canvasUpdate.replace(/\[\[(.*?)\]\]/g, (match, title) => {
+                  return existingTitles.has(title) ? match : title;
+                });
+              }
+            }
+
+            // FINAL SAVE to Firestore for Chat
             await DataService.updateMessage(activeUniverseId, sessionId, botId, {
-              text: currentText,
+              text: finalChatText,
               isStreaming: false,
             });
+
+            // If we have a canvas update, push it to the active canvas
+            if (canvasUpdate && isCanvasMode) {
+              const session = sessions.find((s) => s.id === sessionId);
+              if (session) {
+                const currentCanvases = session.canvases || [];
+                let updatedCanvases;
+                let activeId = session.activeCanvasId;
+
+                if (currentCanvases.length === 0) {
+                  // AUTO-CREATE if none exist
+                  const newCanvas = {
+                    id: generateId(),
+                    title: 'Main Document',
+                    content: canvasUpdate,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  };
+                  updatedCanvases = [newCanvas];
+                  activeId = newCanvas.id;
+                } else {
+                  // Update existing
+                  activeId = session.activeCanvasId || currentCanvases[0].id;
+                  updatedCanvases = currentCanvases.map((c) =>
+                    c.id === activeId
+                      ? { ...c, content: canvasUpdate!, updatedAt: new Date().toISOString() }
+                      : c,
+                  );
+                }
+
+                await updateSession(sessionId, {
+                  canvases: updatedCanvases,
+                  activeCanvasId: activeId,
+                });
+              }
+            }
           }
         }, revealInterval);
       } catch (error) {
@@ -205,7 +300,15 @@ export const useUniverseChat = (
         setIsLoading(false);
       }
     },
-    [registry, generateText, activeUniverseId, currentUser?.id],
+    [
+      registry,
+      generateText,
+      activeUniverseId,
+      currentUser?.id,
+      sessions,
+      updateSession,
+      isCanvasMode,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -245,6 +348,8 @@ export const useUniverseChat = (
             id: newSessionId,
             universeId: activeUniverseId,
             title: text.slice(0, 30) || 'New Project',
+            canvases: [],
+            activeCanvasId: null,
             messageMap: {},
             rootNodeIds: [],
             selectedRootId: null,
@@ -341,7 +446,7 @@ export const useUniverseChat = (
         };
 
         const history = getThread({ ...tempSession, senderId: 'system' });
-        triggerGeneration(sessionId, userMsgId, history, context);
+        triggerGeneration(sessionId, userMsgId, history, isCanvasMode, context);
       } catch (error) {
         console.error('[useUniverseChat] Failed to send message:', error);
         setIsLoading(false);
@@ -355,6 +460,7 @@ export const useUniverseChat = (
       getThread,
       triggerGeneration,
       currentUser,
+      isCanvasMode,
     ],
   );
 
@@ -416,7 +522,7 @@ export const useUniverseChat = (
           currentLeafId: newBranchId,
         };
         const history = getThread(tempSession);
-        triggerGeneration(currentSessionId, newBranchId, history);
+        triggerGeneration(currentSessionId, newBranchId, history, isCanvasMode);
       }
     },
     [
@@ -427,6 +533,7 @@ export const useUniverseChat = (
       triggerGeneration,
       getThread,
       currentUser?.id,
+      isCanvasMode,
     ],
   );
 
@@ -440,7 +547,7 @@ export const useUniverseChat = (
         editMessage(nodeId, node.text);
       } else if (node.role === 'model' && node.parentId) {
         const history = getThread({ ...currentSession, currentLeafId: node.parentId });
-        triggerGeneration(currentSessionId, node.parentId, history);
+        triggerGeneration(currentSessionId, node.parentId, history, isCanvasMode);
       }
     },
     [
@@ -451,6 +558,7 @@ export const useUniverseChat = (
       editMessage,
       getThread,
       triggerGeneration,
+      isCanvasMode,
     ],
   );
 
@@ -534,6 +642,8 @@ export const useUniverseChat = (
         senderId: 'system',
         universeId: activeUniverseId,
         title: 'New Project',
+        canvases: [],
+        activeCanvasId: null,
         messageMap: {},
         rootNodeIds: [],
         selectedRootId: null,
@@ -564,6 +674,10 @@ export const useUniverseChat = (
     updateTitle: async (id: string, title: string) => {
       if (!activeUniverseId) return;
       await DataService.updateChatSessionTitle(activeUniverseId, id, title);
+    },
+    updateSession: async (id: string, updates: Partial<ChatSession>) => {
+      if (!activeUniverseId) return;
+      await DataService.updateChatSession(activeUniverseId, id, updates);
     },
     navigateBranch,
   };

@@ -8,12 +8,16 @@ import {
   Edit2,
   Check,
   X,
+  PanelRightClose,
+  PanelRight,
 } from 'lucide-react';
 import { useUniverseChat } from './hooks/useUniverseChat';
+import { useCanvasState, CanvasMode } from './hooks/useCanvasState';
 import { Sidebar } from './components/Sidebar';
 import { MessageList } from './components/MessageList';
 import { Composer } from './components/Composer';
 import { EmptyState } from './components/EmptyState';
+import { SideCanvas } from './components/SideCanvas';
 import { NexusObject } from '../../types';
 
 interface UniverseGeneratorFeatureProps {
@@ -27,6 +31,10 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
   registry,
   activeUniverseId,
 }) => {
+  // Canvas visibility is now manually togglable + smart activation
+  const [mode, setMode] = useState<CanvasMode>('hidden');
+  const isCanvasVisible = mode !== 'hidden';
+
   const {
     sessions,
     currentSessionId,
@@ -40,8 +48,24 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
     editMessage,
     regenerate,
     updateTitle,
+    updateSession,
     navigateBranch,
-  } = useUniverseChat(registry, activeUniverseId);
+  } = useUniverseChat(registry, activeUniverseId, isCanvasVisible);
+
+  // Canvas State Management
+  const {
+    document: canvasDocument,
+    activeCanvas,
+    canvases,
+    updateDocument,
+    updateCanvasTitle,
+    createCanvas,
+    switchCanvas,
+    deleteCanvas,
+    isUpdating,
+    toggleCanvasMode,
+    refineDocument,
+  } = useCanvasState(currentSession, thread, registry, updateSession, mode, setMode);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,8 +79,8 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
         setIsMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.document.addEventListener('mousedown', handleClickOutside);
+    return () => window.document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleStartRename = () => {
@@ -76,8 +100,8 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
 
   return (
     <div className="flex h-full bg-nexus-950 text-nexus-text relative overflow-hidden font-sans">
-      {/* Left Panel ... (rest is same) */}
       {/* Left Panel - Mobile Overlay */}
+      {/* ... (Left Panel code stays same) ... */}
       <div
         className={`
                 fixed inset-0 z-[60] md:relative md:z-auto transition-transform duration-300
@@ -89,31 +113,28 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           className="absolute inset-0 bg-black/40 backdrop-blur-sm md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
-        <div className="relative h-full w-72">
+        <div className="relative h-full w-80 shrink-0 border-r border-nexus-800 hidden lg:block">
           <Sidebar
             sessions={sessions}
             activeId={currentSessionId}
             onCreate={() => {
               createSession();
-              setIsSidebarOpen(false);
             }}
             onSelect={(id) => {
               selectSession(id);
-              setIsSidebarOpen(false);
             }}
             onDelete={deleteSession}
             onSuggestionClick={(text) => {
-              setIsSidebarOpen(false);
               sendMessage(text);
             }}
           />
         </div>
       </div>
 
-      {/* Main Chat Interface */}
+      {/* Main Container - Dual Column Layout */}
       <div className="flex-1 flex flex-col relative min-w-0">
         {/* 1. TOP BAR */}
-        <header className="h-16 flex items-center justify-between px-6 shrink-0 bg-nexus-900/50 backdrop-blur-xl border-b border-nexus-800 z-20">
+        <header className="h-16 flex items-center justify-between px-6 shrink-0 bg-nexus-900/40 backdrop-blur-3xl border-b border-white/5 z-20">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -177,6 +198,20 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           </div>
 
           <div className="flex items-center gap-2 relative" ref={menuRef}>
+            {/* Manual Canvas Toggle Button */}
+            <button
+              onClick={toggleCanvasMode}
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+                isCanvasVisible
+                  ? 'bg-nexus-accent/10 border-nexus-accent/30 text-nexus-accent'
+                  : 'bg-nexus-800/50 border-nexus-800 text-nexus-muted hover:text-nexus-text'
+              }`}
+              title={isCanvasVisible ? 'Close Canvas' : 'Open Canvas'}
+            >
+              {isCanvasVisible ? <PanelRightClose size={18} /> : <PanelRight size={18} />}
+              <span className="text-[10px] font-black uppercase tracking-widest">Canvas</span>
+            </button>
+
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className={`p-3 md:p-2 text-nexus-muted hover:text-nexus-text rounded-xl transition-all ${isMenuOpen ? 'bg-nexus-800 text-nexus-text' : ''}`}
@@ -221,46 +256,77 @@ export const UniverseGeneratorFeature: React.FC<UniverseGeneratorFeatureProps> =
           </div>
         </header>
 
-        {/* 2. MAIN SCROLL AREA */}
-        {hasMessages ? (
-          <>
-            <div className="flex-1 overflow-hidden relative">
-              {currentSession && (
-                <MessageList
-                  thread={thread}
-                  session={currentSession}
-                  isLoading={isLoading}
-                  editMessage={editMessage}
-                  regenerate={regenerate}
-                  navigateBranch={navigateBranch}
-                  onScan={onScan}
-                  registry={registry}
-                />
-              )}
-            </div>
-
-            {/* 3. INPUT FOOTER */}
-            <div className="shrink-0 w-full bg-nexus-950 border-t border-nexus-800/30">
-              <div className="max-w-4xl mx-auto px-6 pb-8 md:pb-8 pt-4 pb-safe">
-                <Composer
-                  isLoading={isLoading}
-                  onSend={sendMessage}
-                  variant="footer"
-                  registry={registry}
-                />
-                <div className="text-center mt-3">
-                  <p className="text-[10px] text-nexus-muted font-mono tracking-widest uppercase opacity-60">
-                    Nexus Engine v4.0 // Project Stability: Optimal
-                  </p>
+        {/* 2. MAIN CONTENT AREA - SPLIT SCREEN */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Chat Sidebar (Editing Tool) */}
+          <div
+            className={`
+              flex flex-col border-r border-white/10 transition-all duration-500 ease-nexus-in-out
+              ${isCanvasVisible ? 'w-full md:w-[320px] lg:w-[380px]' : 'w-full'}
+            `}
+          >
+            {hasMessages ? (
+              <>
+                <div className="flex-1 overflow-hidden relative">
+                  {currentSession && (
+                    <MessageList
+                      thread={thread}
+                      session={currentSession}
+                      isLoading={isLoading}
+                      editMessage={editMessage}
+                      regenerate={regenerate}
+                      navigateBranch={navigateBranch}
+                      onScan={onScan}
+                      registry={registry}
+                    />
+                  )}
                 </div>
+
+                {/* 3. INPUT FOOTER */}
+                <div className="shrink-0 w-full bg-nexus-950/80 border-t border-nexus-800/30">
+                  <div className="max-w-3xl mx-auto px-4 pb-4 pt-2 pb-safe">
+                    <Composer
+                      isLoading={isLoading}
+                      onSend={sendMessage}
+                      variant="footer"
+                      registry={registry}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex overflow-y-auto no-scrollbar">
+                <EmptyState onSend={sendMessage} registry={registry} />
               </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex overflow-y-auto no-scrollbar">
-            <EmptyState onSend={sendMessage} registry={registry} />
+            )}
           </div>
-        )}
+
+          {/* Main Canvas Area - Smart Activation */}
+          <div
+            className={`flex-1 flex flex-col transition-all duration-500 overflow-hidden ${!isCanvasVisible ? 'hidden' : ''}`}
+          >
+            {isCanvasVisible && (
+              <SideCanvas
+                sessionId={currentSessionId}
+                document={canvasDocument}
+                activeCanvas={activeCanvas}
+                canvases={canvases}
+                onUpdateDocument={updateDocument}
+                onUpdateCanvasTitle={updateCanvasTitle}
+                onCreateCanvas={createCanvas}
+                onSwitchCanvas={switchCanvas}
+                onDeleteCanvas={deleteCanvas}
+                onRefineDocument={refineDocument}
+                onScan={onScan}
+                registry={registry}
+                isUpdating={isUpdating}
+                mode={mode}
+                onModeChange={setMode}
+                onClose={() => setMode('hidden')}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

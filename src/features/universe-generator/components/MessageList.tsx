@@ -43,8 +43,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   }
 
   return (
-    <div ref={scrollRef} className="w-full h-full overflow-y-auto px-4 md:px-0 py-6 scroll-smooth">
-      <div className="max-w-3xl mx-auto">
+    <div
+      ref={scrollRef}
+      className="w-full h-full overflow-y-auto px-3 md:px-6 py-4 scroll-smooth no-scrollbar"
+    >
+      <div className="max-w-2xl mx-auto space-y-6">
         {thread.map((node) => (
           <MessageBubble
             key={node.id}
@@ -59,9 +62,9 @@ export const MessageList: React.FC<MessageListProps> = ({
         ))}
 
         {isLoading && lastMessageText.length === 0 && (
-          <div className="flex items-center gap-3 text-nexus-accent text-xs animate-pulse ml-0 mt-4 pl-4 md:pl-0">
+          <div className="flex items-center gap-2 text-nexus-accent text-xs animate-pulse py-2">
             <Sparkles size={14} />
-            <span className="uppercase tracking-widest font-bold">Computing...</span>
+            <span className="uppercase tracking-wider font-bold">Thinking...</span>
           </div>
         )}
 

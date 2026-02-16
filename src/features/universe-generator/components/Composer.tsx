@@ -49,7 +49,6 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const handleRemoveMention = (id: string, title?: string) => {
     setWeightedMentions(weightedMentions.filter((m) => m.id !== id));
-    // Also remove text representation if title is provided
     if (title) {
       const mentionText = `[[${title}]]`;
       if (text.includes(mentionText)) {
@@ -58,19 +57,15 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  // Sync Text -> Context: If user deletes [[Title]], remove the context pill
   useEffect(() => {
     if (weightedMentions.length === 0) return;
 
     const activeTitlesInText = new Set<string>();
-    // Simple regex to find [[Title]] patterns.
-    // Note: This assumes titles don't have nested brackets.
     const matches = text.match(/\[\[(.*?)\]\]/g);
     if (matches) {
       matches.forEach((m) => activeTitlesInText.add(m.slice(2, -2)));
     }
 
-    // Identify mentions that are no longer in text
     const mentionsToRemove = weightedMentions.filter((wm) => {
       const note = registry[wm.id] as SimpleNote;
       if (!note) return false;
@@ -83,14 +78,10 @@ export const Composer: React.FC<ComposerProps> = ({
       );
     }
   }, [text, registry, weightedMentions]);
-  // Note: we exclude weightedMentions from dep array to avoid loops,
-  // but we need to be careful. Actually, if we only remove, it should be fine.
-  // Better implementation: calculate new state and only set if different.
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       if (atMenu) {
-        // Allow selection from menu via keyboard if implemented, otherwise close
         setAtMenu(null);
       } else {
         e.preventDefault();
@@ -102,7 +93,6 @@ export const Composer: React.FC<ComposerProps> = ({
   const detectAtTrigger = (val: string, pos: number) => {
     const beforeCursor = val.slice(0, pos);
     const lastAtIndex = beforeCursor.lastIndexOf('@');
-    // Ensure we are typing a valid query (no spaces after @ yet)
     if (lastAtIndex !== -1 && !beforeCursor.slice(lastAtIndex).includes(' ')) {
       setAtMenu({ query: beforeCursor.slice(lastAtIndex + 1) });
     } else {
@@ -117,12 +107,10 @@ export const Composer: React.FC<ComposerProps> = ({
     const afterCursor = text.slice(pos);
     const lastAtIndex = beforeCursor.lastIndexOf('@');
 
-    // Insert [[Title]]
     const mentionText = `[[${node.title}]]`;
     const newText = beforeCursor.slice(0, lastAtIndex) + mentionText + ' ' + afterCursor;
     setText(newText);
 
-    // Add to Weighted Mentions with MAX score (10)
     if (!weightedMentions.some((m) => m.id === node.id)) {
       setWeightedMentions((prev) => [...prev, { id: node.id, score: 10 }]);
     }
@@ -130,7 +118,6 @@ export const Composer: React.FC<ComposerProps> = ({
     setAtMenu(null);
     setTimeout(() => {
       textareaRef.current?.focus();
-      // Move cursor after the inserted mention + space
       const newPos = lastAtIndex + mentionText.length + 1;
       textareaRef.current?.setSelectionRange(newPos, newPos);
     }, 0);
@@ -143,7 +130,7 @@ export const Composer: React.FC<ComposerProps> = ({
         textareaRef.current.style.height = '100%';
       } else {
         const newHeight = Math.min(textareaRef.current.scrollHeight, 200);
-        textareaRef.current.style.height = `${Math.max(newHeight, 52)}px`;
+        textareaRef.current.style.height = `${Math.max(newHeight, 36)}px`;
       }
     }
   }, [text, isExpanded]);
@@ -156,7 +143,6 @@ export const Composer: React.FC<ComposerProps> = ({
     const q = atMenu.query.replace(/_/g, ' ').toLowerCase();
     const allItems = Object.values(registry) as NexusObject[];
 
-    // Compute basic seniority (depth)
     const parentMap: Record<string, string[]> = {};
     allItems.forEach((obj) => {
       if (isContainer(obj)) {
@@ -179,7 +165,6 @@ export const Composer: React.FC<ComposerProps> = ({
       .filter((n) => !isLink(n) && (n as SimpleNote).title?.toLowerCase().includes(q))
       .map((n) => ({ node: n as SimpleNote, depth: getDepth(n.id) }));
 
-    // Prioritize lower depth (most senior parents)
     return filtered
       .sort((a, b) => a.depth - b.depth)
       .map((f) => f.node)
@@ -192,46 +177,43 @@ export const Composer: React.FC<ComposerProps> = ({
   );
 
   return (
-    // ... (imports remain)
-
-    // Inside the component return:
     <div
       className={`
             shrink-0 transition-all duration-500 ease-out w-full
             ${isExpanded ? 'fixed inset-0 bg-nexus-950/95 backdrop-blur-3xl flex items-center justify-center p-8 md:p-16 z-[100]' : 'z-40 relative'}
         `}
     >
-      {/* Mention Menu */}
+      {/* Mention Menu - Compact */}
       {atMenu && suggestions.length > 0 && (
         <div
-          className={`absolute bottom-full left-0 mb-6 w-full max-w-lg bg-nexus-900 border border-nexus-700 rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.7)] overflow-hidden backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-300 z-[110] ${isExpanded ? 'ml-0' : ''}`}
+          className={`absolute bottom-full left-0 mb-3 w-full max-w-md bg-nexus-900/95 backdrop-blur-xl border border-nexus-700/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-[110]`}
         >
-          <div className="px-8 py-5 border-b border-nexus-800 flex items-center justify-between bg-nexus-950/40">
-            <span className="text-xs md:text-[11px] font-display font-black text-nexus-accent uppercase tracking-[0.25em] flex items-center gap-3">
-              <Sparkles size={16} /> NEURAL REGISTRY SCRY
+          <div className="px-4 py-3 border-b border-nexus-800/50 flex items-center justify-between bg-nexus-950/40">
+            <span className="text-[9px] font-display font-black text-nexus-accent uppercase tracking-wider flex items-center gap-2">
+              <Sparkles size={12} /> Registry Search
             </span>
             <button
               onClick={() => setAtMenu(null)}
-              className="p-2 rounded-full hover:bg-white/5 text-nexus-muted hover:text-nexus-text transition-all"
+              className="p-1 rounded-lg hover:bg-nexus-800/50 text-nexus-muted hover:text-nexus-text transition-all"
             >
-              <X size={20} />
+              <X size={14} />
             </button>
           </div>
-          <div className="p-4 space-y-2 max-h-[450px] overflow-y-auto no-scrollbar">
+          <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto no-scrollbar">
             {suggestions.map((n) => {
               const node = n as SimpleNote;
               return (
                 <button
                   key={node.id}
                   onClick={() => insertMention(node)}
-                  className="w-full flex items-center gap-5 px-6 py-4 rounded-[28px] hover:bg-nexus-accent hover:text-white transition-all group text-left border border-transparent hover:border-white/20"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-nexus-accent hover:text-white transition-all group text-left"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-nexus-900 border border-nexus-800 flex items-center justify-center text-[12px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all shadow-sm">
+                  <div className="w-8 h-8 rounded-lg bg-nexus-900 border border-nexus-800 flex items-center justify-center text-[9px] font-black text-nexus-accent group-hover:bg-white group-hover:text-nexus-accent transition-all">
                     {node.category_id?.charAt(0) || 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-lg font-black truncate leading-tight">{node.title}</div>
-                    <div className="text-[10px] opacity-50 uppercase font-mono font-bold tracking-widest mt-0.5">
+                    <div className="text-sm font-bold truncate leading-tight">{node.title}</div>
+                    <div className="text-[8px] opacity-50 uppercase font-mono font-bold tracking-wider mt-0.5">
                       {node.category_id}
                     </div>
                   </div>
@@ -249,15 +231,15 @@ export const Composer: React.FC<ComposerProps> = ({
                   isExpanded
                     ? 'w-full max-w-5xl h-[75vh] bg-nexus-900 rounded-[56px] border border-nexus-700 shadow-[0_100px_200px_-50px_rgba(0,0,0,0.8)] overflow-hidden'
                     : isCenter
-                      ? 'mx-auto max-w-3xl bg-nexus-900 rounded-[40px] shadow-2xl border border-nexus-800 p-3'
-                      : 'mx-auto w-full bg-nexus-900 rounded-[32px] border border-nexus-800 shadow-xl ring-1 ring-nexus-text/5 hover:ring-nexus-accent/20'
+                      ? 'mx-auto max-w-3xl bg-nexus-900/80 backdrop-blur-sm rounded-3xl shadow-xl border border-nexus-800/50 p-2'
+                      : 'mx-auto w-full max-w-3xl bg-nexus-900/80 backdrop-blur-sm rounded-2xl border border-nexus-800/50 shadow-lg hover:border-nexus-700/50 transition-all'
                 }
             `}
       >
-        {/* Context Pills Area */}
+        {/* Context Pills - Compact */}
         {weightedMentions.length > 0 && (
           <div
-            className={`px-10 pt-8 pb-2 flex flex-wrap gap-4 transition-all ${isExpanded ? 'px-14' : ''}`}
+            className={`px-4 pt-3 pb-1 flex flex-wrap gap-2 transition-all ${isExpanded ? 'px-8 pt-6' : ''}`}
           >
             {weightedMentions.map((unit) => (
               <ContextPill
@@ -273,7 +255,7 @@ export const Composer: React.FC<ComposerProps> = ({
           </div>
         )}
 
-        <div className={`w-full flex-1 min-h-0 ${isExpanded ? 'p-14 pb-0' : 'px-10 pt-6 pb-4'}`}>
+        <div className={`w-full flex-1 min-h-0 ${isExpanded ? 'p-10' : 'px-3 pt-2 pb-1.5'}`}>
           <textarea
             ref={textareaRef}
             value={text}
@@ -282,88 +264,93 @@ export const Composer: React.FC<ComposerProps> = ({
               detectAtTrigger(e.target.value, e.target.selectionStart);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Manifest your reality... (Use @ to scry registry)"
+            placeholder="Message AI... (Use @ for registry)"
             className={`
                             w-full bg-transparent border-none focus:ring-0 focus:outline-none resize-none no-scrollbar
-                            text-nexus-text placeholder-nexus-muted font-normal leading-relaxed
-                            ${isExpanded ? 'h-full text-3xl font-serif italic' : 'min-h-[64px] text-[20px]'}
+                            text-nexus-text placeholder-nexus-muted/50 font-normal leading-relaxed
+                            ${isExpanded ? 'h-full text-2xl font-serif italic' : 'min-h-[36px] text-[14px]'}
                         `}
             rows={1}
           />
         </div>
 
         <div
-          className={`flex items-center justify-between ${isExpanded ? 'px-8 pb-8 pt-4' : 'px-5 pb-4 pt-1'}`}
+          className={`flex items-center justify-between ${isExpanded ? 'px-8 pb-8 pt-3' : 'px-3 pb-2 pt-1'}`}
         >
-          <div className="flex items-center gap-3">
-            <button className="p-3 md:p-2 rounded-xl text-nexus-muted hover:text-nexus-text hover:bg-nexus-800 transition-all">
-              <Plus size={18} />
-            </button>
-
+          <div className="flex items-center gap-2">
             <div className="relative">
               <button
                 onClick={() => setShowContextOverlay(!showContextOverlay)}
-                className={`flex items-center gap-2 transition-all p-3 md:py-2 md:px-4 rounded-xl text-xs md:text-[10px] font-display font-black uppercase tracking-widest ${showContextOverlay ? 'bg-nexus-accent text-white' : 'text-nexus-muted hover:text-nexus-accent hover:bg-nexus-800'}`}
+                className={`flex items-center gap-1.5 transition-all p-2 rounded-lg text-[8px] font-display font-black uppercase tracking-wider ${showContextOverlay ? 'bg-nexus-accent text-white' : 'text-nexus-muted hover:text-nexus-accent hover:bg-nexus-800/50'}`}
               >
-                <StickyNote size={14} />
-                <span>Memory: {registrySize} Units</span>
+                <StickyNote size={12} />
+                <span className="hidden sm:inline">{registrySize}</span>
               </button>
 
               {showContextOverlay && (
-                <div className="absolute bottom-full left-0 mb-4 w-64 bg-nexus-900 border border-nexus-800 rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Database size={16} className="text-nexus-accent" />
-                    <h4 className="text-xs md:text-[10px] font-black uppercase tracking-widest">
-                      Active Scry Context
+                <div className="absolute bottom-full left-0 mb-2 w-56 bg-nexus-900/95 backdrop-blur-xl border border-nexus-800 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-2 duration-200 z-50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Database size={14} className="text-nexus-accent" />
+                    <h4 className="text-[9px] font-black uppercase tracking-wider">
+                      Memory Context
                     </h4>
                   </div>
-                  <p className="text-[11px] text-nexus-muted leading-relaxed font-serif italic">
-                    The synthesis engine is currently aware of all{' '}
-                    <span className="text-nexus-accent font-bold">{registrySize} units</span> in
-                    your global registry. Mention them by name or use @ to trigger specific scrying.
+                  <p className="text-[10px] text-nexus-muted leading-relaxed">
+                    AI aware of <span className="text-nexus-accent font-bold">{registrySize}</span>{' '}
+                    registry units. Use @ to reference specific entities.
                   </p>
                   <button
                     onClick={() => setShowContextOverlay(false)}
-                    className="w-full mt-4 py-2 rounded-xl bg-nexus-800 text-[9px] font-black uppercase tracking-widest hover:bg-nexus-700"
+                    className="w-full mt-3 py-1.5 rounded-lg bg-nexus-800 text-[8px] font-black uppercase tracking-wider hover:bg-nexus-700 transition-all"
                   >
-                    Dismiss
+                    Close
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {text.length > 0 && (
               <button
                 onClick={handleSend}
                 disabled={isLoading}
                 className={`
-                                    flex items-center justify-center w-12 h-12 md:w-10 md:h-10 rounded-full transition-all
+                                    flex items-center justify-center w-9 h-9 rounded-full transition-all
                                     ${
                                       !isLoading
-                                        ? 'bg-nexus-accent text-white hover:bg-nexus-text hover:scale-105 active:scale-95 shadow-lg shadow-nexus-accent/20'
+                                        ? 'bg-nexus-accent text-white hover:brightness-110 hover:scale-105 active:scale-95 shadow-lg shadow-nexus-accent/20'
                                         : 'bg-nexus-800 text-nexus-muted cursor-not-allowed'
                                     }
                                 `}
               >
                 {isLoading ? (
-                  <RotateCw size={18} className="animate-spin" />
+                  <RotateCw size={16} className="animate-spin" />
                 ) : (
-                  <ArrowUp size={20} />
+                  <ArrowUp size={16} />
                 )}
               </button>
             )}
           </div>
         </div>
 
-        {text.length > 0 && (
+        {text.length > 0 && !isExpanded && (
+          <button
+            onClick={toggleExpand}
+            className="absolute top-2 right-2 text-nexus-muted hover:text-nexus-text p-1.5 rounded-lg hover:bg-nexus-800/50 transition-all opacity-0 group-hover:opacity-100"
+            title="Expand"
+          >
+            <Maximize2 size={12} />
+          </button>
+        )}
+
+        {isExpanded && (
           <button
             onClick={toggleExpand}
             className="absolute top-4 right-4 text-nexus-muted hover:text-nexus-text p-2 rounded-xl hover:bg-nexus-800 transition-all"
-            title={isExpanded ? 'Collapse' : 'Expand'}
+            title="Collapse"
           >
-            {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            <Minimize2 size={16} />
           </button>
         )}
       </div>

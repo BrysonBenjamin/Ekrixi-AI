@@ -15,6 +15,15 @@ export interface MessageNode {
   isError?: boolean;
 }
 
+export interface CanvasDocument {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  isMain?: boolean;
+}
+
 export interface ChatSession {
   id: string;
   senderId: string;
@@ -26,6 +35,10 @@ export interface ChatSession {
   rootNodeIds: string[]; // Support multiple starting points for branching roots
   selectedRootId: string | null;
   currentLeafId: string | null;
+
+  // Canvas Data
+  canvases?: CanvasDocument[];
+  activeCanvasId?: string | null;
 
   createdAt: string;
   updatedAt: string;
